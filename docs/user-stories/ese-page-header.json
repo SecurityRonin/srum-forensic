@@ -1,0 +1,29 @@
+[
+  {
+    "description": "Parse ESE page header flags from raw page bytes",
+    "steps": [
+      "Call EsePage::parse_header on a buffer with known flag bytes at the correct offset",
+      "Verify page_flags field matches the expected value",
+      "Verify leaf/branch/root flag constants are defined and usable"
+    ],
+    "passes": false
+  },
+  {
+    "description": "Parse previous and next page links from ESE page header",
+    "steps": [
+      "Call EsePage::parse_header on a buffer with known prev_page and next_page values",
+      "Verify prev_page field matches the encoded value",
+      "Verify next_page field matches the encoded value",
+      "Verify 0xFFFFFFFF encodes as None (no sibling)"
+    ],
+    "passes": false
+  },
+  {
+    "description": "Page header parse fails gracefully on short buffer",
+    "steps": [
+      "Call EsePage::parse_header on a buffer shorter than the 40-byte page header",
+      "Verify the call returns Err (not a panic)"
+    ],
+    "passes": false
+  }
+]

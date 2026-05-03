@@ -1,0 +1,21 @@
+[
+  {
+    "description": "parse_id_map returns IdMapEntry records from SruDbIdMapTable",
+    "steps": [
+      "Build a minimal synthetic ESE database with an IdMapTable leaf page containing 2 entries",
+      "Call srum_parser::parse_id_map(path)",
+      "Verify Ok is returned with 2 IdMapEntry values",
+      "Verify id and name fields match encoded values (e.g., id=42, name='explorer.exe')"
+    ],
+    "passes": false
+  },
+  {
+    "description": "IdMapEntry name is a UTF-16LE decoded string",
+    "steps": [
+      "Encode a name as UTF-16LE bytes in the synthetic page",
+      "Call parse_id_map and inspect the name field",
+      "Verify the name string matches the original Unicode text"
+    ],
+    "passes": false
+  }
+]

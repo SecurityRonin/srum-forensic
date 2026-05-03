@@ -10,7 +10,7 @@ members = [
 [workspace.package]
 edition = "2021"
 rust-version = "1.80"
-license = "Apache-2.0"
+license = "MIT"
 authors = ["Albert Hui <albert@securityronin.com>"]
 
 [workspace.dependencies]

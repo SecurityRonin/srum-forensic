@@ -1,0 +1,32 @@
+[
+  {
+    "description": "parse_network_usage returns records from a synthetic SRUDB.dat",
+    "steps": [
+      "Build a minimal synthetic ESE database containing one NetworkUsage leaf page with 3 encoded records",
+      "Call srum_parser::parse_network_usage(path)",
+      "Verify Ok is returned",
+      "Verify exactly 3 NetworkUsageRecord values are in the Vec",
+      "Verify bytes_sent and bytes_recv match the encoded values",
+      "Verify timestamps parse to the correct UTC datetime"
+    ],
+    "passes": false
+  },
+  {
+    "description": "NetworkUsageRecord app_id matches the encoded integer ID",
+    "steps": [
+      "Encode a record with app_id = 99 in the synthetic page",
+      "Call parse_network_usage and inspect the result",
+      "Verify app_id == 99"
+    ],
+    "passes": false
+  },
+  {
+    "description": "Invalid ESE signature still returns Err from parse_network_usage",
+    "steps": [
+      "Create a file whose first 4096 bytes have a wrong magic value",
+      "Call parse_network_usage",
+      "Verify Err is returned"
+    ],
+    "passes": false
+  }
+]

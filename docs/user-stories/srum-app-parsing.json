@@ -1,0 +1,22 @@
+[
+  {
+    "description": "parse_app_usage returns records from a synthetic SRUDB.dat",
+    "steps": [
+      "Build a minimal synthetic ESE database containing one AppUsage leaf page with 2 encoded records",
+      "Call srum_parser::parse_app_usage(path)",
+      "Verify Ok is returned",
+      "Verify exactly 2 AppUsageRecord values are in the Vec",
+      "Verify foreground_cycles and background_cycles match the encoded values"
+    ],
+    "passes": false
+  },
+  {
+    "description": "AppUsageRecord timestamp parses from Windows FILETIME encoding",
+    "steps": [
+      "Encode a record with a known Windows FILETIME value representing 2024-06-15T08:00:00Z",
+      "Call parse_app_usage and inspect the timestamp",
+      "Verify timestamp equals 2024-06-15T08:00:00Z"
+    ],
+    "passes": false
+  }
+]

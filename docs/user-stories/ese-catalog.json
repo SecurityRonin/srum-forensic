@@ -1,0 +1,29 @@
+[
+  {
+    "description": "Read catalog entries from the ESE catalog B-tree",
+    "steps": [
+      "Open a synthetic ESE database with a minimal catalog page at page 4",
+      "Call EseDatabase::catalog_entries() to retrieve all catalog entries",
+      "Verify at least one entry is returned",
+      "Verify each entry has an object_name and table_page fields"
+    ],
+    "passes": false
+  },
+  {
+    "description": "Look up a table root page number by object name",
+    "steps": [
+      "Construct a synthetic ESE database with a catalog containing a known table name",
+      "Call EseDatabase::find_table_page('SruDbNetworkTable')",
+      "Verify the returned page number matches the encoded value"
+    ],
+    "passes": false
+  },
+  {
+    "description": "find_table_page returns Err for unknown table names",
+    "steps": [
+      "Call EseDatabase::find_table_page('NonExistentTable') on a database without that table",
+      "Verify Err is returned with a descriptive message"
+    ],
+    "passes": false
+  }
+]

@@ -1,0 +1,30 @@
+[
+  {
+    "description": "Read the tag array from an ESE leaf page",
+    "steps": [
+      "Construct a synthetic ESE page buffer with a known tag count in the page header",
+      "Call EsePage::tags() to retrieve all tag offsets and lengths",
+      "Verify tag count matches the header value",
+      "Verify first tag offset and length match encoded values"
+    ],
+    "passes": false
+  },
+  {
+    "description": "Extract record data slice for a given tag index",
+    "steps": [
+      "Construct a synthetic page with two tags pointing to known data",
+      "Call EsePage::record_data(0) and EsePage::record_data(1)",
+      "Verify each slice matches the encoded bytes"
+    ],
+    "passes": false
+  },
+  {
+    "description": "Tag access beyond tag count returns Err",
+    "steps": [
+      "Construct a page with 2 tags",
+      "Call EsePage::record_data(5)",
+      "Verify Err is returned"
+    ],
+    "passes": false
+  }
+]
