@@ -17,13 +17,22 @@ pub use page::EsePage;
 ///
 /// Returns [`EseError`] if the file cannot be read or is not a valid ESE database.
 pub fn open(path: &std::path::Path) -> Result<EseHeader, EseError> {
-    todo!("implement ESE header parsing")
+    use std::io::Read as _;
+    let mut f = std::fs::File::open(path)?;
+    let mut buf = vec![0u8; EseHeader::SIZE];
+    let n = f.read(&mut buf)?;
+    if n < EseHeader::SIZE {
+        return Err(EseError::TooShort {
+            need: EseHeader::SIZE,
+            got: n,
+        });
+    }
+    EseHeader::from_bytes(&buf)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write as _;
     use tempfile::NamedTempFile;
 
     #[test]
