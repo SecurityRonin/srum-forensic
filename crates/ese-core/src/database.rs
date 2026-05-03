@@ -3,7 +3,7 @@
 use std::io::{Read as _, Seek as _, SeekFrom};
 use std::path::{Path, PathBuf};
 
-use crate::{EseError, EseHeader, EsePage};
+use crate::{catalog::CatalogEntry, EseError, EseHeader, EsePage};
 
 /// An open ESE database file, ready for page-level access.
 ///
@@ -69,5 +69,49 @@ impl EseDatabase {
             .map(|m| m.len())
             .unwrap_or(0);
         file_len / self.header.page_size as u64
+    }
+
+    /// Read and parse all entries from the ESE catalog (page 4).
+    ///
+    /// The catalog maps table names to their root B-tree page numbers.
+    /// Each tag on the catalog leaf page (tags 1+, skipping tag 0) is decoded
+    /// as a [`CatalogEntry`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EseError`] if the catalog page cannot be read or contains
+    /// malformed records.
+    pub fn catalog_entries(&self) -> Result<Vec<CatalogEntry>, EseError> {
+        const CATALOG_PAGE: u32 = 4;
+        let page = self.read_page(CATALOG_PAGE)?;
+        let tags = page.tags()?;
+        let mut entries = Vec::new();
+        // Tag 0 is the page header tag — skip it; data records start at tag 1.
+        for i in 1..tags.len() {
+            let data = page.record_data(i)?;
+            match CatalogEntry::from_bytes(data) {
+                Ok(entry) => entries.push(entry),
+                Err(_) => continue, // skip malformed/padding records
+            }
+        }
+        Ok(entries)
+    }
+
+    /// Find the root B-tree page number for the named table.
+    ///
+    /// Reads the catalog and returns the `table_page` of the first entry
+    /// whose `object_name` matches `name`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EseError::NotFound`] if no matching table is in the catalog,
+    /// or any I/O / parse error from [`catalog_entries`][Self::catalog_entries].
+    pub fn find_table_page(&self, name: &str) -> Result<u32, EseError> {
+        let entries = self.catalog_entries()?;
+        entries
+            .iter()
+            .find(|e| e.object_name == name)
+            .map(|e| e.table_page)
+            .ok_or_else(|| EseError::NotFound(format!("table '{name}' not in catalog")))
     }
 }

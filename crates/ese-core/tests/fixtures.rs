@@ -79,6 +79,7 @@ pub fn make_leaf_page_with_records(flags_extra: u32, records: &[Vec<u8>]) -> Vec
 /// Each child reference is encoded as an 8-byte record:
 /// - 4 bytes: child page number (u32 LE)
 /// - 4 bytes: padding zeros
+#[allow(dead_code)] // used by upcoming btree-walk tests
 pub fn make_parent_page_with_children(children: &[u32]) -> Vec<u8> {
     let mut page = vec![0u8; PAGE_SIZE];
     let tag_count = (1 + children.len()) as u16;
