@@ -3,15 +3,17 @@
 //! Provides low-level access to ESE/JET Blue database files such as
 //! `SRUDB.dat`, `WebCacheV01.dat`, and Active Directory's `ntds.dit`.
 
+pub mod catalog;
 pub mod database;
 pub mod error;
 pub mod header;
 pub mod page;
 
+pub use catalog::CatalogEntry;
 pub use database::EseDatabase;
 pub use error::EseError;
 pub use header::EseHeader;
-pub use page::EsePage;
+pub use page::{EsePage, EsePageHeader, PAGE_FLAG_EMPTY, PAGE_FLAG_LEAF, PAGE_FLAG_PARENT, PAGE_FLAG_ROOT, PAGE_FLAG_SPACE_TREE};
 
 /// Open an ESE database file and return the parsed header.
 ///
