@@ -11,6 +11,7 @@ ese-core.workspace = true
 srum-core.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
+chrono.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
