@@ -1,0 +1,24 @@
+[package]
+name = "sr-cli"
+version = "0.1.0"
+description = "sr — SRUM forensic analysis CLI"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "sr"
+path = "src/main.rs"
+
+[dependencies]
+srum-parser.workspace = true
+srum-core.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

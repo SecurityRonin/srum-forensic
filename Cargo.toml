@@ -1,0 +1,47 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/ese-core",
+    "crates/srum-core",
+    "crates/srum-parser",
+    "crates/sr-cli",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.80"
+license = "Apache-2.0"
+authors = ["Albert Hui <albert@securityronin.com>"]
+
+[workspace.dependencies]
+# Binary parsing
+binrw = "0.14"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Time
+chrono = { version = "0.4", default-features = false, features = ["alloc", "serde"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Testing
+tempfile = "3"
+
+# Internal
+ese-core   = { path = "crates/ese-core" }
+srum-core  = { path = "crates/srum-core" }
+srum-parser = { path = "crates/srum-parser" }
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
