@@ -7,7 +7,7 @@
       "Verify at least one entry is returned",
       "Verify each entry has an object_name and table_page fields"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "description": "Look up a table root page number by object name",
@@ -16,7 +16,7 @@
       "Call EseDatabase::find_table_page('SruDbNetworkTable')",
       "Verify the returned page number matches the encoded value"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "description": "find_table_page returns Err for unknown table names",
@@ -24,6 +24,6 @@
       "Call EseDatabase::find_table_page('NonExistentTable') on a database without that table",
       "Verify Err is returned with a descriptive message"
     ],
-    "passes": false
+    "passes": true
   }
 ]

@@ -7,7 +7,7 @@
       "Verify tag count matches the header value",
       "Verify first tag offset and length match encoded values"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "description": "Extract record data slice for a given tag index",
@@ -16,7 +16,7 @@
       "Call EsePage::record_data(0) and EsePage::record_data(1)",
       "Verify each slice matches the encoded bytes"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "description": "Tag access beyond tag count returns Err",
@@ -25,6 +25,6 @@
       "Call EsePage::record_data(5)",
       "Verify Err is returned"
     ],
-    "passes": false
+    "passes": true
   }
 ]

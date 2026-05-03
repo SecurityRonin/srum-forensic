@@ -6,7 +6,7 @@
       "Verify page_flags field matches the expected value",
       "Verify leaf/branch/root flag constants are defined and usable"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "description": "Parse previous and next page links from ESE page header",
@@ -16,7 +16,7 @@
       "Verify next_page field matches the encoded value",
       "Verify 0xFFFFFFFF encodes as None (no sibling)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "description": "Page header parse fails gracefully on short buffer",
@@ -24,6 +24,6 @@
       "Call EsePage::parse_header on a buffer shorter than the 40-byte page header",
       "Verify the call returns Err (not a panic)"
     ],
-    "passes": false
+    "passes": true
   }
 ]
