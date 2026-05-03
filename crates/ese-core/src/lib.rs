@@ -3,10 +3,12 @@
 //! Provides low-level access to ESE/JET Blue database files such as
 //! `SRUDB.dat`, `WebCacheV01.dat`, and Active Directory's `ntds.dit`.
 
+pub mod database;
 pub mod error;
 pub mod header;
 pub mod page;
 
+pub use database::EseDatabase;
 pub use error::EseError;
 pub use header::EseHeader;
 pub use page::EsePage;
