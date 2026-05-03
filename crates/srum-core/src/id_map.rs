@@ -1,4 +1,6 @@
-//! ID map entry stub (RED phase).
+//! ID map entry — maps integer IDs to application/user string names.
+//!
+//! Source table: `SruDbIdMapTable` in SRUDB.dat.
 
-/// Stub — fields will be added in GREEN phase.
+/// Stub — RED phase. Full fields added in GREEN.
 pub struct IdMapEntry;
