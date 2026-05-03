@@ -11,4 +11,8 @@ pub enum EseError {
     BadSignature(u32),
     #[error("unsupported page size: {0}")]
     UnsupportedPageSize(u32),
+    #[error("not found: {0}")]
+    NotFound(String),
+    #[error("invalid record: {0}")]
+    InvalidRecord(String),
 }
