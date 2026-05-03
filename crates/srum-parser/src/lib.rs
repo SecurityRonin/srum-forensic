@@ -4,6 +4,12 @@
 //! `C:\Windows\System32\sru\SRUDB.dat`. On a live system it is locked;
 //! forensic analysis always operates on a copy.
 //!
+//! # Current status
+//!
+//! ESE header validation is fully implemented. Full B-tree record extraction
+//! requires a complete ESE page walker; the functions return an empty `Vec`
+//! for valid ESE databases while that work is in progress.
+//!
 //! # TODO
 //!
 //! Implement full ESE B-tree record extraction to populate the returned
@@ -14,13 +20,19 @@
 /// Returns all records from the
 /// `{973F5D5C-1D90-4944-BE8E-24B22A728CF2}` table.
 ///
+/// Currently returns an empty `Vec` for valid ESE databases — full B-tree
+/// record extraction is not yet implemented.
+///
 /// # Errors
 ///
 /// Returns an error if the file cannot be read or is not a valid ESE database.
 pub fn parse_network_usage(
     path: &std::path::Path,
 ) -> anyhow::Result<Vec<srum_core::NetworkUsageRecord>> {
-    todo!()
+    // Validate the ESE header first — this proves the file is a real SRUDB.dat.
+    ese_core::open(path).map_err(|e| anyhow::anyhow!("ESE open failed: {e}"))?;
+    // TODO: implement full ESE B-tree record extraction
+    Ok(vec![])
 }
 
 /// Parse application usage records from a SRUDB.dat file.
@@ -28,19 +40,24 @@ pub fn parse_network_usage(
 /// Returns all records from the
 /// `{5C8CF1C7-7257-4F13-B223-970EF5939312}` table.
 ///
+/// Currently returns an empty `Vec` for valid ESE databases — full B-tree
+/// record extraction is not yet implemented.
+///
 /// # Errors
 ///
 /// Returns an error if the file cannot be read or is not a valid ESE database.
 pub fn parse_app_usage(
     path: &std::path::Path,
 ) -> anyhow::Result<Vec<srum_core::AppUsageRecord>> {
-    todo!()
+    // Validate the ESE header first.
+    ese_core::open(path).map_err(|e| anyhow::anyhow!("ESE open failed: {e}"))?;
+    // TODO: implement full ESE B-tree record extraction
+    Ok(vec![])
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write as _;
     use tempfile::NamedTempFile;
 
     #[test]
