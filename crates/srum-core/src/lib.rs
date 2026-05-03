@@ -20,7 +20,7 @@ mod tests {
         let r = NetworkUsageRecord {
             bytes_sent: 1024,
             bytes_recv: 0,
-            timestamp: chrono::Utc::now(),
+            timestamp: chrono::DateTime::UNIX_EPOCH.with_timezone(&chrono::Utc),
             app_id: 1,
             user_id: 0,
         };
@@ -32,7 +32,7 @@ mod tests {
         let r = NetworkUsageRecord {
             bytes_sent: 0,
             bytes_recv: 2048,
-            timestamp: chrono::Utc::now(),
+            timestamp: chrono::DateTime::UNIX_EPOCH.with_timezone(&chrono::Utc),
             app_id: 1,
             user_id: 0,
         };
@@ -41,7 +41,7 @@ mod tests {
 
     #[test]
     fn network_record_has_timestamp() {
-        let ts = chrono::Utc::now();
+        let ts = chrono::DateTime::UNIX_EPOCH.with_timezone(&chrono::Utc);
         let r = NetworkUsageRecord {
             bytes_sent: 0,
             bytes_recv: 0,
@@ -57,7 +57,7 @@ mod tests {
         let r = NetworkUsageRecord {
             bytes_sent: 0,
             bytes_recv: 0,
-            timestamp: chrono::Utc::now(),
+            timestamp: chrono::DateTime::UNIX_EPOCH.with_timezone(&chrono::Utc),
             app_id: 42,
             user_id: 0,
         };
@@ -69,7 +69,7 @@ mod tests {
         let r = AppUsageRecord {
             app_id: 1,
             user_id: 0,
-            timestamp: chrono::Utc::now(),
+            timestamp: chrono::DateTime::UNIX_EPOCH.with_timezone(&chrono::Utc),
             foreground_cycles: 999_000,
             background_cycles: 0,
         };
