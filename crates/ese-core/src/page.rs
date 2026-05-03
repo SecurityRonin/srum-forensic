@@ -16,9 +16,9 @@ pub const PAGE_FLAG_SPACE_TREE: u32 = 0x0400;
 /// Parsed ESE page header fields (Vista+ "new" 40-byte format).
 #[derive(Debug, Clone)]
 pub struct EsePageHeader {
-    /// Previous page number; `None` when 0xFFFF_FFFF.
+    /// Previous page number; `None` when `0xFFFF_FFFF`.
     pub prev_page: Option<u32>,
-    /// Next page number; `None` when 0xFFFF_FFFF.
+    /// Next page number; `None` when `0xFFFF_FFFF`.
     pub next_page: Option<u32>,
     /// Father data page object ID.
     pub fdp_object_id: u32,
@@ -39,7 +39,7 @@ pub struct EsePageHeader {
 pub struct EsePage {
     /// Page number (1-based).
     pub page_number: u32,
-    /// Page flags (from raw read — use parse_header for full header).
+    /// Page flags (from raw read — use `parse_header` for full header).
     pub flags: u32,
     /// Raw page data.
     pub data: Vec<u8>,
@@ -237,7 +237,7 @@ mod tests {
     /// - Tag array at page end: tag[0] covers header, tags[1..] cover records
     fn make_page_with_records(page_size: usize, records: &[&[u8]]) -> Vec<u8> {
         let mut d = vec![0u8; page_size];
-        let tag_count = (1 + records.len()) as u16; // tag0 + data tags
+        let tag_count = u16::try_from(1 + records.len()).unwrap_or(u16::MAX);
         // header: tag_count at 0x1E, PAGE_FLAG_LEAF at 0x20
         d[0x1E..0x20].copy_from_slice(&tag_count.to_le_bytes());
         d[0x20..0x24].copy_from_slice(&PAGE_FLAG_LEAF.to_le_bytes());
@@ -249,8 +249,8 @@ mod tests {
         let mut cur_offset: u16 = 40;
         for (i, rec) in records.iter().enumerate() {
             let tag_idx = i + 1;
-            let rec_size = rec.len() as u16;
-            let start = cur_offset as usize;
+            let rec_size = u16::try_from(rec.len()).unwrap_or(u16::MAX);
+            let start = usize::from(cur_offset);
             d[start..start + rec.len()].copy_from_slice(rec);
             write_tag(&mut d, page_size, tag_idx, cur_offset, rec_size);
             cur_offset += rec_size;

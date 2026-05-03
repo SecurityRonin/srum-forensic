@@ -40,15 +40,15 @@ impl EseDatabase {
     /// Returns [`EseError`] on I/O error or if the page is out of range.
     pub fn read_page(&self, page_number: u32) -> Result<EsePage, EseError> {
         let page_size = self.header.page_size as usize;
-        let offset = page_number as u64 * page_size as u64;
+        let offset = u64::from(page_number) * u64::try_from(page_size).unwrap_or(u64::MAX);
 
         let mut f = std::fs::File::open(&self.path)?;
         let file_len = f.metadata()?.len();
 
-        if offset + page_size as u64 > file_len {
+        if offset + u64::try_from(page_size).unwrap_or(u64::MAX) > file_len {
             return Err(EseError::TooShort {
-                need: (offset + page_size as u64) as usize,
-                got: file_len as usize,
+                need: usize::try_from(offset).unwrap_or(usize::MAX).saturating_add(page_size),
+                got: usize::try_from(file_len).unwrap_or(usize::MAX),
             });
         }
 
@@ -68,7 +68,7 @@ impl EseDatabase {
         let file_len = std::fs::metadata(&self.path)
             .map(|m| m.len())
             .unwrap_or(0);
-        file_len / self.header.page_size as u64
+        file_len / u64::from(self.header.page_size)
     }
 
     /// Read and parse all entries from the ESE catalog (page 4).
@@ -89,12 +89,46 @@ impl EseDatabase {
         // Tag 0 is the page header tag — skip it; data records start at tag 1.
         for i in 1..tags.len() {
             let data = page.record_data(i)?;
-            match CatalogEntry::from_bytes(data) {
-                Ok(entry) => entries.push(entry),
-                Err(_) => continue, // skip malformed/padding records
+            if let Ok(entry) = CatalogEntry::from_bytes(data) {
+                entries.push(entry);
+                // silently skip malformed/padding records
             }
         }
         Ok(entries)
+    }
+
+    /// Walk the B-tree rooted at `root_page` and return the page numbers of
+    /// all leaf pages.
+    ///
+    /// - If the page has [`PAGE_FLAG_LEAF`][crate::PAGE_FLAG_LEAF] set, it is
+    ///   returned directly.
+    /// - If the page has [`PAGE_FLAG_PARENT`][crate::PAGE_FLAG_PARENT] set,
+    ///   each tag (skipping tag 0) is decoded as an 8-byte child reference
+    ///   whose first 4 bytes are the child page number (u32 LE); the walk
+    ///   recurses into each child.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EseError`] if any page cannot be read or parsed.
+    pub fn walk_leaf_pages(&self, root_page: u32) -> Result<Vec<u32>, EseError> {
+        let page = self.read_page(root_page)?;
+        let hdr = page.parse_header()?;
+        if hdr.page_flags & crate::PAGE_FLAG_LEAF != 0 {
+            return Ok(vec![root_page]);
+        }
+        // Parent page: collect child page numbers from tags 1+.
+        let tag_count = hdr.available_page_tag_count as usize;
+        let mut leaves = Vec::new();
+        for i in 1..tag_count {
+            let data = page.record_data(i)?;
+            if data.len() < 4 {
+                continue;
+            }
+            let child_page = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+            let mut child_leaves = self.walk_leaf_pages(child_page)?;
+            leaves.append(&mut child_leaves);
+        }
+        Ok(leaves)
     }
 
     /// Find the root B-tree page number for the named table.

@@ -63,10 +63,10 @@ mod tests {
         // Header page: ESE magic at offset 4
         buf[4..8].copy_from_slice(&0x89AB_CDEF_u32.to_le_bytes());
         // page_size field at offset 0xEC = 236
-        buf[236..240].copy_from_slice(&(page_size as u32).to_le_bytes());
+        buf[236..240].copy_from_slice(&(u32::try_from(page_size).unwrap()).to_le_bytes());
         // Each data page: first byte = 1-based page number for easy identification
         for i in 0..extra_pages {
-            buf[page_size * (i + 1)] = (i + 1) as u8;
+            buf[page_size * (i + 1)] = u8::try_from(i + 1).unwrap_or(u8::MAX);
         }
         let mut tmp = NamedTempFile::new().expect("tempfile");
         tmp.write_all(&buf).expect("write test ESE file");

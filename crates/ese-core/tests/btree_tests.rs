@@ -1,6 +1,6 @@
 //! Integration tests for ese-btree-walk story.
 //!
-//! Tests EseDatabase::walk_leaf_pages(root_page).
+//! Tests [`EseDatabase::walk_leaf_pages`].
 
 mod fixtures;
 use ese_core::EseDatabase;

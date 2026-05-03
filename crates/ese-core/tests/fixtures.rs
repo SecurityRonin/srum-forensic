@@ -22,8 +22,8 @@ pub fn put_u16(buf: &mut [u8], offset: usize, val: u16) {
 
 /// Write a tag into the page (tag array grows from end downward).
 ///
-/// Tag format: bits 0-14 = value_offset, bit 15 = flag,
-///             bits 16-30 = value_size, bit 31 = flag.
+/// Tag format: bits 0-14 = `value_offset`, bit 15 = flag,
+///             bits 16-30 = `value_size`, bit 31 = flag.
 pub fn write_tag(page: &mut [u8], tag_idx: usize, value_offset: u16, value_size: u16) {
     let raw: u32 = (u32::from(value_offset) & 0x7FFF) | ((u32::from(value_size) & 0x7FFF) << 16);
     let pos = PAGE_SIZE - (tag_idx + 1) * 4;
@@ -36,7 +36,7 @@ pub fn make_ese_header_page() -> Vec<u8> {
     // ESE magic signature at offset 4
     put_u32(&mut page, 4, 0x89AB_CDEF);
     // page_size at offset 0xEC = 236
-    put_u32(&mut page, 236, PAGE_SIZE as u32);
+    put_u32(&mut page, 236, u32::try_from(PAGE_SIZE).unwrap());
     page
 }
 
@@ -46,7 +46,7 @@ pub fn make_ese_header_page() -> Vec<u8> {
 /// Tags 1..n = record slices, packed starting at offset 40.
 pub fn make_leaf_page_with_records(flags_extra: u32, records: &[Vec<u8>]) -> Vec<u8> {
     let mut page = vec![0u8; PAGE_SIZE];
-    let tag_count = (1 + records.len()) as u16;
+    let tag_count = u16::try_from(1 + records.len()).unwrap_or(u16::MAX);
     let page_flags = PAGE_FLAG_LEAF | flags_extra;
 
     // Page header fields
@@ -63,8 +63,8 @@ pub fn make_leaf_page_with_records(flags_extra: u32, records: &[Vec<u8>]) -> Vec
     let mut cur_offset: u16 = 40;
     for (i, rec) in records.iter().enumerate() {
         let tag_idx = i + 1;
-        let rec_size = rec.len() as u16;
-        let start = cur_offset as usize;
+        let rec_size = u16::try_from(rec.len()).unwrap_or(u16::MAX);
+        let start = usize::from(cur_offset);
         page[start..start + rec.len()].copy_from_slice(rec);
         write_tag(&mut page, tag_idx, cur_offset, rec_size);
         cur_offset += rec_size;
@@ -82,7 +82,7 @@ pub fn make_leaf_page_with_records(flags_extra: u32, records: &[Vec<u8>]) -> Vec
 #[allow(dead_code)] // used by upcoming btree-walk tests
 pub fn make_parent_page_with_children(children: &[u32]) -> Vec<u8> {
     let mut page = vec![0u8; PAGE_SIZE];
-    let tag_count = (1 + children.len()) as u16;
+    let tag_count = u16::try_from(1 + children.len()).unwrap_or(u16::MAX);
     let page_flags = PAGE_FLAG_PARENT | PAGE_FLAG_ROOT;
 
     put_u16(&mut page, 0x1E, tag_count);
@@ -97,7 +97,7 @@ pub fn make_parent_page_with_children(children: &[u32]) -> Vec<u8> {
     let mut cur_offset: u16 = 40;
     for (i, &child_page) in children.iter().enumerate() {
         let tag_idx = i + 1;
-        let start = cur_offset as usize;
+        let start = usize::from(cur_offset);
         put_u32(&mut page, start, child_page);
         // size 8 (4 page_num + 4 padding)
         write_tag(&mut page, tag_idx, cur_offset, 8);
@@ -120,10 +120,11 @@ pub fn write_ese_file(pages: &[Vec<u8>]) -> NamedTempFile {
 
 /// Build a single-page ESE database with a catalog leaf page at page 4.
 ///
-/// Returns a NamedTempFile with pages: [header, 1, 2, 3, catalog_leaf].
+/// Returns a `NamedTempFile` with pages: `[header, 1, 2, 3, catalog_leaf]`.
 /// The catalog page is a leaf containing the given catalog entries.
+#[allow(dead_code)] // used by catalog integration tests
 pub fn make_ese_with_catalog(entries: &[CatalogEntry]) -> NamedTempFile {
-    let records: Vec<Vec<u8>> = entries.iter().map(|e| e.to_bytes()).collect();
+    let records: Vec<Vec<u8>> = entries.iter().map(CatalogEntry::to_bytes).collect();
     let catalog_page = make_leaf_page_with_records(0, &records);
 
     // Pages 0-3: header + 3 padding pages; page 4 = catalog

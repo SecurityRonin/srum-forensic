@@ -5,12 +5,13 @@
 //! test fixtures.
 //!
 //! Synthetic catalog record layout (all little-endian):
-//! - `[0..2]`    object_type (u16): 1 = table, 2 = column, etc.
-//! - `[2..6]`    object_id (u32)
-//! - `[6..10]`   parent_object_id (u32)
-//! - `[10..14]`  table_page (u32) — root page of this table's B-tree
-//! - `[14..16]`  name_len (u16)
-//! - `[16..]`    name bytes (UTF-8)
+//!
+//! - bytes `0..2`: `object_type` (u16): 1 = table, 2 = column, etc.
+//! - bytes `2..6`: `object_id` (u32)
+//! - bytes `6..10`: `parent_object_id` (u32)
+//! - bytes `10..14`: `table_page` (u32) — root page of this table's B-tree
+//! - bytes `14..16`: `name_len` (u16)
+//! - bytes `16..`: name bytes (UTF-8)
 
 use crate::EseError;
 
@@ -80,7 +81,7 @@ impl CatalogEntry {
         out.extend_from_slice(&self.object_id.to_le_bytes());
         out.extend_from_slice(&self.parent_object_id.to_le_bytes());
         out.extend_from_slice(&self.table_page.to_le_bytes());
-        out.extend_from_slice(&(name_bytes.len() as u16).to_le_bytes());
+        out.extend_from_slice(&(u16::try_from(name_bytes.len()).unwrap_or(u16::MAX)).to_le_bytes());
         out.extend_from_slice(name_bytes);
         out
     }

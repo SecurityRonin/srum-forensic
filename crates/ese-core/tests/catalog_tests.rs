@@ -1,6 +1,6 @@
 //! Integration tests for ese-catalog story.
 //!
-//! Tests EseDatabase::catalog_entries() and EseDatabase::find_table_page().
+//! Tests [`EseDatabase::catalog_entries`] and [`EseDatabase::find_table_page`].
 
 mod fixtures;
 use ese_core::{CatalogEntry, EseDatabase};
