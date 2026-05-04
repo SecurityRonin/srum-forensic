@@ -1,4 +1,5 @@
 //! Synthetic SRUDB.dat fixture builder for srum-parser integration tests.
+#![allow(dead_code)] // shared helpers; each test file uses a different subset
 //!
 //! Builds minimal valid ESE binary buffers representing a SRUDB.dat with
 //! synthetic SRUM table data for parser testing.
@@ -82,7 +83,6 @@ pub fn encode_network_record(filetime: u64, app_id: i32, user_id: i32, bytes_sen
     out
 }
 
-#[allow(dead_code)] // used by upcoming app-parsing tests
 /// Encode one [`AppUsageRecord`](srum_core::AppUsageRecord) as 32 raw bytes.
 ///
 /// Binary layout (all little-endian):
@@ -101,7 +101,6 @@ pub fn encode_app_record(filetime: u64, app_id: i32, user_id: i32, fg_cycles: u6
     out
 }
 
-#[allow(dead_code)] // used by upcoming idmap-parsing tests
 /// Encode one [`IdMapEntry`](srum_core::IdMapEntry).
 ///
 /// Binary layout:
@@ -144,7 +143,6 @@ pub fn make_srudb_with_network_records(raw_records: &[Vec<u8>]) -> NamedTempFile
     ])
 }
 
-#[allow(dead_code)] // used by upcoming app-parsing tests
 /// Build a synthetic SRUDB.dat with an `AppUsage` leaf page at page 5.
 ///
 /// Layout mirrors [`make_srudb_with_network_records`] but uses the
@@ -169,7 +167,6 @@ pub fn make_srudb_with_app_records(raw_records: &[Vec<u8>]) -> NamedTempFile {
     ])
 }
 
-#[allow(dead_code)] // used by upcoming idmap-parsing tests
 /// Build a synthetic SRUDB.dat with an `IdMap` leaf page at page 5.
 pub fn make_srudb_with_id_map_records(raw_records: &[Vec<u8>]) -> NamedTempFile {
     let catalog_entry = CatalogEntry {
