@@ -105,14 +105,16 @@ pub fn encode_app_record(filetime: u64, app_id: i32, user_id: i32, fg_cycles: u6
 ///
 /// Binary layout:
 /// - `[0..4]`:  `id` (i32 LE)
-/// - `[4..6]`:  `name_len` (u16 LE)
-/// - `[6..]`:   `name` (UTF-8 bytes)
+/// - `[4..6]`:  `name_utf16le_byte_len` (u16 LE) — byte length of the UTF-16LE name
+/// - `[6..]`:   `name` encoded as UTF-16LE bytes
 pub fn encode_id_map_entry(id: i32, name: &str) -> Vec<u8> {
-    let name_bytes = name.as_bytes();
+    let utf16: Vec<u16> = name.encode_utf16().collect();
+    let name_bytes: Vec<u8> = utf16.iter().flat_map(|c| c.to_le_bytes()).collect();
+    let byte_len = u16::try_from(name_bytes.len()).unwrap_or(u16::MAX);
     let mut out = Vec::with_capacity(6 + name_bytes.len());
     out.extend_from_slice(&id.to_le_bytes());
-    out.extend_from_slice(&(u16::try_from(name_bytes.len()).unwrap_or(u16::MAX)).to_le_bytes());
-    out.extend_from_slice(name_bytes);
+    out.extend_from_slice(&byte_len.to_le_bytes());
+    out.extend_from_slice(&name_bytes);
     out
 }
 
