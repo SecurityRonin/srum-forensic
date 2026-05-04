@@ -9,6 +9,7 @@
 //! ESE header validation and B-tree record extraction are both implemented.
 
 mod app_usage;
+mod id_map;
 mod network;
 
 use ese_core::EseError;
@@ -78,6 +79,38 @@ pub fn parse_app_usage(
         }
     }
     Ok(records)
+}
+
+/// Parse ID map entries from a SRUDB.dat file.
+///
+/// Returns all entries from the `SruDbIdMapTable` table.
+///
+/// Walks the B-tree for the `SruDbIdMapTable` catalog entry and decodes
+/// each record as an [`srum_core::IdMapEntry`] with a UTF-16LE name.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read or is not a valid ESE database.
+pub fn parse_id_map(
+    path: &std::path::Path,
+) -> anyhow::Result<Vec<srum_core::IdMapEntry>> {
+    const IDMAP_TABLE: &str = "SruDbIdMapTable";
+    let db = ese_core::open_database(path)?;
+    let root_page = db.find_table_page(IDMAP_TABLE)
+        .map_err(|e| anyhow::anyhow!("id-map table not found: {e}"))?;
+    let leaf_pages = db.walk_leaf_pages(root_page)?;
+    let mut entries = Vec::new();
+    for page_num in leaf_pages {
+        let page = db.read_page(page_num)?;
+        let tags = page.tags()?;
+        for i in 1..tags.len() {
+            let data = page.record_data(i)?;
+            if let Ok(entry) = id_map::decode_id_map_entry(data) {
+                entries.push(entry);
+            }
+        }
+    }
+    Ok(entries)
 }
 
 #[cfg(test)]
