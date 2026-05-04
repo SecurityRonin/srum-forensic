@@ -8,6 +8,7 @@
 //!
 //! ESE header validation and B-tree record extraction are both implemented.
 
+mod app_usage;
 mod network;
 
 use ese_core::EseError;
@@ -51,8 +52,8 @@ pub fn parse_network_usage(
 /// Returns all records from the
 /// `{5C8CF1C7-7257-4F13-B223-970EF5939312}` table.
 ///
-/// Currently returns an empty `Vec` for valid ESE databases — full B-tree
-/// record extraction is not yet implemented.
+/// Walks the B-tree rooted at the catalog entry for the `AppUsage` table
+/// and decodes each 32-byte record tag from every leaf page.
 ///
 /// # Errors
 ///
@@ -60,10 +61,23 @@ pub fn parse_network_usage(
 pub fn parse_app_usage(
     path: &std::path::Path,
 ) -> anyhow::Result<Vec<srum_core::AppUsageRecord>> {
-    // Validate the ESE header first.
-    ese_core::open(path).map_err(|e| anyhow::anyhow!("ESE open failed: {e}"))?;
-    // TODO: implement full ESE B-tree record extraction
-    Ok(vec![])
+    const APP_TABLE: &str = "{5C8CF1C7-7257-4F13-B223-970EF5939312}";
+    let db = ese_core::open_database(path)?;
+    let root_page = db.find_table_page(APP_TABLE)
+        .map_err(|e| anyhow::anyhow!("app table not found: {e}"))?;
+    let leaf_pages = db.walk_leaf_pages(root_page)?;
+    let mut records = Vec::new();
+    for page_num in leaf_pages {
+        let page = db.read_page(page_num)?;
+        let tags = page.tags()?;
+        for i in 1..tags.len() {
+            let data = page.record_data(i)?;
+            if let Ok(rec) = app_usage::decode_app_record(data) {
+                records.push(rec);
+            }
+        }
+    }
+    Ok(records)
 }
 
 #[cfg(test)]
