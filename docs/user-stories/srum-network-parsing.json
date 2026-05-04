@@ -9,7 +9,7 @@
       "Verify bytes_sent and bytes_recv match the encoded values",
       "Verify timestamps parse to the correct UTC datetime"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "description": "NetworkUsageRecord app_id matches the encoded integer ID",
@@ -18,7 +18,7 @@
       "Call parse_network_usage and inspect the result",
       "Verify app_id == 99"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "description": "Invalid ESE signature still returns Err from parse_network_usage",
@@ -27,6 +27,6 @@
       "Call parse_network_usage",
       "Verify Err is returned"
     ],
-    "passes": false
+    "passes": true
   }
 ]

@@ -7,7 +7,7 @@
       "Verify both leaf page numbers are returned",
       "Verify the root page number itself is not included"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "description": "Single-page B-tree (root is also a leaf) returns that page",
@@ -16,6 +16,6 @@
       "Call EseDatabase::walk_leaf_pages(root_page)",
       "Verify the root page number is returned as the single result"
     ],
-    "passes": false
+    "passes": true
   }
 ]

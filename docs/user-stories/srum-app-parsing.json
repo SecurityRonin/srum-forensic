@@ -8,7 +8,7 @@
       "Verify exactly 2 AppUsageRecord values are in the Vec",
       "Verify foreground_cycles and background_cycles match the encoded values"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "description": "AppUsageRecord timestamp parses from Windows FILETIME encoding",
@@ -17,6 +17,6 @@
       "Call parse_app_usage and inspect the timestamp",
       "Verify timestamp equals 2024-06-15T08:00:00Z"
     ],
-    "passes": false
+    "passes": true
   }
 ]
