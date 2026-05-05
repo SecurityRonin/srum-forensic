@@ -4,7 +4,6 @@ use std::process::Command;
 
 fn sr_bin() -> Command {
     let mut bin = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    // Navigate to workspace root then to the binary
     bin.push("../../target/debug/sr");
     Command::new(bin)
 }
@@ -43,4 +42,49 @@ fn sr_version_exits_success() {
         .status()
         .expect("failed to run sr --version");
     assert!(status.success(), "sr --version should exit 0");
+}
+
+#[test]
+fn sr_network_nonexistent_exits_nonzero() {
+    let status = sr_bin()
+        .args(["network", "/nonexistent/SRUDB.dat"])
+        .status()
+        .expect("run sr");
+    assert!(!status.success(), "sr must exit nonzero for missing file");
+}
+
+#[test]
+fn sr_network_nonexistent_stderr_has_lowercase_error_prefix() {
+    let out = sr_bin()
+        .args(["network", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run sr");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("error:"),
+        "stderr must start with 'error:' (lowercase), got: {stderr}"
+    );
+}
+
+#[test]
+fn sr_apps_nonexistent_stderr_has_lowercase_error_prefix() {
+    let out = sr_bin()
+        .args(["apps", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run sr");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("error:"),
+        "stderr must start with 'error:' (lowercase), got: {stderr}"
+    );
+}
+
+#[test]
+fn sr_network_error_stdout_is_empty() {
+    let out = sr_bin()
+        .args(["network", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run sr");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.is_empty(), "stdout must be empty on error, got: {stdout}");
 }
