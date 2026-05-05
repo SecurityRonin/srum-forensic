@@ -16,6 +16,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn filetime_to_datetime_unix_epoch() {
+        let dt = filetime_to_datetime(FILETIME_EPOCH_OFFSET);
+        assert_eq!(dt.timestamp(), 0, "must map to Unix epoch");
+    }
+
+    #[test]
+    fn filetime_to_datetime_known_date() {
+        // 2024-06-15T08:00:00Z = Unix 1718438400
+        let filetime = FILETIME_EPOCH_OFFSET + 1_718_438_400u64 * 10_000_000;
+        let dt = filetime_to_datetime(filetime);
+        assert_eq!(dt.timestamp(), 1_718_438_400);
+    }
+
+    #[test]
+    fn record_size_constants_are_32() {
+        assert_eq!(NETWORK_RECORD_SIZE, 32usize);
+        assert_eq!(APP_RECORD_SIZE, 32usize);
+    }
+
+    #[test]
     fn network_record_has_bytes_sent() {
         let r = NetworkUsageRecord {
             bytes_sent: 1024,
