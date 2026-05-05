@@ -5,11 +5,60 @@ use std::path::{Path, PathBuf};
 
 use crate::{catalog::CatalogEntry, EseError, EseHeader, EsePage};
 
+/// Iterator over raw record bytes across all leaf pages of a B-tree.
+///
+/// Each item is `(page_number, tag_index, record_bytes)`.
+#[derive(Debug)]
+pub struct TableCursor<'db> {
+    db: &'db EseDatabase,
+    leaf_pages: Vec<u32>,
+    page_idx: usize,
+    tag_idx: usize, // starts at 1 (tag 0 is the page header tag)
+}
+
+impl<'db> Iterator for TableCursor<'db> {
+    type Item = Result<(u32, usize, Vec<u8>), EseError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let &page_num = self.leaf_pages.get(self.page_idx)?;
+            let page = match self.db.read_page(page_num) {
+                Ok(p) => p,
+                Err(e) => {
+                    self.page_idx += 1;
+                    self.tag_idx = 1;
+                    return Some(Err(e));
+                }
+            };
+            let tags = match page.tags() {
+                Ok(t) => t,
+                Err(e) => {
+                    self.page_idx += 1;
+                    self.tag_idx = 1;
+                    return Some(Err(e));
+                }
+            };
+            if self.tag_idx >= tags.len() {
+                self.page_idx += 1;
+                self.tag_idx = 1;
+                continue;
+            }
+            let tag = self.tag_idx;
+            self.tag_idx += 1;
+            return match page.record_data(tag) {
+                Ok(bytes) => Some(Ok((page_num, tag, bytes.to_vec()))),
+                Err(e) => Some(Err(e)),
+            };
+        }
+    }
+}
+
 /// An open ESE database file, ready for page-level access.
 ///
 /// Retains the parsed [`EseHeader`] (which carries `page_size`) so that
 /// every [`read_page`][EseDatabase::read_page] call can locate the correct
 /// byte offset without re-reading the header.
+#[derive(Debug)]
 pub struct EseDatabase {
     path: PathBuf,
     /// Parsed file header.
@@ -149,5 +198,34 @@ impl EseDatabase {
             .find(|e| e.object_name == name)
             .map(|e| e.table_page)
             .ok_or_else(|| EseError::TableNotFound { name: name.to_owned() })
+    }
+
+    /// Open a cursor over all leaf records starting at `root_page`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EseError`] if the leaf pages cannot be walked from `root_page`.
+    pub fn table_records_from_root(
+        &self,
+        root_page: u32,
+    ) -> Result<TableCursor<'_>, EseError> {
+        let leaf_pages = self.walk_leaf_pages(root_page)?;
+        Ok(TableCursor { db: self, leaf_pages, page_idx: 0, tag_idx: 1 })
+    }
+
+    /// Open a cursor over all records in a named SRUM table.
+    ///
+    /// Returns `Err(EseError::TableNotFound)` immediately if the table is absent.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EseError::TableNotFound`] if `table_name` is not in the catalog,
+    /// or any I/O / parse error from reading the catalog or walking leaf pages.
+    pub fn table_records(
+        &self,
+        table_name: &str,
+    ) -> Result<TableCursor<'_>, EseError> {
+        let root_page = self.find_table_page(table_name)?;
+        self.table_records_from_root(root_page)
     }
 }
