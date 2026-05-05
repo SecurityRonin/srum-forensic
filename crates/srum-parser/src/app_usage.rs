@@ -34,10 +34,10 @@ fn filetime_to_datetime(filetime: u64) -> DateTime<Utc> {
 /// Returns [`EseError::InvalidRecord`] if `data` is shorter than 32 bytes.
 pub fn decode_app_record(data: &[u8]) -> Result<AppUsageRecord, EseError> {
     if data.len() < RECORD_SIZE {
-        return Err(EseError::InvalidRecord(format!(
-            "app record too short: {} < {RECORD_SIZE}",
-            data.len()
-        )));
+        return Err(EseError::Corrupt {
+            page: 0,
+            detail: format!("app record too short: {} < {RECORD_SIZE}", data.len()),
+        });
     }
     let filetime = u64::from_le_bytes([
         data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7],

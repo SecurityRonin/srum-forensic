@@ -42,11 +42,10 @@ impl CatalogEntry {
     /// the name bytes are not valid UTF-8.
     pub fn from_bytes(data: &[u8]) -> Result<Self, EseError> {
         if data.len() < Self::MIN_SIZE {
-            return Err(EseError::InvalidRecord(format!(
-                "catalog record too short: {} < {}",
-                data.len(),
-                Self::MIN_SIZE
-            )));
+            return Err(EseError::Corrupt {
+                page: 0,
+                detail: format!("catalog record too short: {} < {}", data.len(), Self::MIN_SIZE),
+            });
         }
         let object_type = u16::from_le_bytes([data[0], data[1]]);
         let object_id = u32::from_le_bytes([data[2], data[3], data[4], data[5]]);
@@ -54,15 +53,21 @@ impl CatalogEntry {
         let table_page = u32::from_le_bytes([data[10], data[11], data[12], data[13]]);
         let name_len = u16::from_le_bytes([data[14], data[15]]) as usize;
         if data.len() < Self::MIN_SIZE + name_len {
-            return Err(EseError::InvalidRecord(format!(
-                "catalog record name truncated: need {} bytes, got {}",
-                Self::MIN_SIZE + name_len,
-                data.len()
-            )));
+            return Err(EseError::Corrupt {
+                page: 0,
+                detail: format!(
+                    "catalog record name truncated: need {}, got {}",
+                    Self::MIN_SIZE + name_len,
+                    data.len()
+                ),
+            });
         }
         let name_bytes = &data[16..16 + name_len];
         let object_name = std::str::from_utf8(name_bytes)
-            .map_err(|e| EseError::InvalidRecord(format!("catalog name not UTF-8: {e}")))?
+            .map_err(|e| EseError::Corrupt {
+                page: 0,
+                detail: format!("catalog name not UTF-8: {e}"),
+            })?
             .to_owned();
         Ok(Self {
             object_type,

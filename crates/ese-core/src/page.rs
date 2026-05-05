@@ -68,13 +68,13 @@ impl EsePage {
     ///
     /// # Errors
     ///
-    /// Returns [`EseError::TooShort`] if `self.data` is shorter than 40 bytes.
+    /// Returns [`EseError::Corrupt`] if `self.data` is shorter than 40 bytes.
     pub fn parse_header(&self) -> Result<EsePageHeader, EseError> {
         let d = &self.data;
         if d.len() < Self::HEADER_SIZE {
-            return Err(EseError::TooShort {
-                need: Self::HEADER_SIZE,
-                got: d.len(),
+            return Err(EseError::Corrupt {
+                page: self.page_number,
+                detail: format!("page header too short: {} < {}", d.len(), Self::HEADER_SIZE),
             });
         }
 
@@ -117,17 +117,14 @@ impl EsePage {
     ///
     /// # Errors
     ///
-    /// Returns [`EseError::TooShort`] if the page is too short to hold the
+    /// Returns [`EseError::TagArrayOverflow`] if the page is too short to hold the
     /// declared tag count.
     pub fn tags(&self) -> Result<Vec<(u16, u16)>, EseError> {
         let hdr = self.parse_header()?;
         let count = hdr.available_page_tag_count as usize;
         let page_size = self.data.len();
         if page_size < count * 4 {
-            return Err(EseError::TooShort {
-                need: count * 4,
-                got: page_size,
-            });
+            return Err(EseError::TagArrayOverflow { page: self.page_number });
         }
         let mut tags = Vec::with_capacity(count);
         for i in 0..count {
@@ -151,23 +148,27 @@ impl EsePage {
     ///
     /// # Errors
     ///
-    /// Returns [`EseError::TooShort`] if `index` is beyond the tag count or
+    /// Returns [`EseError::RecordTooShort`] if `index` is beyond the tag count or
     /// if the tag's data range is out of bounds.
     pub fn record_data(&self, index: usize) -> Result<&[u8], EseError> {
         let tags = self.tags()?;
         if index >= tags.len() {
-            return Err(EseError::TooShort {
-                need: index + 1,
+            return Err(EseError::RecordTooShort {
+                page: self.page_number,
+                tag: index,
                 got: tags.len(),
+                need: index + 1,
             });
         }
         let (offset, size) = tags[index];
         let start = offset as usize;
         let end = start + size as usize;
         if end > self.data.len() {
-            return Err(EseError::TooShort {
-                need: end,
+            return Err(EseError::RecordTooShort {
+                page: self.page_number,
+                tag: index,
                 got: self.data.len(),
+                need: end,
             });
         }
         Ok(&self.data[start..end])

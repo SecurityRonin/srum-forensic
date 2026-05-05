@@ -33,7 +33,7 @@ impl EseDatabase {
     /// Read a single page by its 0-based page number.
     ///
     /// Page 0 is the header page. Data pages start at page 1.
-    /// Returns [`EseError::TooShort`] if `page_number` is beyond the file.
+    /// Returns [`EseError::Corrupt`] if `page_number` is beyond the file.
     ///
     /// # Errors
     ///
@@ -46,9 +46,11 @@ impl EseDatabase {
         let file_len = f.metadata()?.len();
 
         if offset + u64::try_from(page_size).unwrap_or(u64::MAX) > file_len {
-            return Err(EseError::TooShort {
-                need: usize::try_from(offset).unwrap_or(usize::MAX).saturating_add(page_size),
-                got: usize::try_from(file_len).unwrap_or(usize::MAX),
+            let need = usize::try_from(offset).unwrap_or(usize::MAX).saturating_add(page_size);
+            let got = usize::try_from(file_len).unwrap_or(usize::MAX);
+            return Err(EseError::Corrupt {
+                page: page_number,
+                detail: format!("page beyond file end: need offset {need}, file is {got} bytes"),
             });
         }
 
@@ -138,7 +140,7 @@ impl EseDatabase {
     ///
     /// # Errors
     ///
-    /// Returns [`EseError::NotFound`] if no matching table is in the catalog,
+    /// Returns [`EseError::TableNotFound`] if no matching table is in the catalog,
     /// or any I/O / parse error from [`catalog_entries`][Self::catalog_entries].
     pub fn find_table_page(&self, name: &str) -> Result<u32, EseError> {
         let entries = self.catalog_entries()?;
@@ -146,6 +148,6 @@ impl EseDatabase {
             .iter()
             .find(|e| e.object_name == name)
             .map(|e| e.table_page)
-            .ok_or_else(|| EseError::NotFound(format!("table '{name}' not in catalog")))
+            .ok_or_else(|| EseError::TableNotFound { name: name.to_owned() })
     }
 }

@@ -3,18 +3,23 @@
 /// Errors that can occur when reading an ESE database.
 #[derive(Debug, thiserror::Error)]
 pub enum EseError {
-    #[error("I/O error: {0}")]
+    #[error("page {page}: invalid magic {found:#010x}")]
+    InvalidMagic { page: u32, found: u32 },
+
+    #[error("page {page} tag {tag}: record too short ({got} < {need})")]
+    RecordTooShort { page: u32, tag: usize, got: usize, need: usize },
+
+    #[error("page {page}: tag array overflows page boundary")]
+    TagArrayOverflow { page: u32 },
+
+    #[error("table not found: {name}")]
+    TableNotFound { name: String },
+
+    #[error("page {page}: {detail}")]
+    Corrupt { page: u32, detail: String },
+
+    #[error("io: {0}")]
     Io(#[from] std::io::Error),
-    #[error("file too short: need at least {need} bytes, got {got}")]
-    TooShort { need: usize, got: usize },
-    #[error("invalid ESE signature: expected 0x89ABCDEF, got {0:#010x}")]
-    BadSignature(u32),
-    #[error("unsupported page size: {0}")]
-    UnsupportedPageSize(u32),
-    #[error("not found: {0}")]
-    NotFound(String),
-    #[error("invalid record: {0}")]
-    InvalidRecord(String),
 }
 
 #[cfg(test)]

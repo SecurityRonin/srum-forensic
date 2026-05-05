@@ -43,14 +43,14 @@ impl EseHeader {
     /// - Offset 0xEC (4 bytes): page size (0 means 4096)
     pub fn from_bytes(data: &[u8]) -> Result<Self, EseError> {
         if data.len() < Self::SIZE {
-            return Err(EseError::TooShort {
-                need: Self::SIZE,
-                got: data.len(),
+            return Err(EseError::Corrupt {
+                page: 0,
+                detail: format!("file too short: need {} bytes, got {}", Self::SIZE, data.len()),
             });
         }
         let sig = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
         if sig != 0x89AB_CDEF {
-            return Err(EseError::BadSignature(sig));
+            return Err(EseError::InvalidMagic { page: 0, found: sig });
         }
         let format_version = u32::from_le_bytes([data[8], data[9], data[10], data[11]]);
         // db_time at offset 0x10 (8 bytes LE)

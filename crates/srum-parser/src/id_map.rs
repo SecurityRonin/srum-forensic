@@ -25,19 +25,19 @@ pub const MIN_RECORD_SIZE: usize = 6;
 /// UTF-16LE name bytes contain an invalid surrogate pair.
 pub fn decode_id_map_entry(data: &[u8]) -> Result<IdMapEntry, EseError> {
     if data.len() < MIN_RECORD_SIZE {
-        return Err(EseError::InvalidRecord(format!(
-            "id-map record too short: {} < {MIN_RECORD_SIZE}",
-            data.len()
-        )));
+        return Err(EseError::Corrupt {
+            page: 0,
+            detail: format!("id-map record too short: {} < {MIN_RECORD_SIZE}", data.len()),
+        });
     }
     let id = i32::from_le_bytes([data[0], data[1], data[2], data[3]]);
     let name_byte_len = u16::from_le_bytes([data[4], data[5]]) as usize;
     let total = MIN_RECORD_SIZE + name_byte_len;
     if data.len() < total {
-        return Err(EseError::InvalidRecord(format!(
-            "id-map record name truncated: need {total}, got {}",
-            data.len()
-        )));
+        return Err(EseError::Corrupt {
+            page: 0,
+            detail: format!("id-map record name truncated: need {total}, got {}", data.len()),
+        });
     }
     let name_bytes = &data[6..6 + name_byte_len];
     // Decode UTF-16LE: group bytes into u16 code units.

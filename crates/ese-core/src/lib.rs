@@ -26,9 +26,9 @@ pub fn open(path: &std::path::Path) -> Result<EseHeader, EseError> {
     let mut buf = vec![0u8; EseHeader::SIZE];
     let n = f.read(&mut buf)?;
     if n < EseHeader::SIZE {
-        return Err(EseError::TooShort {
-            need: EseHeader::SIZE,
-            got: n,
+        return Err(EseError::Corrupt {
+            page: 0,
+            detail: format!("file too short: need {} bytes, got {}", EseHeader::SIZE, n),
         });
     }
     EseHeader::from_bytes(&buf)
@@ -211,7 +211,10 @@ mod tests {
 
     #[test]
     fn ese_error_implements_display() {
-        let err = EseError::TooShort { need: 4096, got: 0 };
+        let err = EseError::Corrupt {
+            page: 0,
+            detail: "file too short: need 4096 bytes, got 0".into(),
+        };
         let msg = format!("{err}");
         assert!(msg.contains("too short"));
     }
