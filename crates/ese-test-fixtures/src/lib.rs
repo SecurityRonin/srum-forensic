@@ -77,6 +77,14 @@ impl PageBuilder {
     /// Write bytes into the slack region (between last record and tag array).
     pub fn with_slack(mut self, bytes: &[u8]) -> Self {
         let start = self.record_offset;
+        let tag_array_start = self.page_size - self.tag_count * 4;
+        debug_assert!(
+            start + bytes.len() <= tag_array_start,
+            "with_slack: {} bytes at offset {} would overwrite tag array (starts at {})",
+            bytes.len(),
+            start,
+            tag_array_start
+        );
         self.data[start..start + bytes.len()].copy_from_slice(bytes);
         self
     }
@@ -86,6 +94,9 @@ impl PageBuilder {
     }
 
     /// Build a 64-bit db_time at offset `0x10` (file header only).
+    ///
+    /// MUST be called after any `leaf()` / `parent()` call: those methods
+    /// overwrite bytes `0x0C–0x14`, which overlaps this field's `0x10–0x18`.
     pub fn with_header_db_time(mut self, t: u64) -> Self {
         self.data[0x10..0x18].copy_from_slice(&t.to_le_bytes());
         self
