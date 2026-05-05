@@ -11,6 +11,33 @@ pub use app_usage::AppUsageRecord;
 pub use id_map::IdMapEntry;
 pub use network::NetworkUsageRecord;
 
+use chrono::{DateTime, Utc};
+
+/// Number of 100ns ticks between the Windows epoch (1601-01-01) and the
+/// Unix epoch (1970-01-01).
+pub const FILETIME_EPOCH_OFFSET: u64 = 116_444_736_000_000_000;
+
+/// Fixed byte length of a serialised [`NetworkUsageRecord`].
+pub const NETWORK_RECORD_SIZE: usize = 32;
+
+/// Fixed byte length of a serialised [`AppUsageRecord`].
+pub const APP_RECORD_SIZE: usize = 32;
+
+/// Minimum byte length of a serialised [`IdMapEntry`].
+pub const ID_MAP_MIN_SIZE: usize = 6;
+
+/// Convert a Windows FILETIME value to a UTC [`DateTime`].
+///
+/// FILETIME counts 100-nanosecond ticks since 1601-01-01. Values before the
+/// Unix epoch are clamped to `DateTime::UNIX_EPOCH`.
+pub fn filetime_to_datetime(filetime: u64) -> DateTime<Utc> {
+    let unix_100ns = filetime.saturating_sub(FILETIME_EPOCH_OFFSET);
+    let secs = i64::try_from(unix_100ns / 10_000_000).unwrap_or(i64::MAX);
+    let nanos = u32::try_from((unix_100ns % 10_000_000) * 100).unwrap_or(0);
+    DateTime::from_timestamp(secs, nanos)
+        .unwrap_or(DateTime::UNIX_EPOCH.with_timezone(&Utc))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
