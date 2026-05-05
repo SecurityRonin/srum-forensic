@@ -55,12 +55,6 @@ impl PageBuilder {
         self
     }
 
-    /// Write `db_state` into the state field at offset `0x28`.
-    pub fn with_db_state(mut self, s: u32) -> Self {
-        self.data[0x28..0x2C].copy_from_slice(&s.to_le_bytes());
-        self
-    }
-
     /// Append a record and its tag entry.
     pub fn add_record(mut self, record: &[u8]) -> Self {
         let offset = self.record_offset;
@@ -107,10 +101,12 @@ impl PageBuilder {
 
 /// Build a raw ESE file-header page buffer (page 0).
 pub fn make_raw_header_page(db_time: u64, db_state: u32) -> Vec<u8> {
-    PageBuilder::new(PAGE_SIZE)
-        .with_db_state(db_state)
+    let mut page = PageBuilder::new(PAGE_SIZE)
         .with_header_db_time(db_time)
-        .into_file_header()
+        .into_file_header();
+    // db_state lives at offset 0x28 in the file header page only
+    page[0x28..0x2C].copy_from_slice(&db_state.to_le_bytes());
+    page
 }
 
 /// Assembles a header page + optional data pages into a `NamedTempFile`.
