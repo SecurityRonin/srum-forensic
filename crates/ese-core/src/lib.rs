@@ -12,7 +12,7 @@ pub mod page;
 pub use catalog::CatalogEntry;
 pub use database::EseDatabase;
 pub use error::EseError;
-pub use header::EseHeader;
+pub use header::{EseHeader, DB_STATE_CLEAN_SHUTDOWN, DB_STATE_DIRTY_SHUTDOWN, DB_STATE_JUST_CREATED};
 pub use page::{EsePage, EsePageHeader, PAGE_FLAG_EMPTY, PAGE_FLAG_LEAF, PAGE_FLAG_PARENT, PAGE_FLAG_ROOT, PAGE_FLAG_SPACE_TREE};
 
 /// Open an ESE database file and return the parsed header.
@@ -153,6 +153,38 @@ mod tests {
         let tmp = NamedTempFile::new().expect("tempfile");
         let result = open(tmp.path());
         assert!(result.is_err(), "empty file must return Err (too short)");
+    }
+
+    #[test]
+    fn ese_header_parses_db_time() {
+        let mut buf = vec![0u8; 4096];
+        buf[4..8].copy_from_slice(&0x89AB_CDEF_u32.to_le_bytes());
+        buf[236..240].copy_from_slice(&4096_u32.to_le_bytes());
+        // db_time at offset 0x10: set to a known value
+        buf[0x10..0x18].copy_from_slice(&0x0102_0304_0506_0708_u64.to_le_bytes());
+        let header = EseHeader::from_bytes(&buf).expect("valid header");
+        assert_eq!(header.db_time, 0x0102_0304_0506_0708_u64);
+    }
+
+    #[test]
+    fn ese_header_parses_db_state_dirty() {
+        let mut buf = vec![0u8; 4096];
+        buf[4..8].copy_from_slice(&0x89AB_CDEF_u32.to_le_bytes());
+        buf[236..240].copy_from_slice(&4096_u32.to_le_bytes());
+        // db_state = DirtyShutdown (2) at offset 0x28
+        buf[0x28..0x2C].copy_from_slice(&DB_STATE_DIRTY_SHUTDOWN.to_le_bytes());
+        let header = EseHeader::from_bytes(&buf).expect("valid header");
+        assert_eq!(header.db_state, DB_STATE_DIRTY_SHUTDOWN);
+    }
+
+    #[test]
+    fn ese_header_parses_db_state_clean() {
+        let mut buf = vec![0u8; 4096];
+        buf[4..8].copy_from_slice(&0x89AB_CDEF_u32.to_le_bytes());
+        buf[236..240].copy_from_slice(&4096_u32.to_le_bytes());
+        buf[0x28..0x2C].copy_from_slice(&DB_STATE_CLEAN_SHUTDOWN.to_le_bytes());
+        let header = EseHeader::from_bytes(&buf).expect("valid header");
+        assert_eq!(header.db_state, DB_STATE_CLEAN_SHUTDOWN);
     }
 
     #[test]
