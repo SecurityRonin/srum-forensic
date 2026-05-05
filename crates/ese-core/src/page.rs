@@ -148,16 +148,14 @@ impl EsePage {
     ///
     /// # Errors
     ///
-    /// Returns [`EseError::RecordTooShort`] if `index` is beyond the tag count or
-    /// if the tag's data range is out of bounds.
+    /// Returns [`EseError::Corrupt`] if `index` is beyond the tag count, or
+    /// [`EseError::RecordTooShort`] if the tag's data range is out of bounds.
     pub fn record_data(&self, index: usize) -> Result<&[u8], EseError> {
         let tags = self.tags()?;
         if index >= tags.len() {
-            return Err(EseError::RecordTooShort {
+            return Err(EseError::Corrupt {
                 page: self.page_number,
-                tag: index,
-                got: tags.len(),
-                need: index + 1,
+                detail: format!("tag index {index} out of range (tag count: {})", tags.len()),
             });
         }
         let (offset, size) = tags[index];
