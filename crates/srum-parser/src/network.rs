@@ -9,35 +9,25 @@
 //! - `[16..24]`: `bytes_sent` (u64)
 //! - `[24..32]`: `bytes_recv` (u64)
 
-use chrono::{DateTime, Utc};
-use srum_core::NetworkUsageRecord;
+use srum_core::{filetime_to_datetime, NetworkUsageRecord, NETWORK_RECORD_SIZE};
 
-use crate::EseError;
-
-/// Number of 100ns ticks between 1601-01-01 and 1970-01-01.
-const FILETIME_EPOCH_OFFSET: u64 = 116_444_736_000_000_000;
-
-/// Minimum size of a raw network usage record.
-pub const RECORD_SIZE: usize = 32;
-
-/// Parse a Windows FILETIME value to a UTC [`DateTime`].
-fn filetime_to_datetime(filetime: u64) -> DateTime<Utc> {
-    let unix_100ns = filetime.saturating_sub(FILETIME_EPOCH_OFFSET);
-    let secs = i64::try_from(unix_100ns / 10_000_000).unwrap_or(i64::MAX);
-    let nanos = u32::try_from((unix_100ns % 10_000_000) * 100).unwrap_or(0);
-    DateTime::from_timestamp(secs, nanos).unwrap_or(DateTime::UNIX_EPOCH.with_timezone(&Utc))
-}
+use crate::SrumError;
 
 /// Decode one raw 32-byte record into a [`NetworkUsageRecord`].
 ///
 /// # Errors
 ///
-/// Returns [`EseError::Corrupt`] if `data` is shorter than 32 bytes.
-pub fn decode_network_record(data: &[u8]) -> Result<NetworkUsageRecord, EseError> {
-    if data.len() < RECORD_SIZE {
-        return Err(EseError::Corrupt {
-            page: 0,
-            detail: format!("network record too short: {} < {RECORD_SIZE}", data.len()),
+/// Returns [`SrumError::DecodeError`] if `data` is shorter than 32 bytes.
+pub fn decode_network_record(
+    data: &[u8],
+    page: u32,
+    tag: usize,
+) -> Result<NetworkUsageRecord, SrumError> {
+    if data.len() < NETWORK_RECORD_SIZE {
+        return Err(SrumError::DecodeError {
+            page,
+            tag,
+            detail: format!("network record too short: {} < {NETWORK_RECORD_SIZE}", data.len()),
         });
     }
     let filetime = u64::from_le_bytes([

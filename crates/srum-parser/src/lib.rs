@@ -3,10 +3,6 @@
 //! SRUDB.dat is an ESE (JET Blue) database stored at
 //! `C:\Windows\System32\sru\SRUDB.dat`. On a live system it is locked;
 //! forensic analysis always operates on a copy.
-//!
-//! # Current status
-//!
-//! ESE header validation and B-tree record extraction are both implemented.
 
 mod app_usage;
 mod id_map;
@@ -14,13 +10,35 @@ mod network;
 
 use ese_core::EseError;
 
+/// Errors produced by the SRUM parser.
+#[derive(Debug, thiserror::Error)]
+pub enum SrumError {
+    #[error("ese: {0}")]
+    Ese(#[from] EseError),
+    #[error("page {page} tag {tag}: {detail}")]
+    DecodeError { page: u32, tag: usize, detail: String },
+}
+
+/// Iterate a named ESE table and decode each record, silently skipping
+/// records that fail either the ESE read or the domain decode step.
+fn collect_table<T>(
+    db: &ese_core::EseDatabase,
+    table: &str,
+    decode: impl Fn(&[u8], u32, usize) -> Result<T, SrumError>,
+) -> anyhow::Result<Vec<T>> {
+    let records = db.table_records(table)?
+        .filter_map(|r| match r {
+            Ok((page, tag, data)) => decode(&data, page, tag).ok(),
+            Err(_) => None,
+        })
+        .collect();
+    Ok(records)
+}
+
 /// Parse network usage records from a SRUDB.dat file.
 ///
 /// Returns all records from the
 /// `{973F5D5C-1D90-4944-BE8E-24B22A728CF2}` table.
-///
-/// Walks the B-tree rooted at the catalog entry for the `NetworkUsage` table
-/// and decodes each 32-byte record tag from every leaf page.
 ///
 /// # Errors
 ///
@@ -28,24 +46,10 @@ use ese_core::EseError;
 pub fn parse_network_usage(
     path: &std::path::Path,
 ) -> anyhow::Result<Vec<srum_core::NetworkUsageRecord>> {
-    const NETWORK_TABLE: &str = "{973F5D5C-1D90-4944-BE8E-24B22A728CF2}";
-    let db = ese_core::open_database(path)?;
-    let root_page = db.find_table_page(NETWORK_TABLE)
-        .map_err(|e| anyhow::anyhow!("network table not found: {e}"))?;
-    let leaf_pages = db.walk_leaf_pages(root_page)?;
-    let mut records = Vec::new();
-    for page_num in leaf_pages {
-        let page = db.read_page(page_num)?;
-        let tags = page.tags()?;
-        // Tag 0 is the page header — data records start at tag 1.
-        for i in 1..tags.len() {
-            let data = page.record_data(i)?;
-            if let Ok(rec) = network::decode_network_record(data) {
-                records.push(rec);
-            }
-        }
-    }
-    Ok(records)
+    let db = ese_core::EseDatabase::open(path)?;
+    collect_table(&db, "{973F5D5C-1D90-4944-BE8E-24B22A728CF2}", |data, page, tag| {
+        network::decode_network_record(data, page, tag)
+    })
 }
 
 /// Parse application usage records from a SRUDB.dat file.
@@ -53,40 +57,21 @@ pub fn parse_network_usage(
 /// Returns all records from the
 /// `{5C8CF1C7-7257-4F13-B223-970EF5939312}` table.
 ///
-/// Walks the B-tree rooted at the catalog entry for the `AppUsage` table
-/// and decodes each 32-byte record tag from every leaf page.
-///
 /// # Errors
 ///
 /// Returns an error if the file cannot be read or is not a valid ESE database.
 pub fn parse_app_usage(
     path: &std::path::Path,
 ) -> anyhow::Result<Vec<srum_core::AppUsageRecord>> {
-    const APP_TABLE: &str = "{5C8CF1C7-7257-4F13-B223-970EF5939312}";
-    let db = ese_core::open_database(path)?;
-    let root_page = db.find_table_page(APP_TABLE)
-        .map_err(|e| anyhow::anyhow!("app table not found: {e}"))?;
-    let leaf_pages = db.walk_leaf_pages(root_page)?;
-    let mut records = Vec::new();
-    for page_num in leaf_pages {
-        let page = db.read_page(page_num)?;
-        let tags = page.tags()?;
-        for i in 1..tags.len() {
-            let data = page.record_data(i)?;
-            if let Ok(rec) = app_usage::decode_app_record(data) {
-                records.push(rec);
-            }
-        }
-    }
-    Ok(records)
+    let db = ese_core::EseDatabase::open(path)?;
+    collect_table(&db, "{5C8CF1C7-7257-4F13-B223-970EF5939312}", |data, page, tag| {
+        app_usage::decode_app_record(data, page, tag)
+    })
 }
 
 /// Parse ID map entries from a SRUDB.dat file.
 ///
 /// Returns all entries from the `SruDbIdMapTable` table.
-///
-/// Walks the B-tree for the `SruDbIdMapTable` catalog entry and decodes
-/// each record as an [`srum_core::IdMapEntry`] with a UTF-16LE name.
 ///
 /// # Errors
 ///
@@ -94,23 +79,10 @@ pub fn parse_app_usage(
 pub fn parse_id_map(
     path: &std::path::Path,
 ) -> anyhow::Result<Vec<srum_core::IdMapEntry>> {
-    const IDMAP_TABLE: &str = "SruDbIdMapTable";
-    let db = ese_core::open_database(path)?;
-    let root_page = db.find_table_page(IDMAP_TABLE)
-        .map_err(|e| anyhow::anyhow!("id-map table not found: {e}"))?;
-    let leaf_pages = db.walk_leaf_pages(root_page)?;
-    let mut entries = Vec::new();
-    for page_num in leaf_pages {
-        let page = db.read_page(page_num)?;
-        let tags = page.tags()?;
-        for i in 1..tags.len() {
-            let data = page.record_data(i)?;
-            if let Ok(entry) = id_map::decode_id_map_entry(data) {
-                entries.push(entry);
-            }
-        }
-    }
-    Ok(entries)
+    let db = ese_core::EseDatabase::open(path)?;
+    collect_table(&db, "SruDbIdMapTable", |data, page, tag| {
+        id_map::decode_id_map_entry(data, page, tag)
+    })
 }
 
 #[cfg(test)]
@@ -144,16 +116,12 @@ mod tests {
         assert!(result.is_err(), "empty file must return Err");
     }
 
-    /// Verify the return type compiles correctly — Vec<NetworkUsageRecord>.
     #[test]
     fn network_usage_result_type() {
-        // This test verifies the type signature compiles; runtime is Err since
-        // no real SRUDB.dat is present.
         let _: anyhow::Result<Vec<srum_core::NetworkUsageRecord>> =
             parse_network_usage(std::path::Path::new("/nonexistent/SRUDB.dat"));
     }
 
-    /// Verify the return type compiles correctly — Vec<AppUsageRecord>.
     #[test]
     fn app_usage_result_type() {
         let _: anyhow::Result<Vec<srum_core::AppUsageRecord>> =
