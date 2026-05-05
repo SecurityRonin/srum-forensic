@@ -2,6 +2,9 @@
 
 use crate::EseError;
 
+/// Default ESE page size in bytes (Vista+).
+pub const PAGE_SIZE: usize = 4096;
+
 /// Page flag: root page.
 pub const PAGE_FLAG_ROOT: u32 = 0x0001;
 /// Page flag: leaf page.
