@@ -7,7 +7,7 @@
 
 # srum-forensic
 
-**Parse Windows SRUM activity logs. Detect database manipulation. No Windows required.**
+**Parse Windows SRUM activity logs. Check ESE structural integrity. No Windows required.**
 
 Every running process leaves evidence in `SRUDB.dat` — network bytes sent, CPU cycles burned, foreground time, background time — recorded hourly by Windows since 8.1. Every DFIR practitioner knows this. Almost no tool parses it from a Linux analysis workstation without a Python runtime or COM interop.
 
@@ -87,18 +87,18 @@ Every alternative either requires Windows, needs a Python environment, or costs 
 | JSON output | ✓ | — | — | — |
 | Pipe-friendly | ✓ | — | — | — |
 | ESE parsed in Rust | ✓ | — | — | — |
-| Anti-forensic detection | ✓ | — | — | — |
+| Structural integrity checks | ✓ | — | — | — |
 | Forensic copy support | ✓ | ✓ | ✓ | ✓ |
 
 ---
 
-## Anti-Forensic Detection
+## Structural Integrity Checks
 
-`ese-integrity` checks three manipulation indicators at the binary level — facts, not conclusions:
+`ese-integrity` checks three structural anomalies at the binary level — raw facts, not forensic conclusions:
 
 **Dirty shutdown** — `db_state == 2` means the database was never cleanly closed. Could be a crash. Could be a process kill timed to prevent the final flush.
 
-**Timestamp skew** — page `db_time` fields are compared to the file header. A page newer than its own header was written after the header was sealed — a direct indicator of page-level injection.
+**Timestamp skew** — page `db_time` fields are compared to the file header. A page newer than its own header was written after the header was sealed — a structural anomaly that warrants further investigation.
 
 **Slack-space residue** — the region between the last record and the tag array is scanned for non-zero bytes. Residual data here means records were deleted without zeroing — fragments of evicted evidence remain.
 
