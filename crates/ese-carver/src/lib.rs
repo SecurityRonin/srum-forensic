@@ -22,45 +22,53 @@ pub struct FragmentPair {
     pub suffix_len: usize,
 }
 
-/// Parse the tag array from a raw page slice.
-///
-/// Returns a `Vec<(offset, size)>` for each tag, tag 0 first.
-/// Returns `None` if the page is too short to contain the tag array.
-fn parse_tags(page: &[u8], page_size: usize) -> Option<Vec<(usize, usize)>> {
-    if page.len() < page_size {
-        return None;
-    }
-    // tag count at page offset 0x1E (u16 LE)
-    if page_size < 0x20 {
-        return None;
-    }
-    let tag_count = u16::from_le_bytes([page[0x1E], page[0x1F]]) as usize;
-    if tag_count == 0 {
-        return None;
-    }
-    let mut tags = Vec::with_capacity(tag_count);
-    for i in 0..tag_count {
-        let pos = page_size - (i + 1) * 4;
-        if pos + 4 > page_size {
-            return None;
-        }
-        let raw = u32::from_le_bytes([page[pos], page[pos + 1], page[pos + 2], page[pos + 3]]);
-        let offset = (raw & 0x7FFF) as usize;
-        let size = ((raw >> 16) & 0x7FFF) as usize;
-        tags.push((offset, size));
-    }
-    Some(tags)
-}
-
-/// Scan a slice of raw page bytes for records split across consecutive page
+/// Scan an open ESE database for records split across consecutive page
 /// boundaries.
 ///
-/// Returns a [`FragmentPair`] for every pair of adjacent pages where the last
-/// tag of page N and the first data tag of page N+1 together equal
-/// `expected_size`.
+/// Returns a [`FragmentPair`] for every adjacent page pair where the last tag
+/// of page N and the first data tag (tag 1) of page N+1 together equal
+/// `expected_size`. Pages are iterated from 1 to `page_count - 2` (page 0 is
+/// the file header and is skipped; the last page has no successor to pair with).
+pub fn detect_fragments_db(
+    db: &ese_core::EseDatabase,
+    expected_size: usize,
+) -> Vec<FragmentPair> {
+    let page_count = db.page_count() as u32;
+    let mut pairs = Vec::new();
+
+    for page_idx in 1..page_count.saturating_sub(1) {
+        let Ok(page_a) = db.read_page(page_idx) else { continue };
+        let Ok(page_b) = db.read_page(page_idx + 1) else { continue };
+        let Ok(tags_a) = page_a.tags() else { continue };
+        let Ok(tags_b) = page_b.tags() else { continue };
+
+        // Last tag of page A = potential prefix fragment
+        let Some(&(_, prefix_size)) = tags_a.last() else { continue };
+        // First *data* tag of page B (tag 1; tag 0 is the page header)
+        let Some(&(_, suffix_size)) = tags_b.get(1) else { continue };
+
+        let prefix_len = prefix_size as usize;
+        let suffix_len = suffix_size as usize;
+
+        if prefix_len + suffix_len == expected_size {
+            pairs.push(FragmentPair {
+                page_a: page_idx,
+                page_b: page_idx + 1,
+                prefix_len,
+                suffix_len,
+            });
+        }
+    }
+    pairs
+}
+
+/// Scan a flat byte slice for records split across consecutive page boundaries.
 ///
-/// `pages` must be a flat byte slice that is a multiple of `page_size` long.
-/// Pages are numbered starting at 1 (page 0 is the file header, skipped).
+/// This is the raw-bytes variant; prefer [`detect_fragments_db`] when an open
+/// [`ese_core::EseDatabase`] is available.
+///
+/// `pages` must be a multiple of `page_size` bytes. Pages are numbered from 1
+/// (page 0 is the file header and is skipped).
 pub fn detect_fragments(
     pages: &[u8],
     page_size: usize,
@@ -70,7 +78,6 @@ pub fn detect_fragments(
         return vec![];
     }
     let total_pages = pages.len() / page_size;
-    // Page 0 is the header — data pages start at index 1.
     let mut pairs = Vec::new();
 
     for page_idx in 1..total_pages.saturating_sub(1) {
@@ -79,26 +86,39 @@ pub fn detect_fragments(
         let page_a = &pages[a_start..a_start + page_size];
         let page_b = &pages[b_start..b_start + page_size];
 
-        let Some(tags_a) = parse_tags(page_a, page_size) else { continue };
-        let Some(tags_b) = parse_tags(page_b, page_size) else { continue };
+        let Some(tags_a) = parse_tags_raw(page_a, page_size) else { continue };
+        let Some(tags_b) = parse_tags_raw(page_b, page_size) else { continue };
 
-        // Last tag of page A = potential prefix fragment
         let Some(&(_, prefix_len)) = tags_a.last() else { continue };
-        // First *data* tag of page B (tag index 1, skip tag 0 = page header)
         let Some(&(_, suffix_len)) = tags_b.get(1) else { continue };
 
         if prefix_len + suffix_len == expected_size {
-            let page_a_num = u32::try_from(page_idx).unwrap_or(u32::MAX);
-            let page_b_num = u32::try_from(page_idx + 1).unwrap_or(u32::MAX);
             pairs.push(FragmentPair {
-                page_a: page_a_num,
-                page_b: page_b_num,
+                page_a: u32::try_from(page_idx).unwrap_or(u32::MAX),
+                page_b: u32::try_from(page_idx + 1).unwrap_or(u32::MAX),
                 prefix_len,
                 suffix_len,
             });
         }
     }
     pairs
+}
+
+fn parse_tags_raw(page: &[u8], page_size: usize) -> Option<Vec<(usize, usize)>> {
+    if page.len() < page_size || page_size < 0x20 {
+        return None;
+    }
+    let tag_count = u16::from_le_bytes([page[0x1E], page[0x1F]]) as usize;
+    if tag_count == 0 {
+        return None;
+    }
+    let mut tags = Vec::with_capacity(tag_count);
+    for i in 0..tag_count {
+        let pos = page_size - (i + 1) * 4;
+        let raw = u32::from_le_bytes([page[pos], page[pos + 1], page[pos + 2], page[pos + 3]]);
+        tags.push(((raw & 0x7FFF) as usize, ((raw >> 16) & 0x7FFF) as usize));
+    }
+    Some(tags)
 }
 
 /// Reconstruct a fragmented record from a prefix and suffix slice.

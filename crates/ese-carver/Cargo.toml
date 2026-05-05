@@ -11,6 +11,8 @@ ese-core.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+ese-test-fixtures.workspace = true
+ese-core.workspace = true
 tempfile.workspace = true
 
 [lints]
