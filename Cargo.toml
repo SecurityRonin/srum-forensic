@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/ese-core",
+    "crates/ese-integrity",
     "crates/srum-core",
     "crates/srum-parser",
     "crates/sr-cli",
@@ -35,9 +36,10 @@ clap = { version = "4", features = ["derive"] }
 tempfile = "3"
 
 # Internal
-ese-core   = { path = "crates/ese-core" }
-srum-core  = { path = "crates/srum-core" }
-srum-parser = { path = "crates/srum-parser" }
+ese-core      = { path = "crates/ese-core" }
+ese-integrity = { path = "crates/ese-integrity" }
+srum-core     = { path = "crates/srum-core" }
+srum-parser   = { path = "crates/srum-parser" }
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
