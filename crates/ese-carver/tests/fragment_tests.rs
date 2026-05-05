@@ -1,0 +1,75 @@
+//! Integration tests for ese-carver fragment detection and reconstruction.
+//!
+//! Tests [`ese_carver::detect_fragments`] and [`ese_carver::reconstruct_fragment`].
+
+mod fixtures;
+
+use ese_carver::{detect_fragments, reconstruct_fragment};
+
+// ── detect_fragments ─────────────────────────────────────────────────────────
+
+#[test]
+fn detect_fragments_empty_for_complete_pages() {
+    // Three complete records of 12 bytes each — no page-boundary splits.
+    let record = vec![0xABu8; 12];
+    let pages = fixtures::make_flat_complete(&[record.clone(), record.clone(), record]);
+    let pairs = detect_fragments(&pages, fixtures::PAGE_SIZE, 12);
+    assert!(
+        pairs.is_empty(),
+        "complete records must produce no FragmentPair, got: {pairs:?}"
+    );
+}
+
+#[test]
+fn detect_fragments_finds_pair_when_split_across_boundary() {
+    // Record of 20 bytes split: 12-byte prefix on page 1, 8-byte suffix on page 2.
+    let prefix = vec![0xAAu8; 12];
+    let suffix = vec![0xBBu8; 8];
+    let expected_size = prefix.len() + suffix.len(); // 20
+    let pages = fixtures::make_flat_split(&prefix, &suffix);
+    let pairs = detect_fragments(&pages, fixtures::PAGE_SIZE, expected_size);
+    assert_eq!(pairs.len(), 1, "one split must produce exactly one FragmentPair");
+    let pair = &pairs[0];
+    assert_eq!(pair.page_a, 1, "prefix lives on page 1");
+    assert_eq!(pair.page_b, 2, "suffix lives on page 2");
+    assert_eq!(pair.prefix_len, 12);
+    assert_eq!(pair.suffix_len, 8);
+}
+
+#[test]
+fn detect_fragments_ignores_split_when_sizes_do_not_match_expected() {
+    // Same split pages but caller supplies the wrong expected_size — no match.
+    let prefix = vec![0xCCu8; 10];
+    let suffix = vec![0xDDu8; 10];
+    let pages = fixtures::make_flat_split(&prefix, &suffix);
+    // expected_size = 30, but prefix+suffix = 20 — should not match
+    let pairs = detect_fragments(&pages, fixtures::PAGE_SIZE, 30);
+    assert!(
+        pairs.is_empty(),
+        "size mismatch must produce no FragmentPair, got: {pairs:?}"
+    );
+}
+
+// ── reconstruct_fragment ─────────────────────────────────────────────────────
+
+#[test]
+fn reconstruct_returns_none_when_lengths_do_not_match_expected() {
+    let prefix = vec![0x01u8; 4];
+    let suffix = vec![0x02u8; 4];
+    // prefix+suffix = 8, but expected = 12
+    let result = reconstruct_fragment(&prefix, &suffix, 12);
+    assert!(result.is_none(), "length mismatch must return None");
+}
+
+#[test]
+fn reconstruct_returns_stitched_bytes_when_lengths_match() {
+    let prefix = vec![0xAAu8; 6];
+    let suffix = vec![0xBBu8; 6];
+    let expected_size = 12;
+    let result = reconstruct_fragment(&prefix, &suffix, expected_size);
+    assert!(result.is_some(), "matching lengths must return Some");
+    let stitched = result.unwrap();
+    assert_eq!(stitched.len(), expected_size);
+    assert_eq!(&stitched[..6], &prefix[..]);
+    assert_eq!(&stitched[6..], &suffix[..]);
+}

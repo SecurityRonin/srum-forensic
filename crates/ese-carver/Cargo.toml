@@ -1,0 +1,17 @@
+[package]
+name = "ese-carver"
+version = "0.1.0"
+description = "ESE page carving and fragmented record reconstruction"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+ese-core.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
