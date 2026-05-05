@@ -8,6 +8,11 @@ use crate::{catalog::CatalogEntry, EseError, EseHeader, EsePage};
 /// Iterator over raw record bytes across all leaf pages of a B-tree.
 ///
 /// Each item is `(page_number, tag_index, record_bytes)`.
+///
+/// Error recovery: if a page cannot be read or its tag array is corrupt,
+/// the error is yielded and the iterator advances to the next page. If an
+/// individual tag's record data is corrupt, the error is yielded and the
+/// iterator advances to the next tag on the same page.
 #[derive(Debug)]
 pub struct TableCursor<'db> {
     db: &'db EseDatabase,
@@ -109,7 +114,6 @@ impl EseDatabase {
 
         Ok(EsePage {
             page_number,
-            flags: 0,
             data,
         })
     }

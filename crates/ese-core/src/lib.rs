@@ -10,7 +10,7 @@ pub mod header;
 pub mod page;
 
 pub use catalog::CatalogEntry;
-pub use database::EseDatabase;
+pub use database::{EseDatabase, TableCursor};
 pub use error::EseError;
 pub use header::{EseHeader, DB_STATE_CLEAN_SHUTDOWN, DB_STATE_DIRTY_SHUTDOWN, DB_STATE_JUST_CREATED};
 pub use page::{EsePage, EsePageHeader, PAGE_FLAG_EMPTY, PAGE_FLAG_LEAF, PAGE_FLAG_PARENT, PAGE_FLAG_ROOT, PAGE_FLAG_SPACE_TREE, PAGE_SIZE};
@@ -34,17 +34,6 @@ pub fn open(path: &std::path::Path) -> Result<EseHeader, EseError> {
     EseHeader::from_bytes(&buf)
 }
 
-/// Open an ESE database file and return a [`EseDatabase`] for page-level access.
-///
-/// This is the primary entry point for reading records. Use [`open`] only
-/// when you just need to validate the header.
-///
-/// # Errors
-///
-/// Returns [`EseError`] if the file cannot be read or is not a valid ESE database.
-pub fn open_database(path: &std::path::Path) -> Result<EseDatabase, EseError> {
-    EseDatabase::open(path)
-}
 
 #[cfg(test)]
 mod tests {
@@ -203,7 +192,6 @@ mod tests {
     fn ese_page_has_page_number() {
         let page = EsePage {
             page_number: 42,
-            flags: 0,
             data: vec![],
         };
         assert_eq!(page.page_number, 42);
