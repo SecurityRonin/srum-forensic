@@ -21,7 +21,7 @@ pub struct TableCursor<'db> {
     tag_idx: usize, // starts at 1 (tag 0 is the page header tag)
 }
 
-impl<'db> Iterator for TableCursor<'db> {
+impl Iterator for TableCursor<'_> {
     type Item = Result<(u32, usize, Vec<u8>), EseError>;
 
     fn next(&mut self) -> Option<Self::Item> {

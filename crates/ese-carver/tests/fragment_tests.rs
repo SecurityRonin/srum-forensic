@@ -54,10 +54,10 @@ fn detect_fragments_ignores_split_when_sizes_do_not_match_expected() {
 
 #[test]
 fn detect_fragments_db_finds_split_via_ese_database() {
+    use std::io::Write as _;
     let prefix = vec![0xAAu8; 12];
     let suffix = vec![0xBBu8; 8];
     let pages = fixtures::make_flat_split(&prefix, &suffix);
-    use std::io::Write as _;
     let mut tmp = tempfile::NamedTempFile::new().unwrap();
     tmp.write_all(&pages).unwrap();
     let db = ese_core::EseDatabase::open(tmp.path()).expect("open");

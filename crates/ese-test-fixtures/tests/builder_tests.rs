@@ -1,4 +1,4 @@
-//! Tests for PageBuilder and EseFileBuilder.
+//! Tests for `PageBuilder` and `EseFileBuilder`.
 use ese_test_fixtures::{EseFileBuilder, PageBuilder, PAGE_SIZE};
 
 #[test]
@@ -61,7 +61,7 @@ fn ese_file_builder_write_produces_readable_file() {
         .write();
     assert!(tmp.path().exists());
     let meta = std::fs::metadata(tmp.path()).unwrap();
-    assert_eq!(meta.len() as usize, PAGE_SIZE, "header-only file = one page");
+    assert_eq!(usize::try_from(meta.len()).expect("len fits"), PAGE_SIZE, "header-only file = one page");
 }
 
 #[test]
@@ -72,7 +72,7 @@ fn ese_file_builder_add_page_grows_file() {
         .add_page(extra)
         .write();
     let meta = std::fs::metadata(tmp.path()).unwrap();
-    assert_eq!(meta.len() as usize, PAGE_SIZE * 2);
+    assert_eq!(usize::try_from(meta.len()).expect("len fits"), PAGE_SIZE * 2);
 }
 
 #[test]

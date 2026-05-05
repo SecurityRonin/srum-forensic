@@ -1,4 +1,4 @@
-//! Integration tests for TableCursor — ese-cursor story.
+//! Integration tests for `TableCursor` — ese-cursor story.
 mod fixtures;
 
 use ese_core::EseDatabase;

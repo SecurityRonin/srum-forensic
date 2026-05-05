@@ -16,6 +16,7 @@ use tempfile::NamedTempFile;
 /// - `0x28–N`:    record data packed low→high
 /// - `N+1–end`:   slack region
 /// - end of page: tag array packed high→low (4 bytes per tag)
+#[must_use]
 pub struct PageBuilder {
     data: Vec<u8>,
     page_size: usize,
@@ -27,7 +28,7 @@ impl PageBuilder {
     pub fn new(page_size: usize) -> Self {
         let mut data = vec![0u8; page_size];
         // Tag 0 covers the 40-byte page header: offset=0, size=40.
-        let tag0_raw: u32 = (0u32 & 0x7FFF) | ((40u32 & 0x7FFF) << 16);
+        let tag0_raw: u32 = 40u32 << 16;
         let pos = page_size - 4;
         data[pos..pos + 4].copy_from_slice(&tag0_raw.to_le_bytes());
         data[0x1E..0x20].copy_from_slice(&1u16.to_le_bytes());
@@ -60,11 +61,13 @@ impl PageBuilder {
         let offset = self.record_offset;
         self.data[offset..offset + record.len()].copy_from_slice(record);
         self.tag_count += 1;
-        let tag_raw: u32 =
-            (offset as u32 & 0x7FFF) | ((record.len() as u32 & 0x7FFF) << 16);
+        let offset_u32 = u32::try_from(offset).expect("offset within u32");
+        let len_u32 = u32::try_from(record.len()).expect("record len within u32");
+        let tag_raw: u32 = (offset_u32 & 0x7FFF) | ((len_u32 & 0x7FFF) << 16);
         let tag_pos = self.page_size - self.tag_count * 4;
         self.data[tag_pos..tag_pos + 4].copy_from_slice(&tag_raw.to_le_bytes());
-        self.data[0x1E..0x20].copy_from_slice(&(self.tag_count as u16).to_le_bytes());
+        let tag_count_u16 = u16::try_from(self.tag_count).unwrap_or(u16::MAX);
+        self.data[0x1E..0x20].copy_from_slice(&tag_count_u16.to_le_bytes());
         self.record_offset += record.len();
         self
     }
@@ -93,7 +96,7 @@ impl PageBuilder {
         self.data
     }
 
-    /// Build a 64-bit db_time at offset `0x10` (file header only).
+    /// Build a 64-bit `db_time` at offset `0x10` (file header only).
     ///
     /// MUST be called after any `leaf()` / `parent()` call: those methods
     /// overwrite bytes `0x0C–0x14`, which overlaps this field's `0x10–0x18`.
@@ -102,10 +105,11 @@ impl PageBuilder {
         self
     }
 
-    /// Finalize as an ESE file header page (adds magic + page_size fields).
+    /// Finalize as an ESE file header page (adds magic + `page_size` fields).
     pub fn into_file_header(mut self) -> Vec<u8> {
         self.data[4..8].copy_from_slice(&0x89AB_CDEFu32.to_le_bytes());
-        self.data[236..240].copy_from_slice(&(self.page_size as u32).to_le_bytes());
+        let page_size_u32 = u32::try_from(self.page_size).expect("page_size within u32");
+        self.data[236..240].copy_from_slice(&page_size_u32.to_le_bytes());
         self.data
     }
 }
@@ -121,6 +125,7 @@ pub fn make_raw_header_page(db_time: u64, db_state: u32) -> Vec<u8> {
 }
 
 /// Assembles a header page + optional data pages into a `NamedTempFile`.
+#[must_use]
 pub struct EseFileBuilder {
     db_time: u64,
     db_state: u32,

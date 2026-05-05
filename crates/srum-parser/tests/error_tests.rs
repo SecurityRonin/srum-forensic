@@ -1,4 +1,4 @@
-//! Tests for SrumError.
+//! Tests for `SrumError`.
 use srum_parser::SrumError;
 
 #[test]

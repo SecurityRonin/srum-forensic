@@ -33,7 +33,7 @@ pub fn detect_fragments_db(
     db: &ese_core::EseDatabase,
     expected_size: usize,
 ) -> Vec<FragmentPair> {
-    let page_count = db.page_count() as u32;
+    let page_count = u32::try_from(db.page_count()).unwrap_or(u32::MAX);
     let mut pairs = Vec::new();
 
     for page_idx in 1..page_count.saturating_sub(1) {
