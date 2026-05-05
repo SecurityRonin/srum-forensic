@@ -1,16 +1,17 @@
-[![Crates.io](https://img.shields.io/crates/v/srum-forensic.svg)](https://crates.io/crates/srum-forensic)
+[![Stars](https://img.shields.io/github/stars/SecurityRonin/srum-forensic?style=flat-square)](https://github.com/SecurityRonin/srum-forensic/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/SecurityRonin/srum-forensic/actions/workflows/ci.yml/badge.svg)](https://github.com/SecurityRonin/srum-forensic/actions/workflows/ci.yml)
 [![Rust 1.80+](https://img.shields.io/badge/rust-1.80%2B-orange.svg)](https://www.rust-lang.org/)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue.svg)](#install)
 [![Sponsor](https://img.shields.io/badge/sponsor-h4x0r-ea4aaa?logo=github-sponsors)](https://github.com/sponsors/h4x0r)
 
 # srum-forensic
 
-**Parse Windows SRUM activity logs. No Windows required.**
+**Parse Windows SRUM activity logs. Detect database manipulation. No Windows required.**
 
 Every running process leaves evidence in `SRUDB.dat` — network bytes sent, CPU cycles burned, foreground time, background time — recorded hourly by Windows since 8.1. Every DFIR practitioner knows this. Almost no tool parses it from a Linux analysis workstation without a Python runtime or COM interop.
 
-`sr` does it with a single Rust binary.
+`sr` does it with a single Rust binary. And it tells you when the database has been tampered with.
 
 ```bash
 cargo install srum-forensic
@@ -79,14 +80,29 @@ Every alternative either requires Windows, needs a Python environment, or costs 
 
 | | srum-forensic | KAPE + EZTools | python-libESE | Arsenal SRUM |
 |--|:-:|:-:|:-:|:-:|
-| Runs on Linux / macOS | Y | — | Y | — |
-| Single static binary | Y | — | — | — |
-| No Python runtime | Y | — | — | Y |
-| Free & open source | Y | partial | Y | — |
-| JSON output | Y | — | — | — |
-| Pipe-friendly | Y | — | — | — |
-| ESE parsed in Rust | Y | — | — | — |
-| Forensic copy support | Y | Y | Y | Y |
+| Runs on Linux / macOS | ✓ | — | ✓ | — |
+| Single static binary | ✓ | — | — | — |
+| No Python runtime | ✓ | — | — | ✓ |
+| Free & open source | ✓ | partial | ✓ | — |
+| JSON output | ✓ | — | — | — |
+| Pipe-friendly | ✓ | — | — | — |
+| ESE parsed in Rust | ✓ | — | — | — |
+| Anti-forensic detection | ✓ | — | — | — |
+| Forensic copy support | ✓ | ✓ | ✓ | ✓ |
+
+---
+
+## Anti-Forensic Detection
+
+`ese-integrity` checks three manipulation indicators at the binary level — facts, not conclusions:
+
+**Dirty shutdown** — `db_state == 2` means the database was never cleanly closed. Could be a crash. Could be a process kill timed to prevent the final flush.
+
+**Timestamp skew** — page `db_time` fields are compared to the file header. A page newer than its own header was written after the header was sealed — a direct indicator of page-level injection.
+
+**Slack-space residue** — the region between the last record and the tag array is scanned for non-zero bytes. Residual data here means records were deleted without zeroing — fragments of evicted evidence remain.
+
+`ese-carver` goes further: when a record was split across a page boundary by the ESE engine, it detects the split and reconstructs the original bytes, recovering data that appears incomplete in any linear page scan.
 
 ---
 
@@ -130,14 +146,21 @@ Records from the `{5C8CF1C7-7257-4F13-B223-970EF5939312}` SRUM table.
 
 ## Crate Structure
 
-This is a Cargo workspace — use the crates independently in your own tools:
+This is a Cargo workspace. Use the crates independently in your own tools:
+
+<details>
+<summary>Show crate layout</summary>
 
 | Crate | What it does |
 |-------|-------------|
-| [`ese-core`](crates/ese-core/) | ESE/JET Blue binary format parser — page reading, B-tree walking |
+| [`ese-core`](crates/ese-core/) | ESE/JET Blue binary format parser — page reading, B-tree walking, catalog |
+| [`ese-integrity`](crates/ese-integrity/) | Structural anomaly detection — dirty state, timestamp skew, slack-space scanning |
+| [`ese-carver`](crates/ese-carver/) | Page carving — detect and reconstruct records split across page boundaries |
 | [`srum-core`](crates/srum-core/) | SRUM record type definitions — `NetworkUsageRecord`, `AppUsageRecord`, `IdMapEntry` |
 | [`srum-parser`](crates/srum-parser/) | High-level API — `parse_network_usage(path)`, `parse_app_usage(path)` |
 | [`sr-cli`](crates/sr-cli/) | `sr` binary — wraps srum-parser, outputs JSON |
+
+</details>
 
 ```toml
 # Use the parser in your own project
