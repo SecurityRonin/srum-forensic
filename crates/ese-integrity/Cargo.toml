@@ -12,6 +12,7 @@ serde.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+ese-test-fixtures.workspace = true
 tempfile.workspace = true
 
 [lints]
