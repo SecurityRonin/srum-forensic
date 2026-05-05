@@ -50,6 +50,23 @@ fn detect_fragments_ignores_split_when_sizes_do_not_match_expected() {
     );
 }
 
+// ── detect_fragments_db ──────────────────────────────────────────────────────
+
+#[test]
+fn detect_fragments_db_finds_split_via_ese_database() {
+    let prefix = vec![0xAAu8; 12];
+    let suffix = vec![0xBBu8; 8];
+    let pages = fixtures::make_flat_split(&prefix, &suffix);
+    use std::io::Write as _;
+    let mut tmp = tempfile::NamedTempFile::new().unwrap();
+    tmp.write_all(&pages).unwrap();
+    let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
+    let pairs = ese_carver::detect_fragments_db(&db, 20);
+    assert_eq!(pairs.len(), 1);
+    assert_eq!(pairs[0].prefix_len, 12);
+    assert_eq!(pairs[0].suffix_len, 8);
+}
+
 // ── reconstruct_fragment ─────────────────────────────────────────────────────
 
 #[test]
