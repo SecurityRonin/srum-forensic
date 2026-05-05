@@ -32,7 +32,7 @@ fn filetime_to_datetime(filetime: u64) -> DateTime<Utc> {
 ///
 /// # Errors
 ///
-/// Returns [`EseError::InvalidRecord`] if `data` is shorter than 32 bytes.
+/// Returns [`EseError::Corrupt`] if `data` is shorter than 32 bytes.
 pub fn decode_network_record(data: &[u8]) -> Result<NetworkUsageRecord, EseError> {
     if data.len() < RECORD_SIZE {
         return Err(EseError::Corrupt {

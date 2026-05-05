@@ -38,7 +38,7 @@ impl CatalogEntry {
     ///
     /// # Errors
     ///
-    /// Returns [`EseError::InvalidRecord`] if the slice is too short or
+    /// Returns [`EseError::Corrupt`] if the slice is too short or
     /// the name bytes are not valid UTF-8.
     pub fn from_bytes(data: &[u8]) -> Result<Self, EseError> {
         if data.len() < Self::MIN_SIZE {

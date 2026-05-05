@@ -21,7 +21,7 @@ pub const MIN_RECORD_SIZE: usize = 6;
 ///
 /// # Errors
 ///
-/// Returns [`EseError::InvalidRecord`] if the slice is too short or the
+/// Returns [`EseError::Corrupt`] if the slice is too short or the
 /// UTF-16LE name bytes contain an invalid surrogate pair.
 pub fn decode_id_map_entry(data: &[u8]) -> Result<IdMapEntry, EseError> {
     if data.len() < MIN_RECORD_SIZE {
