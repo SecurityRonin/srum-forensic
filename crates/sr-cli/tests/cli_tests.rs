@@ -92,6 +92,52 @@ fn sr_network_error_stdout_is_empty() {
     );
 }
 
+// ── --resolve flag ───────────────────────────────────────────────────────────
+
+#[test]
+fn sr_network_resolve_help_shows_resolve_flag() {
+    let out = sr_bin()
+        .args(["network", "--help"])
+        .output()
+        .expect("run sr network --help");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("resolve"),
+        "sr network --help must document --resolve, got: {stdout}"
+    );
+}
+
+#[test]
+fn sr_apps_resolve_help_shows_resolve_flag() {
+    let out = sr_bin()
+        .args(["apps", "--help"])
+        .output()
+        .expect("run sr apps --help");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("resolve"),
+        "sr apps --help must document --resolve, got: {stdout}"
+    );
+}
+
+#[test]
+fn sr_network_resolve_nonexistent_exits_nonzero() {
+    let status = sr_bin()
+        .args(["network", "--resolve", "/nonexistent/SRUDB.dat"])
+        .status()
+        .expect("run sr");
+    assert!(!status.success());
+}
+
+#[test]
+fn sr_apps_resolve_nonexistent_exits_nonzero() {
+    let status = sr_bin()
+        .args(["apps", "--resolve", "/nonexistent/SRUDB.dat"])
+        .status()
+        .expect("run sr");
+    assert!(!status.success());
+}
+
 // ── sr idmap ─────────────────────────────────────────────────────────────────
 
 #[test]
