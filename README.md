@@ -141,18 +141,38 @@ Records from the `{5C8CF1C7-7257-4F13-B223-970EF5939312}` SRUM table.
 ]
 ```
 
-`app_id` and `user_id` are integer keys into the `SruDbIdMapTable`. Resolve them with:
+`app_id` and `user_id` are integer keys into the `SruDbIdMapTable`. Pass `--resolve`
+to inline the names directly into the output — no jq, no temp files:
 
 ```bash
-sr idmap SRUDB.dat | jq 'map({(.id|tostring): .name}) | add' > idmap.json
-# then join: sr network SRUDB.dat | jq --slurpfile m idmap.json '.[] | .app = $m[0][.app_id|tostring]'
+sr network --resolve SRUDB.dat
+sr apps    --resolve SRUDB.dat
+```
+
+Resolution is best-effort: records whose IDs are absent from the map keep their
+raw integer values and no `app_name`/`user_name` field is injected.
+
+### `sr network --resolve <path>`
+
+```json
+[
+  {
+    "timestamp": "2024-06-15T08:00:00Z",
+    "app_id": 42,
+    "app_name": "\\Device\\HarddiskVolume3\\Windows\\svchost.exe",
+    "user_id": 1,
+    "user_name": "S-1-5-21-1234567890-123456789-1234567890-1001",
+    "bytes_sent": 1048576,
+    "bytes_recv": 8388608
+  }
+]
 ```
 
 ### `sr idmap <path>`
 
 ```json
 [
-  { "id": 42, "name": "\\Device\\HarddiskVolume3\\Windows\\explorer.exe" },
+  { "id": 42, "name": "\\Device\\HarddiskVolume3\\Windows\\svchost.exe" },
   { "id": 1,  "name": "S-1-5-21-1234567890-123456789-1234567890-1001" }
 ]
 ```
