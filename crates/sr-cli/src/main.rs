@@ -71,6 +71,21 @@ enum Cmd {
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
+    /// Parse network connectivity records — L2 connection sessions per process.
+    ///
+    /// Records come from the {DD6636C4-8929-4683-974E-22C046A43763} table.
+    Connectivity {
+        /// Path to SRUDB.dat (or a forensic copy of it).
+        path: PathBuf,
+        /// Resolve `app_id`, `user_id`, and `profile_id` to names from `SruDbIdMapTable`.
+        ///
+        /// Adds `app_name`, `user_name`, and `profile_name` fields to each record.
+        #[arg(long)]
+        resolve: bool,
+        /// Output format (json or csv).
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
+    },
 }
 
 /// Build an id→name lookup from the id-map table in `path`.
@@ -114,6 +129,32 @@ fn enrich<T: Serialize>(record: T, id_map: &HashMap<i32, String>) -> serde_json:
                 "user_name".to_owned(),
                 serde_json::Value::String(name.clone()),
             );
+        }
+    }
+    v
+}
+
+/// Inject `app_name`, `user_name`, and `profile_name` into a connectivity record.
+///
+/// Same pattern as [`enrich`] but also resolves `profile_id` to `profile_name`.
+fn enrich_connectivity(
+    mut v: serde_json::Value,
+    id_map: &std::collections::HashMap<i32, String>,
+) -> serde_json::Value {
+    if let Some(obj) = v.as_object_mut() {
+        for &(id_key, name_key) in &[
+            ("app_id", "app_name"),
+            ("user_id", "user_name"),
+            ("profile_id", "profile_name"),
+        ] {
+            if let Some(name) = obj
+                .get(id_key)
+                .and_then(serde_json::Value::as_i64)
+                .and_then(|id| i32::try_from(id).ok())
+                .and_then(|id| id_map.get(&id))
+            {
+                obj.insert(name_key.to_owned(), serde_json::Value::String(name.clone()));
+            }
         }
     }
     v
@@ -200,6 +241,22 @@ fn run() -> anyhow::Result<()> {
         Cmd::Idmap { path, format } => {
             let entries = srum_parser::parse_id_map(&path)?;
             let values = records_to_values(entries)?;
+            print_values(&values, &format)?;
+        }
+        Cmd::Connectivity {
+            path,
+            resolve,
+            format,
+        } => {
+            let records = srum_parser::parse_network_connectivity(&path)?;
+            let mut values = records_to_values(records)?;
+            if resolve {
+                let id_map = load_id_map(&path);
+                values = values
+                    .into_iter()
+                    .map(|r| enrich_connectivity(r, &id_map))
+                    .collect();
+            }
             print_values(&values, &format)?;
         }
     }

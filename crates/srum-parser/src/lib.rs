@@ -5,6 +5,7 @@
 //! forensic analysis always operates on a copy.
 
 mod app_usage;
+mod connectivity;
 mod id_map;
 mod network;
 
@@ -73,6 +74,25 @@ pub fn parse_app_usage(path: &std::path::Path) -> anyhow::Result<Vec<srum_core::
         &db,
         "{5C8CF1C7-7257-4F13-B223-970EF5939312}",
         app_usage::decode_app_record,
+    )
+}
+
+/// Parse network connectivity records from a SRUDB.dat file.
+///
+/// Returns all records from the
+/// `{DD6636C4-8929-4683-974E-22C046A43763}` table.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read or is not a valid ESE database.
+pub fn parse_network_connectivity(
+    path: &std::path::Path,
+) -> anyhow::Result<Vec<srum_core::NetworkConnectivityRecord>> {
+    let db = ese_core::EseDatabase::open(path)?;
+    collect_table(
+        &db,
+        "{DD6636C4-8929-4683-974E-22C046A43763}",
+        connectivity::decode_connectivity_record,
     )
 }
 

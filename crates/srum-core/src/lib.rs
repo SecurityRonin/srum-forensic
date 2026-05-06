@@ -4,10 +4,12 @@
 //! Parsing is handled by the `srum-parser` crate.
 
 pub mod app_usage;
+pub mod connectivity;
 pub mod id_map;
 pub mod network;
 
 pub use app_usage::AppUsageRecord;
+pub use connectivity::NetworkConnectivityRecord;
 pub use id_map::IdMapEntry;
 pub use network::NetworkUsageRecord;
 
@@ -22,6 +24,9 @@ pub const NETWORK_RECORD_SIZE: usize = 32;
 
 /// Fixed byte length of a serialised [`AppUsageRecord`].
 pub const APP_RECORD_SIZE: usize = 32;
+
+/// Fixed byte length of a serialised [`NetworkConnectivityRecord`].
+pub const NETWORK_CONNECTIVITY_RECORD_SIZE: usize = 28;
 
 /// Minimum byte length of a serialised [`IdMapEntry`].
 pub const ID_MAP_MIN_SIZE: usize = 6;
