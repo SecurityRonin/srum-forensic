@@ -6,6 +6,7 @@
 
 mod app_usage;
 mod connectivity;
+mod energy;
 mod id_map;
 mod network;
 
@@ -93,6 +94,25 @@ pub fn parse_network_connectivity(
         &db,
         "{DD6636C4-8929-4683-974E-22C046A43763}",
         connectivity::decode_connectivity_record,
+    )
+}
+
+/// Parse energy usage records from a SRUDB.dat file.
+///
+/// Returns all records from the
+/// `{FEE4E14F-02A9-4550-B5CE-5FA2DA202E37}` table.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read or is not a valid ESE database.
+pub fn parse_energy_usage(
+    path: &std::path::Path,
+) -> anyhow::Result<Vec<srum_core::EnergyUsageRecord>> {
+    let db = ese_core::EseDatabase::open(path)?;
+    collect_table(
+        &db,
+        "{FEE4E14F-02A9-4550-B5CE-5FA2DA202E37}",
+        energy::decode_energy_record,
     )
 }
 
