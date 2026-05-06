@@ -141,7 +141,21 @@ Records from the `{5C8CF1C7-7257-4F13-B223-970EF5939312}` SRUM table.
 ]
 ```
 
-`app_id` and `user_id` are integer keys into the `SruDbIdMapTable`. Use the `srum-parser` library's `parse_id_map()` function to resolve them to process names and SIDs in your own tooling.
+`app_id` and `user_id` are integer keys into the `SruDbIdMapTable`. Resolve them with:
+
+```bash
+sr idmap SRUDB.dat | jq 'map({(.id|tostring): .name}) | add' > idmap.json
+# then join: sr network SRUDB.dat | jq --slurpfile m idmap.json '.[] | .app = $m[0][.app_id|tostring]'
+```
+
+### `sr idmap <path>`
+
+```json
+[
+  { "id": 42, "name": "\\Device\\HarddiskVolume3\\Windows\\explorer.exe" },
+  { "id": 1,  "name": "S-1-5-21-1234567890-123456789-1234567890-1001" }
+]
+```
 
 ---
 
