@@ -92,6 +92,56 @@ fn sr_network_error_stdout_is_empty() {
     );
 }
 
+// ── --format flag ────────────────────────────────────────────────────────────
+
+#[test]
+fn sr_network_help_shows_format_flag() {
+    let out = sr_bin().args(["network", "--help"]).output().expect("run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("format"),
+        "sr network --help must document --format, got: {stdout}"
+    );
+}
+
+#[test]
+fn sr_apps_help_shows_format_flag() {
+    let out = sr_bin().args(["apps", "--help"]).output().expect("run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("format"),
+        "sr apps --help must document --format, got: {stdout}"
+    );
+}
+
+#[test]
+fn sr_idmap_help_shows_format_flag() {
+    let out = sr_bin().args(["idmap", "--help"]).output().expect("run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("format"),
+        "sr idmap --help must document --format, got: {stdout}"
+    );
+}
+
+#[test]
+fn sr_network_format_csv_nonexistent_exits_nonzero() {
+    let status = sr_bin()
+        .args(["network", "--format", "csv", "/nonexistent/SRUDB.dat"])
+        .status()
+        .expect("run");
+    assert!(!status.success(), "must exit nonzero for missing file");
+}
+
+#[test]
+fn sr_apps_format_csv_nonexistent_exits_nonzero() {
+    let status = sr_bin()
+        .args(["apps", "--format", "csv", "/nonexistent/SRUDB.dat"])
+        .status()
+        .expect("run");
+    assert!(!status.success(), "must exit nonzero for missing file");
+}
+
 // ── --resolve flag ───────────────────────────────────────────────────────────
 
 #[test]
