@@ -86,6 +86,7 @@ Every alternative either requires Windows, needs a Python environment, or costs 
 | Free & open source | ✓ | partial | ✓ | — |
 | JSON output | ✓ | — | — | — |
 | Pipe-friendly | ✓ | — | — | — |
+| Zero-copy mmap I/O | ✓ | — | — | — |
 | ESE parsed in Rust | ✓ | — | — | — |
 | Structural integrity checks | ✓ | — | — | — |
 | Forensic copy support | ✓ | ✓ | ✓ | ✓ |
@@ -140,7 +141,7 @@ Records from the `{5C8CF1C7-7257-4F13-B223-970EF5939312}` SRUM table.
 ]
 ```
 
-`app_id` and `user_id` are integer keys into the `SruDbIdMapTable`. Run `sr idmap <path>` to resolve them to process names and SIDs.
+`app_id` and `user_id` are integer keys into the `SruDbIdMapTable`. Use the `srum-parser` library's `parse_id_map()` function to resolve them to process names and SIDs in your own tooling.
 
 ---
 
@@ -153,12 +154,13 @@ This is a Cargo workspace. Use the crates independently in your own tools:
 
 | Crate | What it does |
 |-------|-------------|
-| [`ese-core`](crates/ese-core/) | ESE/JET Blue binary format parser — page reading, B-tree walking, catalog |
+| [`ese-core`](crates/ese-core/) | ESE/JET Blue binary format parser — memory-mapped page I/O, B-tree walking, catalog, zero-copy `raw_page_slice` |
 | [`ese-integrity`](crates/ese-integrity/) | Structural anomaly detection — dirty state, timestamp skew, slack-space scanning |
 | [`ese-carver`](crates/ese-carver/) | Page carving — detect and reconstruct records split across page boundaries |
 | [`srum-core`](crates/srum-core/) | SRUM record type definitions — `NetworkUsageRecord`, `AppUsageRecord`, `IdMapEntry` |
-| [`srum-parser`](crates/srum-parser/) | High-level API — `parse_network_usage(path)`, `parse_app_usage(path)` |
+| [`srum-parser`](crates/srum-parser/) | High-level API — `parse_network_usage`, `parse_app_usage`, `parse_id_map` |
 | [`sr-cli`](crates/sr-cli/) | `sr` binary — wraps srum-parser, outputs JSON |
+| [`ese-test-fixtures`](crates/ese-test-fixtures/) | Shared test fixture builders — dev-dependency only, never ships |
 
 </details>
 
@@ -167,6 +169,14 @@ This is a Cargo workspace. Use the crates independently in your own tools:
 [dependencies]
 srum-parser = "0.1"
 ```
+
+---
+
+## Performance
+
+`ese-core` memory-maps the database file once at open time (`memmap2`). All subsequent page reads — integrity checks, record iteration, carving — slice directly into the OS-managed mapping with no additional syscalls or heap allocation per page. The OS page cache handles read-ahead and eviction; the tool itself never touches the file descriptor again after `open()`.
+
+This matters in practice: a 200 MB `SRUDB.dat` is mapped in one `mmap(2)` call. A linear integrity scan over all pages costs zero `read(2)` syscalls.
 
 ---
 
