@@ -39,15 +39,27 @@ cargo build --release
 
 ---
 
-## Three Things You Do With This
+## What You Can Extract
+
+| Subcommand | SRUM Table | What It Shows |
+|---|---|---|
+| `sr network` | Network Data Usage | Per-process bytes sent/received per hour |
+| `sr apps` | Application Resource Usage | Per-process foreground/background CPU cycles |
+| `sr connectivity` | Network Connectivity | Profile connection time per app |
+| `sr energy` | Energy Usage | Charge level and energy consumed per app |
+| `sr notifications` | Push Notifications | Notification type and count per app |
+| `sr idmap` | SruDbIdMapTable | Integer ID → process name / SID mapping |
+| `sr timeline` | All of the above | Unified chronological view, all tables merged |
+
+All subcommands accept `--format json` (default) or `--format csv`.
+`network`, `apps`, `connectivity`, and `notifications` accept `--resolve` to inline names from the ID map.
 
 ### Hunt lateral movement — who sent how much, from which process
 
 ```bash
-# Every process that sent data — sorted by bytes, highest first
-sr network SRUDB.dat \
-  | jq -r '.[] | [.app_id, .bytes_sent, .bytes_recv, .timestamp] | @tsv' \
-  | sort -t$'\t' -k2 -rn \
+# Every process that sent data — resolved names, sorted by bytes, highest first
+sr network --resolve --format csv SRUDB.dat \
+  | sort -t, -k5 -rn \
   | head -20
 ```
 
@@ -63,14 +75,23 @@ sr apps SRUDB.dat \
 
 Application usage records track foreground and background CPU cycles for every executable. Background activity with no corresponding foreground session is a red flag.
 
+### Build a unified activity timeline
+
+```bash
+# All SRUM evidence sorted chronologically — one command
+sr timeline SRUDB.dat | jq '.[] | select(.table == "network")'
+```
+
+`sr timeline` loads all tables in a single pass, merges them, and sorts by timestamp. Useful for reconstructing an incident timeline without running five separate commands and manually correlating the output.
+
 ### Feed your SIEM
 
 ```bash
-sr network SRUDB.dat >> srum_network.ndjson
-sr apps SRUDB.dat    >> srum_apps.ndjson
+sr network SRUDB.dat --format csv >> srum_network.csv
+sr apps    SRUDB.dat              >> srum_apps.ndjson
 ```
 
-Both subcommands output JSON arrays. Pipe to `jq -c '.[]'` for NDJSON, redirect to files, or POST directly to Elasticsearch. The schema is stable and documented.
+All subcommands output JSON arrays by default. Pass `--format csv` for flat CSV. Pipe JSON to `jq -c '.[]'` for NDJSON, redirect to files, or POST directly to Elasticsearch. The schema is stable and documented.
 
 ---
 
@@ -85,6 +106,10 @@ Every alternative either requires Windows, needs a Python environment, or costs 
 | No Python runtime | ✓ | — | — | ✓ |
 | Free & open source | ✓ | partial | ✓ | — |
 | JSON output | ✓ | — | — | — |
+| CSV output | ✓ | ✓ | — | ✓ |
+| 5 SRUM tables | ✓ | ✓ | — | ✓ |
+| Inline ID resolution | ✓ | — | — | — |
+| Unified timeline | ✓ | — | — | — |
 | Pipe-friendly | ✓ | — | — | — |
 | Zero-copy mmap I/O | ✓ | — | — | — |
 | ESE parsed in Rust | ✓ | — | — | — |
@@ -145,8 +170,10 @@ Records from the `{5C8CF1C7-7257-4F13-B223-970EF5939312}` SRUM table.
 to inline the names directly into the output — no jq, no temp files:
 
 ```bash
-sr network --resolve SRUDB.dat
-sr apps    --resolve SRUDB.dat
+sr network       --resolve SRUDB.dat
+sr apps          --resolve SRUDB.dat
+sr connectivity  --resolve SRUDB.dat
+sr notifications --resolve SRUDB.dat
 ```
 
 Resolution is best-effort: records whose IDs are absent from the map keep their
@@ -166,6 +193,85 @@ raw integer values and no `app_name`/`user_name` field is injected.
     "bytes_recv": 8388608
   }
 ]
+```
+
+### `sr connectivity <path>`
+
+Records from the `{DD6636C4-8929-4683-974E-22C046A43763}` SRUM table.
+
+```json
+[
+  {
+    "timestamp": "2024-06-15T08:00:00Z",
+    "app_id": 42,
+    "user_id": 1,
+    "profile_id": 3,
+    "connected_time": 3600
+  }
+]
+```
+
+### `sr energy <path>`
+
+Records from the `{FEE4E14F-02A9-4550-B5CE-5FA2DA202E37}` SRUM table.
+
+```json
+[
+  {
+    "timestamp": "2024-06-15T08:00:00Z",
+    "app_id": 42,
+    "user_id": 1,
+    "charge_level": 87,
+    "energy_consumed": 12400
+  }
+]
+```
+
+### `sr notifications <path>`
+
+Records from the `{D10CA2FE-6FCF-4F6D-848E-B2E99266FA89}` SRUM table.
+
+```json
+[
+  {
+    "timestamp": "2024-06-15T08:00:00Z",
+    "app_id": 42,
+    "user_id": 1,
+    "notification_type": 1,
+    "count": 7
+  }
+]
+```
+
+### `sr timeline <path>`
+
+Merges all tables, sorted by timestamp. Each record includes a `"table"` field
+identifying its source. Exits 0 even if individual tables fail (best-effort).
+
+```json
+[
+  {
+    "table": "network",
+    "timestamp": "2024-06-15T07:00:00Z",
+    "app_id": 42,
+    "bytes_sent": 512,
+    "bytes_recv": 1024
+  },
+  {
+    "table": "apps",
+    "timestamp": "2024-06-15T08:00:00Z",
+    "app_id": 42,
+    "foreground_cycles": 12500000,
+    "background_cycles": 0
+  }
+]
+```
+
+Pass `--format csv` to any subcommand for flat CSV output instead of JSON:
+
+```bash
+sr network --format csv SRUDB.dat > network.csv
+sr timeline --format csv SRUDB.dat > timeline.csv
 ```
 
 ### `sr idmap <path>`
@@ -191,9 +297,9 @@ This is a Cargo workspace. Use the crates independently in your own tools:
 | [`ese-core`](crates/ese-core/) | ESE/JET Blue binary format parser — memory-mapped page I/O, B-tree walking, catalog, zero-copy `raw_page_slice` |
 | [`ese-integrity`](crates/ese-integrity/) | Structural anomaly detection — dirty state, timestamp skew, slack-space scanning |
 | [`ese-carver`](crates/ese-carver/) | Page carving — detect and reconstruct records split across page boundaries |
-| [`srum-core`](crates/srum-core/) | SRUM record type definitions — `NetworkUsageRecord`, `AppUsageRecord`, `IdMapEntry` |
-| [`srum-parser`](crates/srum-parser/) | High-level API — `parse_network_usage`, `parse_app_usage`, `parse_id_map` |
-| [`sr-cli`](crates/sr-cli/) | `sr` binary — wraps srum-parser, outputs JSON |
+| [`srum-core`](crates/srum-core/) | SRUM record type definitions — `NetworkUsageRecord`, `AppUsageRecord`, `NetworkConnectivityRecord`, `EnergyUsageRecord`, `PushNotificationRecord`, `IdMapEntry` |
+| [`srum-parser`](crates/srum-parser/) | High-level API — `parse_network_usage`, `parse_app_usage`, `parse_network_connectivity`, `parse_energy_usage`, `parse_push_notifications`, `parse_id_map` |
+| [`sr-cli`](crates/sr-cli/) | `sr` binary — `network`, `apps`, `connectivity`, `energy`, `notifications`, `timeline`, `idmap` subcommands; `--format json/csv`; `--resolve` |
 | [`ese-test-fixtures`](crates/ese-test-fixtures/) | Shared test fixture builders — dev-dependency only, never ships |
 
 </details>
@@ -222,9 +328,12 @@ On a live system the file is locked by `svchost.exe`. Forensic analysis always o
 
 The database contains multiple tables identified by GUID. This tool currently supports:
 
-- `{973F5D5C-1D90-4944-BE8E-24B22A728CF2}` — Network Data Usage
-- `{5C8CF1C7-7257-4F13-B223-970EF5939312}` — Application Resource Usage
-- `SruDbIdMapTable` — Integer ID → process name / SID mapping
+- `{973F5D5C-1D90-4944-BE8E-24B22A728CF2}` — Network Data Usage (`sr network`)
+- `{5C8CF1C7-7257-4F13-B223-970EF5939312}` — Application Resource Usage (`sr apps`)
+- `{DD6636C4-8929-4683-974E-22C046A43763}` — Network Connectivity (`sr connectivity`)
+- `{FEE4E14F-02A9-4550-B5CE-5FA2DA202E37}` — Energy Usage (`sr energy`)
+- `{D10CA2FE-6FCF-4F6D-848E-B2E99266FA89}` — Push Notifications (`sr notifications`)
+- `SruDbIdMapTable` — Integer ID → process name / SID mapping (`sr idmap`)
 
 ---
 
