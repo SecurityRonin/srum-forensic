@@ -233,3 +233,36 @@ fn sr_idmap_nonexistent_stdout_is_empty() {
         "stdout must be empty on error, got: {stdout}"
     );
 }
+
+// ── sr connectivity ──────────────────────────────────────────────────────────
+
+#[test]
+fn sr_connectivity_help_exits_success() {
+    let status = sr_bin()
+        .args(["connectivity", "--help"])
+        .status()
+        .expect("run sr connectivity --help");
+    assert!(status.success(), "sr connectivity --help should exit 0");
+}
+
+#[test]
+fn sr_connectivity_nonexistent_exits_nonzero() {
+    let status = sr_bin()
+        .args(["connectivity", "/nonexistent/SRUDB.dat"])
+        .status()
+        .expect("run sr connectivity");
+    assert!(!status.success(), "sr must exit nonzero for missing file");
+}
+
+#[test]
+fn sr_connectivity_nonexistent_stderr_has_error_prefix() {
+    let out = sr_bin()
+        .args(["connectivity", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run sr connectivity");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("error:"),
+        "stderr must contain 'error:' prefix, got: {stderr}"
+    );
+}
