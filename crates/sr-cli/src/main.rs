@@ -101,6 +101,21 @@ enum Cmd {
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
+    /// Parse push notification records — app notification activity per interval.
+    ///
+    /// Records come from the {D10CA2FE-6FCF-4F6D-848E-B2E99266FA89} table.
+    Notifications {
+        /// Path to SRUDB.dat (or a forensic copy of it).
+        path: PathBuf,
+        /// Resolve `app_id` and `user_id` to names from `SruDbIdMapTable`.
+        ///
+        /// Adds `app_name` and `user_name` fields to each record.
+        #[arg(long)]
+        resolve: bool,
+        /// Output format (json or csv).
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
+    },
 }
 
 /// Build an id→name lookup from the id-map table in `path`.
@@ -280,6 +295,19 @@ fn run() -> anyhow::Result<()> {
             format,
         } => {
             let records = srum_parser::parse_energy_usage(&path)?;
+            let mut values = records_to_values(records)?;
+            if resolve {
+                let id_map = load_id_map(&path);
+                values = values.into_iter().map(|r| enrich(r, &id_map)).collect();
+            }
+            print_values(&values, &format)?;
+        }
+        Cmd::Notifications {
+            path,
+            resolve,
+            format,
+        } => {
+            let records = srum_parser::parse_push_notifications(&path)?;
             let mut values = records_to_values(records)?;
             if resolve {
                 let id_map = load_id_map(&path);

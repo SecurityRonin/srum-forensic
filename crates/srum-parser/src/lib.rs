@@ -9,6 +9,7 @@ mod connectivity;
 mod energy;
 mod id_map;
 mod network;
+mod push_notification;
 
 use ese_core::EseError;
 
@@ -113,6 +114,25 @@ pub fn parse_energy_usage(
         &db,
         "{FEE4E14F-02A9-4550-B5CE-5FA2DA202E37}",
         energy::decode_energy_record,
+    )
+}
+
+/// Parse push notification records from a SRUDB.dat file.
+///
+/// Returns all records from the
+/// `{D10CA2FE-6FCF-4F6D-848E-B2E99266FA89}` table.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read or is not a valid ESE database.
+pub fn parse_push_notifications(
+    path: &std::path::Path,
+) -> anyhow::Result<Vec<srum_core::PushNotificationRecord>> {
+    let db = ese_core::EseDatabase::open(path)?;
+    collect_table(
+        &db,
+        "{D10CA2FE-6FCF-4F6D-848E-B2E99266FA89}",
+        push_notification::decode_push_notification_record,
     )
 }
 

@@ -8,12 +8,14 @@ pub mod connectivity;
 pub mod energy;
 pub mod id_map;
 pub mod network;
+pub mod push_notification;
 
 pub use app_usage::AppUsageRecord;
 pub use connectivity::NetworkConnectivityRecord;
 pub use energy::EnergyUsageRecord;
 pub use id_map::IdMapEntry;
 pub use network::NetworkUsageRecord;
+pub use push_notification::PushNotificationRecord;
 
 use chrono::{DateTime, Utc};
 
@@ -32,6 +34,9 @@ pub const NETWORK_CONNECTIVITY_RECORD_SIZE: usize = 28;
 
 /// Fixed byte length of a serialised [`EnergyUsageRecord`].
 pub const ENERGY_RECORD_SIZE: usize = 32;
+
+/// Minimum byte length of a serialised [`PushNotificationRecord`].
+pub const PUSH_NOTIFICATION_RECORD_SIZE: usize = 24;
 
 /// Minimum byte length of a serialised [`IdMapEntry`].
 pub const ID_MAP_MIN_SIZE: usize = 6;
