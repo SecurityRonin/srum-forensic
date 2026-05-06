@@ -11,6 +11,14 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use serde::Serialize;
 
+/// Output format for subcommand results.
+#[derive(clap::ValueEnum, Clone, Default, PartialEq)]
+enum OutputFormat {
+    #[default]
+    Json,
+    Csv,
+}
+
 /// SRUM forensic analysis tool.
 ///
 /// Reads SRUDB.dat (Windows System Resource Usage Monitor database) and
@@ -35,6 +43,9 @@ enum Cmd {
         /// Adds `app_name` and `user_name` fields to each record.
         #[arg(long)]
         resolve: bool,
+        /// Output format (json or csv).
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
     },
     /// Parse application usage records from SRUDB.dat and print as JSON.
     ///
@@ -47,12 +58,18 @@ enum Cmd {
         /// Adds `app_name` and `user_name` fields to each record.
         #[arg(long)]
         resolve: bool,
+        /// Output format (json or csv).
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
     },
     /// Dump the `SruDbIdMapTable` as JSON — resolves `app_id` / `user_id` integers
     /// to process paths and SIDs.
     Idmap {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
+        /// Output format (json or csv).
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
     },
 }
 
@@ -102,32 +119,88 @@ fn enrich<T: Serialize>(record: T, id_map: &HashMap<i32, String>) -> serde_json:
     v
 }
 
+/// Serialise a slice of records into a `Vec<serde_json::Value>`.
+fn records_to_values<T: Serialize>(records: Vec<T>) -> anyhow::Result<Vec<serde_json::Value>> {
+    records
+        .into_iter()
+        .map(|r| serde_json::to_value(r).map_err(Into::into))
+        .collect()
+}
+
+/// Render a slice of JSON objects as CSV text.
+///
+/// Column order follows the key order of the first object.  Missing keys in
+/// subsequent rows produce empty cells.
+fn values_to_csv(values: &[serde_json::Value]) -> anyhow::Result<String> {
+    if values.is_empty() {
+        return Ok(String::new());
+    }
+    let headers: Vec<String> = match &values[0] {
+        serde_json::Value::Object(m) => m.keys().cloned().collect(),
+        _ => anyhow::bail!("expected JSON object for CSV serialisation"),
+    };
+    let mut wtr = csv::Writer::from_writer(vec![]);
+    wtr.write_record(&headers)?;
+    for v in values {
+        if let serde_json::Value::Object(m) = v {
+            let row: Vec<String> = headers
+                .iter()
+                .map(|k| match m.get(k) {
+                    Some(serde_json::Value::String(s)) => s.clone(),
+                    Some(val) => val.to_string(),
+                    None => String::new(),
+                })
+                .collect();
+            wtr.write_record(&row)?;
+        }
+    }
+    Ok(String::from_utf8(wtr.into_inner()?)?)
+}
+
+/// Print `values` in the requested `format`.
+fn print_values(values: &[serde_json::Value], format: &OutputFormat) -> anyhow::Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(values)?),
+        OutputFormat::Csv => print!("{}", values_to_csv(values)?),
+    }
+    Ok(())
+}
+
 fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Cmd::Network { path, resolve } => {
+        Cmd::Network {
+            path,
+            resolve,
+            format,
+        } => {
             let records = srum_parser::parse_network_usage(&path)?;
-            if resolve {
+            let values: Vec<serde_json::Value> = if resolve {
                 let id_map = load_id_map(&path);
-                let enriched: Vec<_> = records.into_iter().map(|r| enrich(r, &id_map)).collect();
-                println!("{}", serde_json::to_string_pretty(&enriched)?);
+                records.into_iter().map(|r| enrich(r, &id_map)).collect()
             } else {
-                println!("{}", serde_json::to_string_pretty(&records)?);
-            }
+                records_to_values(records)?
+            };
+            print_values(&values, &format)?;
         }
-        Cmd::Apps { path, resolve } => {
+        Cmd::Apps {
+            path,
+            resolve,
+            format,
+        } => {
             let records = srum_parser::parse_app_usage(&path)?;
-            if resolve {
+            let values: Vec<serde_json::Value> = if resolve {
                 let id_map = load_id_map(&path);
-                let enriched: Vec<_> = records.into_iter().map(|r| enrich(r, &id_map)).collect();
-                println!("{}", serde_json::to_string_pretty(&enriched)?);
+                records.into_iter().map(|r| enrich(r, &id_map)).collect()
             } else {
-                println!("{}", serde_json::to_string_pretty(&records)?);
-            }
+                records_to_values(records)?
+            };
+            print_values(&values, &format)?;
         }
-        Cmd::Idmap { path } => {
+        Cmd::Idmap { path, format } => {
             let entries = srum_parser::parse_id_map(&path)?;
-            println!("{}", serde_json::to_string_pretty(&entries)?);
+            let values = records_to_values(entries)?;
+            print_values(&values, &format)?;
         }
     }
     Ok(())
