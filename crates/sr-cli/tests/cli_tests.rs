@@ -88,3 +88,46 @@ fn sr_network_error_stdout_is_empty() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.is_empty(), "stdout must be empty on error, got: {stdout}");
 }
+
+// ── sr idmap ─────────────────────────────────────────────────────────────────
+
+#[test]
+fn sr_idmap_help_exits_success() {
+    let status = sr_bin()
+        .args(["idmap", "--help"])
+        .status()
+        .expect("run sr idmap --help");
+    assert!(status.success(), "sr idmap --help should exit 0");
+}
+
+#[test]
+fn sr_idmap_nonexistent_exits_nonzero() {
+    let status = sr_bin()
+        .args(["idmap", "/nonexistent/SRUDB.dat"])
+        .status()
+        .expect("run sr idmap");
+    assert!(!status.success(), "sr must exit nonzero for missing file");
+}
+
+#[test]
+fn sr_idmap_nonexistent_stderr_has_lowercase_error_prefix() {
+    let out = sr_bin()
+        .args(["idmap", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run sr idmap");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("error:"),
+        "stderr must contain 'error:' prefix, got: {stderr}"
+    );
+}
+
+#[test]
+fn sr_idmap_nonexistent_stdout_is_empty() {
+    let out = sr_bin()
+        .args(["idmap", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run sr idmap");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.is_empty(), "stdout must be empty on error, got: {stdout}");
+}
