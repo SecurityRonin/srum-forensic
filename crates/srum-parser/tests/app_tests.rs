@@ -35,5 +35,9 @@ fn parse_app_timestamp_known_filetime() {
     let raw = vec![encode_app_record(FILETIME_2024_06_15, 1, 0, 0, 0)];
     let tmp = make_srudb_with_app_records(&raw);
     let records = parse_app_usage(tmp.path()).expect("parse ok");
-    assert_eq!(records[0].timestamp.timestamp(), 1_718_438_400, "timestamp must decode to 2024-06-15T08:00:00Z");
+    assert_eq!(
+        records[0].timestamp.timestamp(),
+        1_718_438_400,
+        "timestamp must decode to 2024-06-15T08:00:00Z"
+    );
 }

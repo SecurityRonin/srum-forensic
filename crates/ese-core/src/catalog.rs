@@ -44,7 +44,11 @@ impl CatalogEntry {
         if data.len() < Self::MIN_SIZE {
             return Err(EseError::Corrupt {
                 page: 0,
-                detail: format!("catalog record too short: {} < {}", data.len(), Self::MIN_SIZE),
+                detail: format!(
+                    "catalog record too short: {} < {}",
+                    data.len(),
+                    Self::MIN_SIZE
+                ),
             });
         }
         let object_type = u16::from_le_bytes([data[0], data[1]]);

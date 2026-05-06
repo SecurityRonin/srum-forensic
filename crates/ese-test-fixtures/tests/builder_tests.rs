@@ -11,7 +11,10 @@ fn page_builder_produces_correct_page_size() {
 fn page_builder_leaf_sets_leaf_flag() {
     let page = PageBuilder::new(PAGE_SIZE).leaf().build();
     let flags = u32::from_le_bytes(page[0x20..0x24].try_into().unwrap());
-    assert!(flags & ese_core::PAGE_FLAG_LEAF != 0, "leaf flag must be set");
+    assert!(
+        flags & ese_core::PAGE_FLAG_LEAF != 0,
+        "leaf flag must be set"
+    );
 }
 
 #[test]
@@ -42,7 +45,10 @@ fn page_builder_record_bytes_readable_from_tag() {
 
 #[test]
 fn page_builder_with_db_time_writes_at_offset_0x08() {
-    let page = PageBuilder::new(PAGE_SIZE).leaf().with_db_time(0xDEAD_BEEF).build();
+    let page = PageBuilder::new(PAGE_SIZE)
+        .leaf()
+        .with_db_time(0xDEAD_BEEF)
+        .build();
     let val = u32::from_le_bytes(page[0x08..0x0C].try_into().unwrap());
     assert_eq!(val, 0xDEAD_BEEF);
 }
@@ -50,7 +56,10 @@ fn page_builder_with_db_time_writes_at_offset_0x08() {
 #[test]
 fn page_builder_with_slack_writes_nonzero_bytes_in_slack_region() {
     let slack = vec![0xFFu8; 4];
-    let page = PageBuilder::new(PAGE_SIZE).leaf().with_slack(&slack).build();
+    let page = PageBuilder::new(PAGE_SIZE)
+        .leaf()
+        .with_slack(&slack)
+        .build();
     assert!(page[40..44].iter().any(|&b| b != 0));
 }
 
@@ -61,7 +70,11 @@ fn ese_file_builder_write_produces_readable_file() {
         .write();
     assert!(tmp.path().exists());
     let meta = std::fs::metadata(tmp.path()).unwrap();
-    assert_eq!(usize::try_from(meta.len()).expect("len fits"), PAGE_SIZE, "header-only file = one page");
+    assert_eq!(
+        usize::try_from(meta.len()).expect("len fits"),
+        PAGE_SIZE,
+        "header-only file = one page"
+    );
 }
 
 #[test]
@@ -72,7 +85,10 @@ fn ese_file_builder_add_page_grows_file() {
         .add_page(extra)
         .write();
     let meta = std::fs::metadata(tmp.path()).unwrap();
-    assert_eq!(usize::try_from(meta.len()).expect("len fits"), PAGE_SIZE * 2);
+    assert_eq!(
+        usize::try_from(meta.len()).expect("len fits"),
+        PAGE_SIZE * 2
+    );
 }
 
 #[test]

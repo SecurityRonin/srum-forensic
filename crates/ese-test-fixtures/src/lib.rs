@@ -32,7 +32,12 @@ impl PageBuilder {
         let pos = page_size - 4;
         data[pos..pos + 4].copy_from_slice(&tag0_raw.to_le_bytes());
         data[0x1E..0x20].copy_from_slice(&1u16.to_le_bytes());
-        Self { data, page_size, record_offset: 40, tag_count: 1 }
+        Self {
+            data,
+            page_size,
+            record_offset: 40,
+            tag_count: 1,
+        }
     }
 
     pub fn leaf(mut self) -> Self {
@@ -134,15 +139,27 @@ pub struct EseFileBuilder {
 
 impl Default for EseFileBuilder {
     fn default() -> Self {
-        Self { db_time: 0, db_state: DB_STATE_CLEAN_SHUTDOWN, extra_pages: vec![] }
+        Self {
+            db_time: 0,
+            db_state: DB_STATE_CLEAN_SHUTDOWN,
+            extra_pages: vec![],
+        }
     }
 }
 
 impl EseFileBuilder {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-    pub fn with_db_time(mut self, t: u64) -> Self { self.db_time = t; self }
-    pub fn with_db_state(mut self, s: u32) -> Self { self.db_state = s; self }
+    pub fn with_db_time(mut self, t: u64) -> Self {
+        self.db_time = t;
+        self
+    }
+    pub fn with_db_state(mut self, s: u32) -> Self {
+        self.db_state = s;
+        self
+    }
 
     pub fn add_page(mut self, page: Vec<u8>) -> Self {
         self.extra_pages.push(page);

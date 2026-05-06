@@ -28,7 +28,11 @@ fn detect_fragments_finds_pair_when_split_across_boundary() {
     let expected_size = prefix.len() + suffix.len(); // 20
     let pages = fixtures::make_flat_split(&prefix, &suffix);
     let pairs = detect_fragments(&pages, fixtures::PAGE_SIZE, expected_size);
-    assert_eq!(pairs.len(), 1, "one split must produce exactly one FragmentPair");
+    assert_eq!(
+        pairs.len(),
+        1,
+        "one split must produce exactly one FragmentPair"
+    );
     let pair = &pairs[0];
     assert_eq!(pair.page_a, 1, "prefix lives on page 1");
     assert_eq!(pair.page_b, 2, "suffix lives on page 2");

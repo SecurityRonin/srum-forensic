@@ -15,7 +15,10 @@ fn table_records_from_root_yields_record_bytes() {
     let first = cursor.next().expect("at least one record");
     let (page_num, tag_idx, bytes) = first.expect("no error");
     assert_eq!(page_num, 1u32);
-    assert_eq!(tag_idx, 1usize, "data starts at tag 1 (tag 0 is page header)");
+    assert_eq!(
+        tag_idx, 1usize,
+        "data starts at tag 1 (tag 0 is page header)"
+    );
     assert_eq!(bytes, record);
 }
 
@@ -41,8 +44,13 @@ fn table_records_returns_table_not_found_for_unknown_table() {
     };
     let tmp = fixtures::make_ese_with_catalog(&[entry]);
     let db = EseDatabase::open(tmp.path()).expect("open");
-    let err = db.table_records("NonExistent").expect_err("unknown table must error");
-    assert!(matches!(err, EseError::TableNotFound { .. }), "got: {err:?}");
+    let err = db
+        .table_records("NonExistent")
+        .expect_err("unknown table must error");
+    assert!(
+        matches!(err, EseError::TableNotFound { .. }),
+        "got: {err:?}"
+    );
 }
 
 #[test]

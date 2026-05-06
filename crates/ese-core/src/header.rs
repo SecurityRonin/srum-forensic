@@ -45,24 +45,35 @@ impl EseHeader {
         if data.len() < Self::SIZE {
             return Err(EseError::Corrupt {
                 page: 0,
-                detail: format!("file too short: need {} bytes, got {}", Self::SIZE, data.len()),
+                detail: format!(
+                    "file too short: need {} bytes, got {}",
+                    Self::SIZE,
+                    data.len()
+                ),
             });
         }
         let sig = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
         if sig != 0x89AB_CDEF {
-            return Err(EseError::InvalidMagic { page: 0, found: sig });
+            return Err(EseError::InvalidMagic {
+                page: 0,
+                found: sig,
+            });
         }
         let format_version = u32::from_le_bytes([data[8], data[9], data[10], data[11]]);
         // db_time at offset 0x10 (8 bytes LE)
         let db_time = u64::from_le_bytes([
-            data[0x10], data[0x11], data[0x12], data[0x13],
-            data[0x14], data[0x15], data[0x16], data[0x17],
+            data[0x10], data[0x11], data[0x12], data[0x13], data[0x14], data[0x15], data[0x16],
+            data[0x17],
         ]);
         // db_state at offset 0x28 (4 bytes LE)
         let db_state = u32::from_le_bytes([data[0x28], data[0x29], data[0x2A], data[0x2B]]);
         // Page size is at offset 0xEC = 236
         let raw_page_size = u32::from_le_bytes([data[236], data[237], data[238], data[239]]);
-        let page_size = if raw_page_size == 0 { 4096 } else { raw_page_size };
+        let page_size = if raw_page_size == 0 {
+            4096
+        } else {
+            raw_page_size
+        };
         Ok(EseHeader {
             signature: sig,
             format_version,

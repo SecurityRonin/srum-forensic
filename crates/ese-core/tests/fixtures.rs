@@ -22,7 +22,10 @@ pub fn make_ese_header_page() -> Vec<u8> {
 /// `flags_extra` is accepted for API compatibility but must be 0; all current
 /// callers pass 0 and `PageBuilder::leaf()` sets `PAGE_FLAG_LEAF` exactly.
 pub fn make_leaf_page_with_records(flags_extra: u32, records: &[Vec<u8>]) -> Vec<u8> {
-    debug_assert_eq!(flags_extra, 0, "non-zero flags_extra not supported via PageBuilder");
+    debug_assert_eq!(
+        flags_extra, 0,
+        "non-zero flags_extra not supported via PageBuilder"
+    );
     let mut builder = PageBuilder::new(PAGE_SIZE).leaf();
     for rec in records {
         builder = builder.add_record(rec);

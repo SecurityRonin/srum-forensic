@@ -21,7 +21,13 @@ fn parse_network_returns_three_records() {
 
 #[test]
 fn parse_network_bytes_sent_recv_match() {
-    let raw = vec![encode_network_record(FILETIME_UNIX_EPOCH, 42, 7, 1111, 2222)];
+    let raw = vec![encode_network_record(
+        FILETIME_UNIX_EPOCH,
+        42,
+        7,
+        1111,
+        2222,
+    )];
     let tmp = make_srudb_with_network_records(&raw);
     let records = parse_network_usage(tmp.path()).expect("parse ok");
     assert_eq!(records[0].bytes_sent, 1111);
@@ -41,7 +47,11 @@ fn parse_network_timestamp_at_unix_epoch() {
     let raw = vec![encode_network_record(FILETIME_UNIX_EPOCH, 1, 0, 0, 0)];
     let tmp = make_srudb_with_network_records(&raw);
     let records = parse_network_usage(tmp.path()).expect("parse ok");
-    assert_eq!(records[0].timestamp.timestamp(), 0, "timestamp should be Unix epoch");
+    assert_eq!(
+        records[0].timestamp.timestamp(),
+        0,
+        "timestamp should be Unix epoch"
+    );
 }
 
 #[test]

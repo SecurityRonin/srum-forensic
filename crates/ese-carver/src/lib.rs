@@ -29,23 +29,28 @@ pub struct FragmentPair {
 /// of page N and the first data tag (tag 1) of page N+1 together equal
 /// `expected_size`. Pages are iterated from 1 to `page_count - 2` (page 0 is
 /// the file header and is skipped; the last page has no successor to pair with).
-pub fn detect_fragments_db(
-    db: &ese_core::EseDatabase,
-    expected_size: usize,
-) -> Vec<FragmentPair> {
+pub fn detect_fragments_db(db: &ese_core::EseDatabase, expected_size: usize) -> Vec<FragmentPair> {
     let page_count = u32::try_from(db.page_count()).unwrap_or(u32::MAX);
     let mut pairs = Vec::new();
 
     for page_idx in 1..page_count.saturating_sub(1) {
-        let Ok(page_a) = db.read_page(page_idx) else { continue };
-        let Ok(page_b) = db.read_page(page_idx + 1) else { continue };
+        let Ok(page_a) = db.read_page(page_idx) else {
+            continue;
+        };
+        let Ok(page_b) = db.read_page(page_idx + 1) else {
+            continue;
+        };
         let Ok(tags_a) = page_a.tags() else { continue };
         let Ok(tags_b) = page_b.tags() else { continue };
 
         // Last tag of page A = potential prefix fragment
-        let Some(&(_, prefix_size)) = tags_a.last() else { continue };
+        let Some(&(_, prefix_size)) = tags_a.last() else {
+            continue;
+        };
         // First *data* tag of page B (tag 1; tag 0 is the page header)
-        let Some(&(_, suffix_size)) = tags_b.get(1) else { continue };
+        let Some(&(_, suffix_size)) = tags_b.get(1) else {
+            continue;
+        };
 
         let prefix_len = prefix_size as usize;
         let suffix_len = suffix_size as usize;
@@ -69,11 +74,7 @@ pub fn detect_fragments_db(
 ///
 /// `pages` must be a multiple of `page_size` bytes. Pages are numbered from 1
 /// (page 0 is the file header and is skipped).
-pub fn detect_fragments(
-    pages: &[u8],
-    page_size: usize,
-    expected_size: usize,
-) -> Vec<FragmentPair> {
+pub fn detect_fragments(pages: &[u8], page_size: usize, expected_size: usize) -> Vec<FragmentPair> {
     if page_size == 0 || pages.len() % page_size != 0 {
         return vec![];
     }
@@ -86,11 +87,19 @@ pub fn detect_fragments(
         let page_a = &pages[a_start..a_start + page_size];
         let page_b = &pages[b_start..b_start + page_size];
 
-        let Some(tags_a) = parse_tags_raw(page_a, page_size) else { continue };
-        let Some(tags_b) = parse_tags_raw(page_b, page_size) else { continue };
+        let Some(tags_a) = parse_tags_raw(page_a, page_size) else {
+            continue;
+        };
+        let Some(tags_b) = parse_tags_raw(page_b, page_size) else {
+            continue;
+        };
 
-        let Some(&(_, prefix_len)) = tags_a.last() else { continue };
-        let Some(&(_, suffix_len)) = tags_b.get(1) else { continue };
+        let Some(&(_, prefix_len)) = tags_a.last() else {
+            continue;
+        };
+        let Some(&(_, suffix_len)) = tags_b.get(1) else {
+            continue;
+        };
 
         if prefix_len + suffix_len == expected_size {
             pairs.push(FragmentPair {
@@ -125,11 +134,7 @@ fn parse_tags_raw(page: &[u8], page_size: usize) -> Option<Vec<(usize, usize)>> 
 ///
 /// Returns the stitched bytes if `prefix.len() + suffix.len() == expected_size`,
 /// `None` otherwise.
-pub fn reconstruct_fragment(
-    prefix: &[u8],
-    suffix: &[u8],
-    expected_size: usize,
-) -> Option<Vec<u8>> {
+pub fn reconstruct_fragment(prefix: &[u8], suffix: &[u8], expected_size: usize) -> Option<Vec<u8>> {
     if prefix.len() + suffix.len() != expected_size {
         return None;
     }

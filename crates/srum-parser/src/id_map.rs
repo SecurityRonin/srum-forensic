@@ -20,16 +20,15 @@ use crate::SrumError;
 ///
 /// Returns [`SrumError::DecodeError`] if the slice is too short or the
 /// UTF-16LE name bytes contain an invalid surrogate pair.
-pub fn decode_id_map_entry(
-    data: &[u8],
-    page: u32,
-    tag: usize,
-) -> Result<IdMapEntry, SrumError> {
+pub fn decode_id_map_entry(data: &[u8], page: u32, tag: usize) -> Result<IdMapEntry, SrumError> {
     if data.len() < ID_MAP_MIN_SIZE {
         return Err(SrumError::DecodeError {
             page,
             tag,
-            detail: format!("id-map record too short: {} < {ID_MAP_MIN_SIZE}", data.len()),
+            detail: format!(
+                "id-map record too short: {} < {ID_MAP_MIN_SIZE}",
+                data.len()
+            ),
         });
     }
     let id = i32::from_le_bytes([data[0], data[1], data[2], data[3]]);
@@ -39,7 +38,10 @@ pub fn decode_id_map_entry(
         return Err(SrumError::DecodeError {
             page,
             tag,
-            detail: format!("id-map record name truncated: need {total}, got {}", data.len()),
+            detail: format!(
+                "id-map record name truncated: need {total}, got {}",
+                data.len()
+            ),
         });
     }
     let name_bytes = &data[6..6 + name_byte_len];

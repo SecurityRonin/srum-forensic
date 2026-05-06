@@ -16,7 +16,11 @@ pub enum SrumError {
     #[error("ese: {0}")]
     Ese(#[from] EseError),
     #[error("page {page} tag {tag}: {detail}")]
-    DecodeError { page: u32, tag: usize, detail: String },
+    DecodeError {
+        page: u32,
+        tag: usize,
+        detail: String,
+    },
 }
 
 /// Iterate a named ESE table and decode each record, silently skipping
@@ -26,7 +30,8 @@ fn collect_table<T>(
     table: &str,
     decode: impl Fn(&[u8], u32, usize) -> Result<T, SrumError>,
 ) -> anyhow::Result<Vec<T>> {
-    let records = db.table_records(table)?
+    let records = db
+        .table_records(table)?
         .filter_map(|r| match r {
             Ok((page, tag, data)) => decode(&data, page, tag).ok(),
             Err(_) => None,
@@ -47,9 +52,11 @@ pub fn parse_network_usage(
     path: &std::path::Path,
 ) -> anyhow::Result<Vec<srum_core::NetworkUsageRecord>> {
     let db = ese_core::EseDatabase::open(path)?;
-    collect_table(&db, "{973F5D5C-1D90-4944-BE8E-24B22A728CF2}", |data, page, tag| {
-        network::decode_network_record(data, page, tag)
-    })
+    collect_table(
+        &db,
+        "{973F5D5C-1D90-4944-BE8E-24B22A728CF2}",
+        network::decode_network_record,
+    )
 }
 
 /// Parse application usage records from a SRUDB.dat file.
@@ -60,13 +67,13 @@ pub fn parse_network_usage(
 /// # Errors
 ///
 /// Returns an error if the file cannot be read or is not a valid ESE database.
-pub fn parse_app_usage(
-    path: &std::path::Path,
-) -> anyhow::Result<Vec<srum_core::AppUsageRecord>> {
+pub fn parse_app_usage(path: &std::path::Path) -> anyhow::Result<Vec<srum_core::AppUsageRecord>> {
     let db = ese_core::EseDatabase::open(path)?;
-    collect_table(&db, "{5C8CF1C7-7257-4F13-B223-970EF5939312}", |data, page, tag| {
-        app_usage::decode_app_record(data, page, tag)
-    })
+    collect_table(
+        &db,
+        "{5C8CF1C7-7257-4F13-B223-970EF5939312}",
+        app_usage::decode_app_record,
+    )
 }
 
 /// Parse ID map entries from a SRUDB.dat file.
@@ -76,9 +83,7 @@ pub fn parse_app_usage(
 /// # Errors
 ///
 /// Returns an error if the file cannot be read or is not a valid ESE database.
-pub fn parse_id_map(
-    path: &std::path::Path,
-) -> anyhow::Result<Vec<srum_core::IdMapEntry>> {
+pub fn parse_id_map(path: &std::path::Path) -> anyhow::Result<Vec<srum_core::IdMapEntry>> {
     let db = ese_core::EseDatabase::open(path)?;
     collect_table(&db, "SruDbIdMapTable", |data, page, tag| {
         id_map::decode_id_map_entry(data, page, tag)

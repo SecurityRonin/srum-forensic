@@ -27,7 +27,10 @@ pub fn decode_network_record(
         return Err(SrumError::DecodeError {
             page,
             tag,
-            detail: format!("network record too short: {} < {NETWORK_RECORD_SIZE}", data.len()),
+            detail: format!(
+                "network record too short: {} < {NETWORK_RECORD_SIZE}",
+                data.len()
+            ),
         });
     }
     let filetime = u64::from_le_bytes([

@@ -230,7 +230,9 @@ impl EseDatabase {
             .iter()
             .find(|e| e.object_name == name)
             .map(|e| e.table_page)
-            .ok_or_else(|| EseError::TableNotFound { name: name.to_owned() })
+            .ok_or_else(|| EseError::TableNotFound {
+                name: name.to_owned(),
+            })
     }
 
     /// Open a cursor over all leaf records starting at `root_page`.
@@ -238,12 +240,14 @@ impl EseDatabase {
     /// # Errors
     ///
     /// Returns [`EseError`] if the leaf pages cannot be walked from `root_page`.
-    pub fn table_records_from_root(
-        &self,
-        root_page: u32,
-    ) -> Result<TableCursor<'_>, EseError> {
+    pub fn table_records_from_root(&self, root_page: u32) -> Result<TableCursor<'_>, EseError> {
         let leaf_pages = self.walk_leaf_pages(root_page)?;
-        Ok(TableCursor { db: self, leaf_pages, page_idx: 0, tag_idx: 1 })
+        Ok(TableCursor {
+            db: self,
+            leaf_pages,
+            page_idx: 0,
+            tag_idx: 1,
+        })
     }
 
     /// Open a cursor over all records in a named SRUM table.
@@ -254,10 +258,7 @@ impl EseDatabase {
     ///
     /// Returns [`EseError::TableNotFound`] if `table_name` is not in the catalog,
     /// or any I/O / parse error from reading the catalog or walking leaf pages.
-    pub fn table_records(
-        &self,
-        table_name: &str,
-    ) -> Result<TableCursor<'_>, EseError> {
+    pub fn table_records(&self, table_name: &str) -> Result<TableCursor<'_>, EseError> {
         let root_page = self.find_table_page(table_name)?;
         self.table_records_from_root(root_page)
     }

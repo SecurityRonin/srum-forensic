@@ -25,7 +25,11 @@ fn raw_page_slice_returns_correct_bytes() {
     let db = EseDatabase::open(tmp.path()).expect("open");
     let slice = db.raw_page_slice(1).expect("page 1 in range");
     let page = db.read_page(1).expect("read_page page 1");
-    assert_eq!(slice, page.data.as_slice(), "raw_page_slice must match read_page data");
+    assert_eq!(
+        slice,
+        page.data.as_slice(),
+        "raw_page_slice must match read_page data"
+    );
 }
 
 #[test]

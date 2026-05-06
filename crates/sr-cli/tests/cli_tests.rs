@@ -86,7 +86,10 @@ fn sr_network_error_stdout_is_empty() {
         .output()
         .expect("run sr");
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.is_empty(), "stdout must be empty on error, got: {stdout}");
+    assert!(
+        stdout.is_empty(),
+        "stdout must be empty on error, got: {stdout}"
+    );
 }
 
 // ── sr idmap ─────────────────────────────────────────────────────────────────
@@ -129,5 +132,8 @@ fn sr_idmap_nonexistent_stdout_is_empty() {
         .output()
         .expect("run sr idmap");
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.is_empty(), "stdout must be empty on error, got: {stdout}");
+    assert!(
+        stdout.is_empty(),
+        "stdout must be empty on error, got: {stdout}"
+    );
 }

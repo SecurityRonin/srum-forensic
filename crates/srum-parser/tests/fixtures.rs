@@ -81,11 +81,7 @@ pub fn encode_id_map_entry(id: i32, name: &str) -> Vec<u8> {
 /// - pages 1–3: zero-padded
 /// - page 4: catalog with one entry for `table_name` → page 5
 /// - page 5: leaf page containing `raw_records`
-fn make_srudb(
-    table_name: &str,
-    object_id: u32,
-    raw_records: &[Vec<u8>],
-) -> NamedTempFile {
+fn make_srudb(table_name: &str, object_id: u32, raw_records: &[Vec<u8>]) -> NamedTempFile {
     let catalog_entry = CatalogEntry {
         object_type: 1,
         object_id,
@@ -94,7 +90,10 @@ fn make_srudb(
         object_name: table_name.to_owned(),
     };
     let catalog_bytes = catalog_entry.to_bytes();
-    let catalog_page = PageBuilder::new(PAGE_SIZE).leaf().add_record(&catalog_bytes).build();
+    let catalog_page = PageBuilder::new(PAGE_SIZE)
+        .leaf()
+        .add_record(&catalog_bytes)
+        .build();
 
     let mut data_builder = PageBuilder::new(PAGE_SIZE).leaf();
     for rec in raw_records {

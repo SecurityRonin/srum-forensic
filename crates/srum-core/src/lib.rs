@@ -34,8 +34,7 @@ pub fn filetime_to_datetime(filetime: u64) -> DateTime<Utc> {
     let unix_100ns = filetime.saturating_sub(FILETIME_EPOCH_OFFSET);
     let secs = i64::try_from(unix_100ns / 10_000_000).unwrap_or(i64::MAX);
     let nanos = u32::try_from((unix_100ns % 10_000_000) * 100).unwrap_or(0);
-    DateTime::from_timestamp(secs, nanos)
-        .unwrap_or(DateTime::UNIX_EPOCH.with_timezone(&Utc))
+    DateTime::from_timestamp(secs, nanos).unwrap_or(DateTime::UNIX_EPOCH.with_timezone(&Utc))
 }
 
 #[cfg(test)]

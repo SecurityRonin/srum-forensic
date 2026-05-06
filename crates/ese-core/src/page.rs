@@ -122,7 +122,9 @@ impl EsePage {
         let count = hdr.available_page_tag_count as usize;
         let page_size = self.data.len();
         if page_size < count * 4 {
-            return Err(EseError::TagArrayOverflow { page: self.page_number });
+            return Err(EseError::TagArrayOverflow {
+                page: self.page_number,
+            });
         }
         let mut tags = Vec::with_capacity(count);
         for i in 0..count {
@@ -182,7 +184,10 @@ mod tests {
         let mut data = vec![0u8; 4096];
         // page_flags at offset 0x20
         data[0x20..0x24].copy_from_slice(&PAGE_FLAG_LEAF.to_le_bytes());
-        let page = EsePage { page_number: 1, data };
+        let page = EsePage {
+            page_number: 1,
+            data,
+        };
         let hdr = page.parse_header().expect("parse header");
         assert_eq!(hdr.page_flags, PAGE_FLAG_LEAF);
         assert!(hdr.page_flags & PAGE_FLAG_LEAF != 0);
@@ -202,7 +207,10 @@ mod tests {
         let mut data = vec![0u8; 4096];
         data[0x0C..0x10].copy_from_slice(&5u32.to_le_bytes()); // prev_page = 5
         data[0x10..0x14].copy_from_slice(&7u32.to_le_bytes()); // next_page = 7
-        let page = EsePage { page_number: 3, data };
+        let page = EsePage {
+            page_number: 3,
+            data,
+        };
         let hdr = page.parse_header().expect("parse header");
         assert_eq!(hdr.prev_page, Some(5));
         assert_eq!(hdr.next_page, Some(7));
@@ -213,7 +221,10 @@ mod tests {
         let mut data = vec![0u8; 4096];
         data[0x0C..0x10].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
         data[0x10..0x14].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
-        let page = EsePage { page_number: 1, data };
+        let page = EsePage {
+            page_number: 1,
+            data,
+        };
         let hdr = page.parse_header().expect("parse header");
         assert_eq!(hdr.prev_page, None);
         assert_eq!(hdr.next_page, None);
@@ -222,7 +233,10 @@ mod tests {
     #[test]
     fn parse_header_short_buffer_returns_err() {
         let data = vec![0u8; 20]; // shorter than 40 bytes
-        let page = EsePage { page_number: 1, data };
+        let page = EsePage {
+            page_number: 1,
+            data,
+        };
         let result = page.parse_header();
         assert!(result.is_err(), "short buffer must return Err");
     }
@@ -268,7 +282,10 @@ mod tests {
     fn tags_count_matches_header() {
         // 2 data records => tag_count = 3 (tag0 + 2 data tags)
         let data = make_page_with_records(4096, &[b"hello", b"world"]);
-        let page = EsePage { page_number: 1, data };
+        let page = EsePage {
+            page_number: 1,
+            data,
+        };
         let tags = page.tags().expect("tags");
         assert_eq!(tags.len(), 3);
     }
@@ -276,7 +293,10 @@ mod tests {
     #[test]
     fn tags_first_record_offset_and_size() {
         let data = make_page_with_records(4096, &[b"AAAA", b"BBBB"]);
-        let page = EsePage { page_number: 1, data };
+        let page = EsePage {
+            page_number: 1,
+            data,
+        };
         let tags = page.tags().expect("tags");
         // tag 1 is first data record starting at offset 40, size 4
         assert_eq!(tags[1], (40, 4));
@@ -285,7 +305,10 @@ mod tests {
     #[test]
     fn record_data_first_matches() {
         let data = make_page_with_records(4096, &[b"AAAA", b"BBBB"]);
-        let page = EsePage { page_number: 1, data };
+        let page = EsePage {
+            page_number: 1,
+            data,
+        };
         let rec = page.record_data(1).expect("record 1");
         assert_eq!(rec, b"AAAA");
     }
@@ -293,7 +316,10 @@ mod tests {
     #[test]
     fn record_data_second_matches() {
         let data = make_page_with_records(4096, &[b"AAAA", b"BBBB"]);
-        let page = EsePage { page_number: 1, data };
+        let page = EsePage {
+            page_number: 1,
+            data,
+        };
         let rec = page.record_data(2).expect("record 2");
         assert_eq!(rec, b"BBBB");
     }
@@ -301,7 +327,10 @@ mod tests {
     #[test]
     fn record_data_beyond_count_returns_err() {
         let data = make_page_with_records(4096, &[b"X", b"Y"]);
-        let page = EsePage { page_number: 1, data };
+        let page = EsePage {
+            page_number: 1,
+            data,
+        };
         let result = page.record_data(5);
         assert!(result.is_err(), "index beyond tag count must return Err");
     }

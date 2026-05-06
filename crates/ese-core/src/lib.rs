@@ -12,8 +12,13 @@ pub mod page;
 pub use catalog::CatalogEntry;
 pub use database::{EseDatabase, TableCursor};
 pub use error::EseError;
-pub use header::{EseHeader, DB_STATE_CLEAN_SHUTDOWN, DB_STATE_DIRTY_SHUTDOWN, DB_STATE_JUST_CREATED};
-pub use page::{EsePage, EsePageHeader, PAGE_FLAG_EMPTY, PAGE_FLAG_LEAF, PAGE_FLAG_PARENT, PAGE_FLAG_ROOT, PAGE_FLAG_SPACE_TREE, PAGE_SIZE};
+pub use header::{
+    EseHeader, DB_STATE_CLEAN_SHUTDOWN, DB_STATE_DIRTY_SHUTDOWN, DB_STATE_JUST_CREATED,
+};
+pub use page::{
+    EsePage, EsePageHeader, PAGE_FLAG_EMPTY, PAGE_FLAG_LEAF, PAGE_FLAG_PARENT, PAGE_FLAG_ROOT,
+    PAGE_FLAG_SPACE_TREE, PAGE_SIZE,
+};
 
 /// Open an ESE database file and return the parsed header.
 ///
@@ -33,7 +38,6 @@ pub fn open(path: &std::path::Path) -> Result<EseHeader, EseError> {
     }
     EseHeader::from_bytes(&buf)
 }
-
 
 #[cfg(test)]
 mod tests {

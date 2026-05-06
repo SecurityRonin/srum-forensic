@@ -18,11 +18,7 @@ use crate::SrumError;
 /// # Errors
 ///
 /// Returns [`SrumError::DecodeError`] if `data` is shorter than 32 bytes.
-pub fn decode_app_record(
-    data: &[u8],
-    page: u32,
-    tag: usize,
-) -> Result<AppUsageRecord, SrumError> {
+pub fn decode_app_record(data: &[u8], page: u32, tag: usize) -> Result<AppUsageRecord, SrumError> {
     if data.len() < APP_RECORD_SIZE {
         return Err(SrumError::DecodeError {
             page,
