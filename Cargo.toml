@@ -20,6 +20,9 @@ authors = ["Albert Hui <albert@securityronin.com>"]
 # Binary parsing
 binrw = "0.14"
 
+# Memory-mapped I/O
+memmap2 = "0.9"
+
 # Error handling
 thiserror = "2"
 anyhow = "1"

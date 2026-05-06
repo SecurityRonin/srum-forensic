@@ -8,6 +8,7 @@ license.workspace = true
 
 [dependencies]
 thiserror.workspace = true
+memmap2.workspace = true
 
 [dev-dependencies]
 ese-test-fixtures.workspace = true

@@ -1,7 +1,8 @@
 //! ESE database handle for page-level access.
 
-use std::io::{Read as _, Seek as _, SeekFrom};
 use std::path::{Path, PathBuf};
+
+use memmap2::Mmap;
 
 use crate::{catalog::CatalogEntry, EseError, EseHeader, EsePage};
 
@@ -58,30 +59,80 @@ impl Iterator for TableCursor<'_> {
     }
 }
 
-/// An open ESE database file, ready for page-level access.
+/// An open ESE database file, memory-mapped for zero-copy page access.
 ///
-/// Retains the parsed [`EseHeader`] (which carries `page_size`) so that
-/// every [`read_page`][EseDatabase::read_page] call can locate the correct
-/// byte offset without re-reading the header.
-#[derive(Debug)]
+/// The file is mapped once at [`open`][EseDatabase::open] time. All subsequent
+/// [`read_page`][EseDatabase::read_page] and [`raw_page_slice`][EseDatabase::raw_page_slice]
+/// calls slice directly into the mapping — no additional syscalls or heap
+/// allocations per page.
+///
+/// # Safety invariant
+///
+/// The mapping is read-only. Callers must not modify the file on disk while an
+/// `EseDatabase` is live; doing so is undefined behaviour (per `memmap2` docs).
+/// In practice SRUDB.dat is treated as forensic evidence and never written.
 pub struct EseDatabase {
     path: PathBuf,
     /// Parsed file header.
     pub header: EseHeader,
+    mmap: Mmap,
+}
+
+impl std::fmt::Debug for EseDatabase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EseDatabase")
+            .field("path", &self.path)
+            .field("header", &self.header)
+            .field("mmap_len", &self.mmap.len())
+            .finish()
+    }
 }
 
 impl EseDatabase {
-    /// Open an ESE database at `path` and parse its header.
+    /// Open an ESE database at `path` and memory-map the entire file.
     ///
     /// # Errors
     ///
-    /// Returns [`EseError`] if the file cannot be read or is not a valid ESE database.
+    /// Returns [`EseError`] if the file cannot be opened, mapped, or is not a
+    /// valid ESE database.
     pub fn open(path: &Path) -> Result<Self, EseError> {
-        let header = crate::open(path)?;
+        let file = std::fs::File::open(path)?;
+        // SAFETY: SRUDB.dat is read-only forensic evidence; we never write to
+        // it while this mapping is live, so the UB precondition cannot trigger.
+        let mmap = unsafe { Mmap::map(&file) }?;
+        let header = EseHeader::from_bytes(&mmap)?;
         Ok(Self {
             path: path.to_owned(),
             header,
+            mmap,
         })
+    }
+
+    /// Return a zero-copy slice of the raw bytes for page `page_number`.
+    ///
+    /// The slice borrows directly from the memory mapping — no heap allocation.
+    /// Returns [`EseError::Corrupt`] if `page_number` is beyond the end of the
+    /// file.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EseError`] if the requested page is out of range.
+    pub fn raw_page_slice(&self, page_number: u32) -> Result<&[u8], EseError> {
+        let page_size = self.header.page_size as usize;
+        let start = usize::try_from(page_number)
+            .unwrap_or(usize::MAX)
+            .saturating_mul(page_size);
+        let end = start.saturating_add(page_size);
+        if end > self.mmap.len() {
+            return Err(EseError::Corrupt {
+                page: page_number,
+                detail: format!(
+                    "page beyond file end: need offset {end}, file is {} bytes",
+                    self.mmap.len()
+                ),
+            });
+        }
+        Ok(&self.mmap[start..end])
     }
 
     /// Read a single page by its 0-based page number.
@@ -93,37 +144,15 @@ impl EseDatabase {
     ///
     /// Returns [`EseError`] on I/O error or if the page is out of range.
     pub fn read_page(&self, page_number: u32) -> Result<EsePage, EseError> {
-        let page_size = self.header.page_size as usize;
-        let offset = u64::from(page_number) * u64::try_from(page_size).unwrap_or(u64::MAX);
-
-        let mut f = std::fs::File::open(&self.path)?;
-        let file_len = f.metadata()?.len();
-
-        if offset + u64::try_from(page_size).unwrap_or(u64::MAX) > file_len {
-            let need = usize::try_from(offset).unwrap_or(usize::MAX).saturating_add(page_size);
-            let got = usize::try_from(file_len).unwrap_or(usize::MAX);
-            return Err(EseError::Corrupt {
-                page: page_number,
-                detail: format!("page beyond file end: need offset {need}, file is {got} bytes"),
-            });
-        }
-
-        f.seek(SeekFrom::Start(offset))?;
-        let mut data = vec![0u8; page_size];
-        f.read_exact(&mut data)?;
-
         Ok(EsePage {
             page_number,
-            data,
+            data: self.raw_page_slice(page_number)?.to_vec(),
         })
     }
 
     /// Return the total number of pages in the file (including the header page).
     pub fn page_count(&self) -> u64 {
-        let file_len = std::fs::metadata(&self.path)
-            .map(|m| m.len())
-            .unwrap_or(0);
-        file_len / u64::from(self.header.page_size)
+        u64::try_from(self.mmap.len()).unwrap_or(0) / u64::from(self.header.page_size)
     }
 
     /// Read and parse all entries from the ESE catalog (page 4).
