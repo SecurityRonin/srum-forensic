@@ -34,6 +34,12 @@ enum Cmd {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
     },
+    /// Dump the `SruDbIdMapTable` as JSON — resolves `app_id` / `user_id` integers
+    /// to process paths and SIDs.
+    Idmap {
+        /// Path to SRUDB.dat (or a forensic copy of it).
+        path: PathBuf,
+    },
 }
 
 fn run() -> anyhow::Result<()> {
@@ -46,6 +52,10 @@ fn run() -> anyhow::Result<()> {
         Cmd::Apps { path } => {
             let records = srum_parser::parse_app_usage(&path)?;
             println!("{}", serde_json::to_string_pretty(&records)?);
+        }
+        Cmd::Idmap { path } => {
+            let entries = srum_parser::parse_id_map(&path)?;
+            println!("{}", serde_json::to_string_pretty(&entries)?);
         }
     }
     Ok(())
