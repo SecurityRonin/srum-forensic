@@ -116,6 +116,18 @@ enum Cmd {
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
+    /// Merge all SRUM tables into a single chronological timeline.
+    ///
+    /// Reads network, apps, connectivity, energy, and notification records,
+    /// injects a `table` field on each entry, and sorts by timestamp.
+    /// Tables that are absent or unreadable are silently skipped.
+    Timeline {
+        /// Path to SRUDB.dat (or a forensic copy of it).
+        path: PathBuf,
+        /// Output format (json or csv).
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
+    },
 }
 
 /// Build an id→name lookup from the id-map table in `path`.
@@ -237,6 +249,46 @@ fn print_values(values: &[serde_json::Value], format: &OutputFormat) -> anyhow::
     Ok(())
 }
 
+/// Build a merged, chronologically sorted timeline from all SRUM tables.
+///
+/// Each record has a `table` field injected to identify its source.
+/// Tables that cannot be read are silently skipped (best-effort).
+fn build_timeline(path: &std::path::Path) -> Vec<serde_json::Value> {
+    let mut all: Vec<serde_json::Value> = Vec::new();
+
+    macro_rules! load_table {
+        ($name:expr, $loader:expr) => {
+            if let Ok(records) = $loader(path) {
+                if let Ok(mut values) = records_to_values(records) {
+                    for v in &mut values {
+                        if let Some(obj) = v.as_object_mut() {
+                            obj.insert(
+                                "table".to_owned(),
+                                serde_json::Value::String($name.to_owned()),
+                            );
+                        }
+                    }
+                    all.append(&mut values);
+                }
+            }
+        };
+    }
+
+    load_table!("network", srum_parser::parse_network_usage);
+    load_table!("apps", srum_parser::parse_app_usage);
+    load_table!("connectivity", srum_parser::parse_network_connectivity);
+    load_table!("energy", srum_parser::parse_energy_usage);
+    load_table!("notifications", srum_parser::parse_push_notifications);
+
+    all.sort_by(|a, b| {
+        let ta = a.get("timestamp").and_then(|v| v.as_str()).unwrap_or("");
+        let tb = b.get("timestamp").and_then(|v| v.as_str()).unwrap_or("");
+        ta.cmp(tb)
+    });
+
+    all
+}
+
 fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
@@ -314,6 +366,10 @@ fn run() -> anyhow::Result<()> {
                 values = values.into_iter().map(|r| enrich(r, &id_map)).collect();
             }
             print_values(&values, &format)?;
+        }
+        Cmd::Timeline { path, format } => {
+            let all = build_timeline(&path);
+            print_values(&all, &format)?;
         }
     }
     Ok(())
