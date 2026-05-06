@@ -332,3 +332,45 @@ fn sr_notifications_nonexistent_stderr_has_error_prefix() {
         "stderr must contain 'error:' prefix, got: {stderr}"
     );
 }
+
+// ── sr timeline ──────────────────────────────────────────────────────────────
+
+#[test]
+fn sr_timeline_help_exits_success() {
+    let status = sr_bin()
+        .args(["timeline", "--help"])
+        .status()
+        .expect("run sr timeline --help");
+    assert!(status.success(), "sr timeline --help should exit 0");
+}
+
+#[test]
+fn sr_timeline_nonexistent_exits_zero_best_effort() {
+    // timeline is best-effort: all tables fail → empty array, exit 0
+    let out = sr_bin()
+        .args(["timeline", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run sr timeline");
+    assert!(
+        out.status.success(),
+        "timeline must exit 0 even when all tables fail (best-effort)"
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains('['),
+        "must output a JSON array even when empty, got: {stdout}"
+    );
+}
+
+#[test]
+fn sr_timeline_format_flag_exists() {
+    let out = sr_bin()
+        .args(["timeline", "--help"])
+        .output()
+        .expect("run sr timeline --help");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("format"),
+        "sr timeline --help must document --format, got: {stdout}"
+    );
+}
