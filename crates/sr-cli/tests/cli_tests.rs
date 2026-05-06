@@ -266,3 +266,36 @@ fn sr_connectivity_nonexistent_stderr_has_error_prefix() {
         "stderr must contain 'error:' prefix, got: {stderr}"
     );
 }
+
+// ── sr energy ────────────────────────────────────────────────────────────────
+
+#[test]
+fn sr_energy_help_exits_success() {
+    let status = sr_bin()
+        .args(["energy", "--help"])
+        .status()
+        .expect("run sr energy --help");
+    assert!(status.success(), "sr energy --help should exit 0");
+}
+
+#[test]
+fn sr_energy_nonexistent_exits_nonzero() {
+    let status = sr_bin()
+        .args(["energy", "/nonexistent/SRUDB.dat"])
+        .status()
+        .expect("run sr energy");
+    assert!(!status.success(), "sr must exit nonzero for missing file");
+}
+
+#[test]
+fn sr_energy_nonexistent_stderr_has_error_prefix() {
+    let out = sr_bin()
+        .args(["energy", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run sr energy");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("error:"),
+        "stderr must contain 'error:' prefix, got: {stderr}"
+    );
+}
