@@ -370,6 +370,37 @@ fn apply_heuristics(values: &mut Vec<serde_json::Value>) {
     }
 }
 
+const USER_PRESENCE_THRESHOLD_MS: u64 = 10_000; // 10 seconds of actual input = user present
+
+/// Annotate every record in `all` with `user_present: true` if the aggregate
+/// `user_input_time_ms` across all `apps` records for that timestamp meets or
+/// exceeds [`USER_PRESENCE_THRESHOLD_MS`].
+///
+/// Records at timestamps with no apps activity receive no annotation — their
+/// presence status is unknown, not absent.
+fn annotate_user_presence(all: &mut Vec<serde_json::Value>) {
+    let mut totals: HashMap<String, u64> = HashMap::new();
+    for v in all.iter() {
+        if v.get("table").and_then(|t| t.as_str()) == Some("apps") {
+            if let (Some(ts), Some(ms)) = (
+                v.get("timestamp").and_then(serde_json::Value::as_str).map(str::to_owned),
+                v.get("user_input_time_ms").and_then(serde_json::Value::as_u64),
+            ) {
+                *totals.entry(ts).or_insert(0) += ms;
+            }
+        }
+    }
+    for v in all.iter_mut() {
+        if let Some(ts) = v.get("timestamp").and_then(serde_json::Value::as_str) {
+            if totals.get(ts).copied().unwrap_or(0) >= USER_PRESENCE_THRESHOLD_MS {
+                if let Some(obj) = v.as_object_mut() {
+                    obj.insert("user_present".to_owned(), serde_json::Value::Bool(true));
+                }
+            }
+        }
+    }
+}
+
 /// Inject `exfil_signal: true` into `apps` records where the matching network
 /// record shows exfiltration-level bytes, the app ran in the background, and
 /// the user had no focus time — the three-way signature of data theft.
@@ -472,6 +503,7 @@ fn build_timeline(
 
     apply_heuristics(&mut all);
     apply_cross_table_signals(&mut all);
+    annotate_user_presence(&mut all);
 
     all.sort_by(|a, b| {
         let ta = a.get("timestamp").and_then(|v| v.as_str()).unwrap_or("");
