@@ -8,6 +8,7 @@ license.workspace = true
 
 [dependencies]
 ese-core.workspace = true
+forensicnomicon.workspace = true
 srum-core.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true

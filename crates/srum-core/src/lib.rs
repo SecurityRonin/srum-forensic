@@ -3,6 +3,7 @@
 //! These are pure data types with no parsing logic.
 //! Parsing is handled by the `srum-parser` crate.
 
+pub mod app_timeline;
 pub mod app_usage;
 pub mod connectivity;
 pub mod energy;
@@ -10,6 +11,7 @@ pub mod id_map;
 pub mod network;
 pub mod push_notification;
 
+pub use app_timeline::AppTimelineRecord;
 pub use app_usage::AppUsageRecord;
 pub use connectivity::NetworkConnectivityRecord;
 pub use energy::EnergyUsageRecord;
@@ -28,6 +30,9 @@ pub const NETWORK_RECORD_SIZE: usize = 32;
 
 /// Fixed byte length of a serialised [`AppUsageRecord`].
 pub const APP_RECORD_SIZE: usize = 32;
+
+/// Fixed byte length of a serialised [`AppTimelineRecord`].
+pub const APP_TIMELINE_RECORD_SIZE: usize = 32;
 
 /// Fixed byte length of a serialised [`NetworkConnectivityRecord`].
 pub const NETWORK_CONNECTIVITY_RECORD_SIZE: usize = 28;

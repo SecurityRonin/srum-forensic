@@ -45,6 +45,7 @@ tempfile = "3"
 ese-core          = { path = "crates/ese-core" }
 ese-integrity     = { path = "crates/ese-integrity" }
 ese-test-fixtures = { path = "crates/ese-test-fixtures" }
+forensicnomicon   = { path = "../forensicnomicon" }
 srum-core         = { path = "crates/srum-core" }
 srum-parser       = { path = "crates/srum-parser" }
 
