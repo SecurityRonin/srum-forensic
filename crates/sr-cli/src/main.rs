@@ -116,24 +116,6 @@ enum Cmd {
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
-    /// Parse application timeline records — in-focus and user-input duration per app.
-    ///
-    /// Records come from the {7ACBBAA3-D029-4BE4-9A7A-0885927F1D8F} table.
-    /// Available since Windows 10 Anniversary Update (1607).
-    /// CPU cycles in `apps` with zero focus_time_ms here → background-only execution.
-    #[command(name = "focus")]
-    Focus {
-        /// Path to SRUDB.dat (or a forensic copy of it).
-        path: PathBuf,
-        /// Resolve `app_id` and `user_id` to names from `SruDbIdMapTable`.
-        ///
-        /// Adds `app_name` and `user_name` fields to each record.
-        #[arg(long)]
-        resolve: bool,
-        /// Output format (json or csv).
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
-    },
     /// Merge all SRUM tables into a single chronological timeline.
     ///
     /// Reads network, apps, connectivity, energy, notifications, and focus
@@ -275,10 +257,45 @@ fn print_values(values: &[serde_json::Value], format: &OutputFormat) -> anyhow::
     Ok(())
 }
 
+/// Merge Application Timeline focus data into matching `apps` records.
+///
+/// Joins by `(app_id, timestamp)` and injects `focus_time_ms` and
+/// `user_input_time_ms` into each apps record that has a counterpart in the
+/// focus slice.  Unmatched focus records are silently dropped.
+fn merge_focus_into_apps(apps: &mut Vec<serde_json::Value>, focus: Vec<serde_json::Value>) {
+    let mut focus_map: HashMap<(i64, String), (u64, u64)> = HashMap::new();
+    for f in focus {
+        if let (Some(app_id), Some(ts), Some(focus_ms), Some(input_ms)) = (
+            f.get("app_id").and_then(serde_json::Value::as_i64),
+            f.get("timestamp").and_then(serde_json::Value::as_str).map(str::to_owned),
+            f.get("focus_time_ms").and_then(serde_json::Value::as_u64),
+            f.get("user_input_time_ms").and_then(serde_json::Value::as_u64),
+        ) {
+            focus_map.insert((app_id, ts), (focus_ms, input_ms));
+        }
+    }
+    for v in apps.iter_mut() {
+        if let Some(obj) = v.as_object_mut() {
+            let key = obj
+                .get("app_id")
+                .and_then(serde_json::Value::as_i64)
+                .zip(obj.get("timestamp").and_then(serde_json::Value::as_str).map(str::to_owned));
+            if let Some((app_id, ts)) = key {
+                if let Some(&(focus_ms, input_ms)) = focus_map.get(&(app_id, ts)) {
+                    obj.insert("focus_time_ms".to_owned(), focus_ms.into());
+                    obj.insert("user_input_time_ms".to_owned(), input_ms.into());
+                }
+            }
+        }
+    }
+}
+
 /// Apply forensic heuristics from `forensicnomicon` to a merged timeline.
 ///
-/// Currently flags `apps` records where background CPU dominates foreground
-/// by injecting `"background_cpu_dominant": true`.
+/// Flags `apps` records with:
+/// - `background_cpu_dominant`: background cycles ≥ 10× foreground
+/// - `no_focus_with_cpu`: background CPU active but zero focus time (only when
+///   focus data was merged in — absent focus field means unknown, not false)
 fn apply_heuristics(values: &mut Vec<serde_json::Value>) {
     use forensicnomicon::heuristics::srum::is_background_cpu_dominant;
     for v in values.iter_mut() {
@@ -297,6 +314,15 @@ fn apply_heuristics(values: &mut Vec<serde_json::Value>) {
                         "background_cpu_dominant".to_owned(),
                         serde_json::Value::Bool(true),
                     );
+                }
+                if obj.contains_key("focus_time_ms") {
+                    let focus_ms = obj
+                        .get("focus_time_ms")
+                        .and_then(serde_json::Value::as_u64)
+                        .unwrap_or(0);
+                    if bg > 0 && focus_ms == 0 {
+                        obj.insert("no_focus_with_cpu".to_owned(), serde_json::Value::Bool(true));
+                    }
                 }
             }
         }
@@ -337,7 +363,26 @@ fn build_timeline(
     load_table!("connectivity", srum_parser::parse_network_connectivity);
     load_table!("energy", srum_parser::parse_energy_usage);
     load_table!("notifications", srum_parser::parse_push_notifications);
-    load_table!("focus", srum_parser::parse_app_timeline);
+
+    if let Ok(focus_records) = srum_parser::parse_app_timeline(path) {
+        if let Ok(focus_values) = records_to_values(focus_records) {
+            let mut apps_values: Vec<serde_json::Value> = all
+                .iter()
+                .filter(|v| v.get("table").and_then(|t| t.as_str()) == Some("apps"))
+                .cloned()
+                .collect();
+            merge_focus_into_apps(&mut apps_values, focus_values);
+            for merged in &apps_values {
+                if let Some(pos) = all.iter().position(|v| {
+                    v.get("app_id") == merged.get("app_id")
+                        && v.get("timestamp") == merged.get("timestamp")
+                        && v.get("table").and_then(|t| t.as_str()) == Some("apps")
+                }) {
+                    all[pos] = merged.clone();
+                }
+            }
+        }
+    }
 
     if let Some(map) = id_map {
         all = all.into_iter().map(|v| enrich(v, map)).collect();
@@ -377,12 +422,17 @@ fn run() -> anyhow::Result<()> {
             format,
         } => {
             let records = srum_parser::parse_app_usage(&path)?;
-            let values: Vec<serde_json::Value> = if resolve {
+            let mut values: Vec<serde_json::Value> = if resolve {
                 let id_map = load_id_map(&path);
                 records.into_iter().map(|r| enrich(r, &id_map)).collect()
             } else {
                 records_to_values(records)?
             };
+            if let Ok(focus_records) = srum_parser::parse_app_timeline(&path) {
+                if let Ok(focus_values) = records_to_values(focus_records) {
+                    merge_focus_into_apps(&mut values, focus_values);
+                }
+            }
             print_values(&values, &format)?;
         }
         Cmd::Idmap { path, format } => {
@@ -430,20 +480,6 @@ fn run() -> anyhow::Result<()> {
                 let id_map = load_id_map(&path);
                 values = values.into_iter().map(|r| enrich(r, &id_map)).collect();
             }
-            print_values(&values, &format)?;
-        }
-        Cmd::Focus {
-            path,
-            resolve,
-            format,
-        } => {
-            let records = srum_parser::parse_app_timeline(&path)?;
-            let values: Vec<serde_json::Value> = if resolve {
-                let id_map = load_id_map(&path);
-                records.into_iter().map(|r| enrich(r, &id_map)).collect()
-            } else {
-                records_to_values(records)?
-            };
             print_values(&values, &format)?;
         }
         Cmd::Timeline {
