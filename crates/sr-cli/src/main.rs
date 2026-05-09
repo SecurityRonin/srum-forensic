@@ -116,6 +116,26 @@ enum Cmd {
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
+    /// Parse application timeline records — in-focus and user-input duration per app.
+    ///
+    /// Records come from the {7ACBBAA3-D029-4BE4-9A7A-0885927F1D8F} table.
+    /// Available since Windows 10 Anniversary Update (1607).
+    ///
+    /// Forensic value: an app with CPU cycles in `apps` but zero focus_time_ms
+    /// here was running in the background — a red flag for malware or injected code.
+    #[command(name = "app-timeline")]
+    AppTimeline {
+        /// Path to SRUDB.dat (or a forensic copy of it).
+        path: PathBuf,
+        /// Resolve `app_id` and `user_id` to names from `SruDbIdMapTable`.
+        ///
+        /// Adds `app_name` and `user_name` fields to each record.
+        #[arg(long)]
+        resolve: bool,
+        /// Output format (json or csv).
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
+    },
     /// Merge all SRUM tables into a single chronological timeline.
     ///
     /// Reads network, apps, connectivity, energy, and notification records,
@@ -279,6 +299,7 @@ fn build_timeline(path: &std::path::Path) -> Vec<serde_json::Value> {
     load_table!("connectivity", srum_parser::parse_network_connectivity);
     load_table!("energy", srum_parser::parse_energy_usage);
     load_table!("notifications", srum_parser::parse_push_notifications);
+    load_table!("app-timeline", srum_parser::parse_app_timeline);
 
     all.sort_by(|a, b| {
         let ta = a.get("timestamp").and_then(|v| v.as_str()).unwrap_or("");
@@ -365,6 +386,20 @@ fn run() -> anyhow::Result<()> {
                 let id_map = load_id_map(&path);
                 values = values.into_iter().map(|r| enrich(r, &id_map)).collect();
             }
+            print_values(&values, &format)?;
+        }
+        Cmd::AppTimeline {
+            path,
+            resolve,
+            format,
+        } => {
+            let records = srum_parser::parse_app_timeline(&path)?;
+            let values: Vec<serde_json::Value> = if resolve {
+                let id_map = load_id_map(&path);
+                records.into_iter().map(|r| enrich(r, &id_map)).collect()
+            } else {
+                records_to_values(records)?
+            };
             print_values(&values, &format)?;
         }
         Cmd::Timeline { path, format } => {
