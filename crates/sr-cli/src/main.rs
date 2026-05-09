@@ -737,6 +737,76 @@ mod tests {
         );
     }
 
+    // ── apply_heuristics: automated_execution + interactivity_ratio ──────────
+
+    #[test]
+    fn apply_heuristics_flags_automated_execution_sustained_focus_no_input() {
+        // focus ≥ 60_000 ms with zero user input
+        let mut values = vec![apps_record_with_focus(0, 0, 60_000, 0)];
+        apply_heuristics(&mut values);
+        assert_eq!(
+            values[0].get("automated_execution"),
+            Some(&serde_json::Value::Bool(true))
+        );
+    }
+
+    #[test]
+    fn apply_heuristics_automated_execution_not_set_when_input_present() {
+        let mut values = vec![apps_record_with_focus(0, 0, 60_000, 1)];
+        apply_heuristics(&mut values);
+        assert!(values[0].get("automated_execution").is_none());
+    }
+
+    #[test]
+    fn apply_heuristics_automated_execution_not_set_below_threshold() {
+        let mut values = vec![apps_record_with_focus(0, 0, 59_999, 0)];
+        apply_heuristics(&mut values);
+        assert!(values[0].get("automated_execution").is_none());
+    }
+
+    #[test]
+    fn apply_heuristics_automated_execution_absent_when_focus_field_missing() {
+        let mut values = vec![apps_record(0, 0)];
+        apply_heuristics(&mut values);
+        assert!(values[0].get("automated_execution").is_none());
+    }
+
+    #[test]
+    fn apply_heuristics_interactivity_ratio_emitted_when_focus_nonzero() {
+        // 30_000 input / 60_000 focus = 0.5
+        let mut values = vec![apps_record_with_focus(0, 0, 60_000, 30_000)];
+        apply_heuristics(&mut values);
+        let ratio = values[0]
+            .get("interactivity_ratio")
+            .and_then(serde_json::Value::as_f64);
+        assert!((ratio.unwrap() - 0.5).abs() < f64::EPSILON, "expected 0.5, got {ratio:?}");
+    }
+
+    #[test]
+    fn apply_heuristics_interactivity_ratio_zero_when_no_user_input() {
+        let mut values = vec![apps_record_with_focus(0, 0, 60_000, 0)];
+        apply_heuristics(&mut values);
+        let ratio = values[0]
+            .get("interactivity_ratio")
+            .and_then(serde_json::Value::as_f64);
+        assert_eq!(ratio, Some(0.0));
+    }
+
+    #[test]
+    fn apply_heuristics_interactivity_ratio_absent_when_focus_zero() {
+        // focus_time_ms = 0: don't divide, don't emit
+        let mut values = vec![apps_record_with_focus(0, 0, 0, 0)];
+        apply_heuristics(&mut values);
+        assert!(values[0].get("interactivity_ratio").is_none());
+    }
+
+    #[test]
+    fn apply_heuristics_interactivity_ratio_absent_when_focus_field_missing() {
+        let mut values = vec![apps_record(0, 0)];
+        apply_heuristics(&mut values);
+        assert!(values[0].get("interactivity_ratio").is_none());
+    }
+
     // ── merge_focus_into_apps ─────────────────────────────────────────────────
 
     #[test]
