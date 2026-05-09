@@ -120,9 +120,7 @@ enum Cmd {
     ///
     /// Records come from the {7ACBBAA3-D029-4BE4-9A7A-0885927F1D8F} table.
     /// Available since Windows 10 Anniversary Update (1607).
-    ///
-    /// Forensic value: an app with CPU cycles in `apps` but zero focus_time_ms
-    /// here was running in the background — a red flag for malware or injected code.
+    /// CPU cycles in `apps` with zero focus_time_ms here → background-only execution.
     #[command(name = "app-timeline")]
     AppTimeline {
         /// Path to SRUDB.dat (or a forensic copy of it).

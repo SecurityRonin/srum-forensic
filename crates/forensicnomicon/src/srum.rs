@@ -32,6 +32,23 @@ pub const TABLE_PUSH_NOTIFICATIONS: &str = "{D10CA2FE-6FCF-4F6D-848E-B2E99266FA8
 /// Application Timeline — in-focus duration and user input time per app.
 ///
 /// Available since Windows 10 Anniversary Update (1607).  Maps to `sr app-timeline`.
+///
+/// # Forensic heuristics
+///
+/// - **Background execution without focus**: an app that accumulates CPU cycles
+///   in [`TABLE_APP_RESOURCE_USAGE`] but has `focus_time_ms == 0` here was never
+///   in the foreground. Legitimate software rarely does sustained background CPU
+///   work with no user interaction; this combination is a red flag for injected
+///   code, scheduled malware, or a shell spawned by another process.
+///
+/// - **Activity window**: `timestamp` marks the interval start; records are
+///   written approximately hourly. Correlate with [`TABLE_NETWORK_USAGE`] and
+///   [`TABLE_APP_RESOURCE_USAGE`] in the same interval to build a per-app
+///   activity profile.
+///
+/// - **Input vs. focus**: `user_input_ms` ≤ `focus_time_ms` always. A large
+///   gap (focus but no input) may indicate an app was visible but the user was
+///   not interacting with it — or the window was opened programmatically.
 pub const TABLE_APP_TIMELINE: &str = "{7ACBBAA3-D029-4BE4-9A7A-0885927F1D8F}";
 
 /// ID map table — integer ID → process path / SID mapping.
