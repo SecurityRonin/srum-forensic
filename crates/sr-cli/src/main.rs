@@ -432,7 +432,7 @@ fn apply_cross_table_signals(all: &mut Vec<serde_json::Value>) {
                         let net_exfil = is_exfil_volume(sent) || is_exfil_ratio(sent, recv);
                         let bg = obj.get("background_cycles").and_then(serde_json::Value::as_u64).unwrap_or(0);
                         let focus_ms = obj.get("focus_time_ms").and_then(serde_json::Value::as_u64);
-                        if net_exfil && bg > 0 && focus_ms == Some(0) {
+                        if net_exfil && bg > 0 && focus_ms.map_or(true, |ms| ms == 0) {
                             obj.insert("exfil_signal".to_owned(), serde_json::Value::Bool(true));
                         }
                     }
@@ -479,19 +479,32 @@ fn build_timeline(
 
     if let Ok(focus_records) = srum_parser::parse_app_timeline(path) {
         if let Ok(focus_values) = records_to_values(focus_records) {
-            let mut apps_values: Vec<serde_json::Value> = all
-                .iter()
-                .filter(|v| v.get("table").and_then(|t| t.as_str()) == Some("apps"))
-                .cloned()
-                .collect();
-            merge_focus_into_apps(&mut apps_values, focus_values);
-            for merged in &apps_values {
-                if let Some(pos) = all.iter().position(|v| {
-                    v.get("app_id") == merged.get("app_id")
-                        && v.get("timestamp") == merged.get("timestamp")
-                        && v.get("table").and_then(|t| t.as_str()) == Some("apps")
-                }) {
-                    all[pos] = merged.clone();
+            // Build focus lookup once, then do a single O(n) pass directly over all.
+            // Avoids the O(n²) clone+position-scan write-back.
+            let mut focus_map: HashMap<(i64, String), (u64, u64)> = HashMap::new();
+            for f in focus_values {
+                if let (Some(app_id), Some(ts), Some(focus_ms), Some(input_ms)) = (
+                    f.get("app_id").and_then(serde_json::Value::as_i64),
+                    f.get("timestamp").and_then(serde_json::Value::as_str).map(str::to_owned),
+                    f.get("focus_time_ms").and_then(serde_json::Value::as_u64),
+                    f.get("user_input_time_ms").and_then(serde_json::Value::as_u64),
+                ) {
+                    focus_map.insert((app_id, ts), (focus_ms, input_ms));
+                }
+            }
+            for v in all.iter_mut() {
+                if v.get("table").and_then(|t| t.as_str()) == Some("apps") {
+                    if let Some(obj) = v.as_object_mut() {
+                        let key = obj
+                            .get("app_id").and_then(serde_json::Value::as_i64)
+                            .zip(obj.get("timestamp").and_then(serde_json::Value::as_str).map(str::to_owned));
+                        if let Some((app_id, ts)) = key {
+                            if let Some(&(focus_ms, input_ms)) = focus_map.get(&(app_id, ts)) {
+                                obj.insert("focus_time_ms".to_owned(), focus_ms.into());
+                                obj.insert("user_input_time_ms".to_owned(), input_ms.into());
+                            }
+                        }
+                    }
                 }
             }
         }
