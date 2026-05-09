@@ -828,6 +828,115 @@ mod tests {
         assert!(values[0].get("interactivity_ratio").is_none());
     }
 
+    // ── apply_cross_table_signals ─────────────────────────────────────────────
+
+    fn network_record(app_id: i32, ts: &str, bytes_sent: u64, bytes_recv: u64) -> serde_json::Value {
+        serde_json::json!({
+            "table": "network",
+            "app_id": app_id,
+            "timestamp": ts,
+            "bytes_sent": bytes_sent,
+            "bytes_received": bytes_recv,
+        })
+    }
+
+    #[test]
+    fn cross_table_signals_flags_exfil_on_matching_background_app() {
+        // Network: 200 MiB sent (above volume threshold) for app 42 at T1
+        // Apps: app 42 at T1, background_cycles > 0, focus_time_ms = 0
+        let mut all = vec![
+            network_record(42, "2024-06-15T08:00:00Z", 200 * 1024 * 1024, 1024),
+            serde_json::json!({
+                "table": "apps", "app_id": 42, "timestamp": "2024-06-15T08:00:00Z",
+                "background_cycles": 5000_u64, "foreground_cycles": 0_u64,
+                "focus_time_ms": 0_u64, "user_input_time_ms": 0_u64,
+            }),
+        ];
+        apply_cross_table_signals(&mut all);
+        let apps_rec = all.iter().find(|v| v.get("table").and_then(|t| t.as_str()) == Some("apps")).unwrap();
+        assert_eq!(apps_rec.get("exfil_signal"), Some(&serde_json::Value::Bool(true)));
+    }
+
+    #[test]
+    fn cross_table_signals_no_flag_when_focus_present() {
+        // Same setup but app had focus — not a background exfil
+        let mut all = vec![
+            network_record(42, "2024-06-15T08:00:00Z", 200 * 1024 * 1024, 1024),
+            serde_json::json!({
+                "table": "apps", "app_id": 42, "timestamp": "2024-06-15T08:00:00Z",
+                "background_cycles": 5000_u64, "foreground_cycles": 0_u64,
+                "focus_time_ms": 30_000_u64, "user_input_time_ms": 10_000_u64,
+            }),
+        ];
+        apply_cross_table_signals(&mut all);
+        let apps_rec = all.iter().find(|v| v.get("table").and_then(|t| t.as_str()) == Some("apps")).unwrap();
+        assert!(apps_rec.get("exfil_signal").is_none());
+    }
+
+    #[test]
+    fn cross_table_signals_no_flag_when_network_below_threshold() {
+        // Network bytes below both volume and ratio thresholds
+        let mut all = vec![
+            network_record(42, "2024-06-15T08:00:00Z", 1024, 1024),
+            serde_json::json!({
+                "table": "apps", "app_id": 42, "timestamp": "2024-06-15T08:00:00Z",
+                "background_cycles": 5000_u64, "foreground_cycles": 0_u64,
+                "focus_time_ms": 0_u64, "user_input_time_ms": 0_u64,
+            }),
+        ];
+        apply_cross_table_signals(&mut all);
+        let apps_rec = all.iter().find(|v| v.get("table").and_then(|t| t.as_str()) == Some("apps")).unwrap();
+        assert!(apps_rec.get("exfil_signal").is_none());
+    }
+
+    #[test]
+    fn cross_table_signals_no_flag_when_no_matching_network_record() {
+        // Apps record with background CPU + no focus, but no network record for this app/time
+        let mut all = vec![
+            network_record(99, "2024-06-15T08:00:00Z", 200 * 1024 * 1024, 0),
+            serde_json::json!({
+                "table": "apps", "app_id": 42, "timestamp": "2024-06-15T08:00:00Z",
+                "background_cycles": 5000_u64, "foreground_cycles": 0_u64,
+                "focus_time_ms": 0_u64, "user_input_time_ms": 0_u64,
+            }),
+        ];
+        apply_cross_table_signals(&mut all);
+        let apps_rec = all.iter().find(|v| v.get("table").and_then(|t| t.as_str()) == Some("apps")).unwrap();
+        assert!(apps_rec.get("exfil_signal").is_none());
+    }
+
+    #[test]
+    fn cross_table_signals_no_flag_when_background_cycles_zero() {
+        // Network exfil volume but app used no background CPU
+        let mut all = vec![
+            network_record(42, "2024-06-15T08:00:00Z", 200 * 1024 * 1024, 0),
+            serde_json::json!({
+                "table": "apps", "app_id": 42, "timestamp": "2024-06-15T08:00:00Z",
+                "background_cycles": 0_u64, "foreground_cycles": 500_u64,
+                "focus_time_ms": 0_u64, "user_input_time_ms": 0_u64,
+            }),
+        ];
+        apply_cross_table_signals(&mut all);
+        let apps_rec = all.iter().find(|v| v.get("table").and_then(|t| t.as_str()) == Some("apps")).unwrap();
+        assert!(apps_rec.get("exfil_signal").is_none());
+    }
+
+    #[test]
+    fn cross_table_signals_flags_exfil_by_ratio_not_just_volume() {
+        // 10 MiB sent, 0 received: triggers is_exfil_ratio (10:0), not is_exfil_volume
+        let mut all = vec![
+            network_record(42, "2024-06-15T08:00:00Z", 10 * 1024 * 1024, 0),
+            serde_json::json!({
+                "table": "apps", "app_id": 42, "timestamp": "2024-06-15T08:00:00Z",
+                "background_cycles": 5000_u64, "foreground_cycles": 0_u64,
+                "focus_time_ms": 0_u64, "user_input_time_ms": 0_u64,
+            }),
+        ];
+        apply_cross_table_signals(&mut all);
+        let apps_rec = all.iter().find(|v| v.get("table").and_then(|t| t.as_str()) == Some("apps")).unwrap();
+        assert_eq!(apps_rec.get("exfil_signal"), Some(&serde_json::Value::Bool(true)));
+    }
+
     // ── merge_focus_into_apps ─────────────────────────────────────────────────
 
     #[test]
