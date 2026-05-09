@@ -314,7 +314,7 @@ fn merge_focus_into_apps(apps: &mut Vec<serde_json::Value>, focus: Vec<serde_jso
 /// - `no_focus_with_cpu`: background CPU active but zero focus time (only when
 ///   focus data was merged in — absent focus field means unknown, not false)
 fn apply_heuristics(values: &mut Vec<serde_json::Value>) {
-    use forensicnomicon::heuristics::srum::is_background_cpu_dominant;
+    use forensicnomicon::heuristics::srum::{is_background_cpu_dominant, is_phantom_foreground};
     for v in values.iter_mut() {
         if v.get("table").and_then(|t| t.as_str()) == Some("apps") {
             if let Some(obj) = v.as_object_mut() {
@@ -339,6 +339,9 @@ fn apply_heuristics(values: &mut Vec<serde_json::Value>) {
                         .unwrap_or(0);
                     if bg > 0 && focus_ms == 0 {
                         obj.insert("no_focus_with_cpu".to_owned(), serde_json::Value::Bool(true));
+                    }
+                    if is_phantom_foreground(fg, focus_ms) {
+                        obj.insert("phantom_foreground".to_owned(), serde_json::Value::Bool(true));
                     }
                 }
             }
