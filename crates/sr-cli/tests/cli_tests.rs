@@ -393,3 +393,36 @@ fn sr_timeline_format_flag_exists() {
         "sr timeline --help must document --format, got: {stdout}"
     );
 }
+
+// ── sr app-timeline ──────────────────────────────────────────────────────────
+
+#[test]
+fn sr_app_timeline_help_exits_success() {
+    let status = sr_bin()
+        .args(["app-timeline", "--help"])
+        .status()
+        .expect("run sr app-timeline --help");
+    assert!(status.success(), "sr app-timeline --help should exit 0");
+}
+
+#[test]
+fn sr_app_timeline_nonexistent_exits_nonzero() {
+    let status = sr_bin()
+        .args(["app-timeline", "/nonexistent/SRUDB.dat"])
+        .status()
+        .expect("run sr app-timeline");
+    assert!(!status.success(), "sr must exit nonzero for missing file");
+}
+
+#[test]
+fn sr_app_timeline_nonexistent_stderr_has_error_prefix() {
+    let out = sr_bin()
+        .args(["app-timeline", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run sr app-timeline");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("error:"),
+        "stderr must contain 'error:' prefix, got: {stderr}"
+    );
+}
