@@ -1,0 +1,10 @@
+[package]
+name = "forensicnomicon"
+version = "0.1.0"
+description = "Forensic knowledge registry — named constants for SRUM table GUIDs and ESE artefacts"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
