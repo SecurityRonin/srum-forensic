@@ -479,6 +479,29 @@ mod tests {
         })
     }
 
+    fn apps_record_with_focus(bg: u64, fg: u64, focus_ms: u64, input_ms: u64) -> serde_json::Value {
+        serde_json::json!({
+            "table": "apps",
+            "app_id": 1,
+            "timestamp": "2024-06-15T08:00:00Z",
+            "background_cycles": bg,
+            "foreground_cycles": fg,
+            "focus_time_ms": focus_ms,
+            "user_input_time_ms": input_ms,
+        })
+    }
+
+    fn focus_record(app_id: i32, ts: &str, focus_ms: u64, input_ms: u64) -> serde_json::Value {
+        serde_json::json!({
+            "app_id": app_id,
+            "timestamp": ts,
+            "focus_time_ms": focus_ms,
+            "user_input_time_ms": input_ms,
+        })
+    }
+
+    // ── apply_heuristics: background_cpu_dominant ─────────────────────────────
+
     #[test]
     fn apply_heuristics_flags_dominant_background_cpu() {
         let mut values = vec![apps_record(10_000, 0)];
@@ -522,5 +545,135 @@ mod tests {
         let mut values = vec![apps_record(10_000, 0)];
         apply_heuristics(&mut values);
         assert_eq!(values[0].get("app_id"), Some(&serde_json::Value::Number(1.into())));
+    }
+
+    // ── apply_heuristics: no_focus_with_cpu ──────────────────────────────────
+
+    #[test]
+    fn apply_heuristics_flags_no_focus_with_background_cpu() {
+        let mut values = vec![apps_record_with_focus(5_000, 0, 0, 0)];
+        apply_heuristics(&mut values);
+        assert_eq!(
+            values[0].get("no_focus_with_cpu"),
+            Some(&serde_json::Value::Bool(true))
+        );
+    }
+
+    #[test]
+    fn apply_heuristics_no_focus_with_cpu_not_set_when_focus_present() {
+        // App had some foreground time and some focus — not suspicious
+        let mut values = vec![apps_record_with_focus(1_000, 100, 30_000, 15_000)];
+        apply_heuristics(&mut values);
+        assert!(values[0].get("no_focus_with_cpu").is_none());
+    }
+
+    #[test]
+    fn apply_heuristics_no_focus_with_cpu_not_set_when_no_background_cycles() {
+        // Zero background cycles — not a CPU-without-focus case
+        let mut values = vec![apps_record_with_focus(0, 500, 0, 0)];
+        apply_heuristics(&mut values);
+        assert!(values[0].get("no_focus_with_cpu").is_none());
+    }
+
+    #[test]
+    fn apply_heuristics_no_focus_with_cpu_absent_when_focus_field_missing() {
+        // Focus data not merged in — don't emit the signal (unknown, not false)
+        let mut values = vec![apps_record(5_000, 0)];
+        apply_heuristics(&mut values);
+        assert!(values[0].get("no_focus_with_cpu").is_none());
+    }
+
+    #[test]
+    fn apply_heuristics_both_signals_set_for_cover_ui_malware() {
+        // 10:1 ratio (background_cpu_dominant) AND zero focus (no_focus_with_cpu)
+        let mut values = vec![apps_record_with_focus(10_000, 1_000, 0, 0)];
+        apply_heuristics(&mut values);
+        assert_eq!(
+            values[0].get("background_cpu_dominant"),
+            Some(&serde_json::Value::Bool(true))
+        );
+        assert_eq!(
+            values[0].get("no_focus_with_cpu"),
+            Some(&serde_json::Value::Bool(true))
+        );
+    }
+
+    #[test]
+    fn apply_heuristics_only_no_focus_set_when_ratio_ok_but_zero_focus() {
+        // Small background/foreground ratio (not dominant) but zero focus time
+        let mut values = vec![apps_record_with_focus(200, 100, 0, 0)];
+        apply_heuristics(&mut values);
+        assert!(values[0].get("background_cpu_dominant").is_none());
+        assert_eq!(
+            values[0].get("no_focus_with_cpu"),
+            Some(&serde_json::Value::Bool(true))
+        );
+    }
+
+    // ── merge_focus_into_apps ─────────────────────────────────────────────────
+
+    #[test]
+    fn merge_focus_injects_fields_on_matching_record() {
+        let mut apps = vec![serde_json::json!({
+            "table": "apps",
+            "app_id": 42,
+            "timestamp": "2024-06-15T08:00:00Z",
+            "background_cycles": 1000_u64,
+        })];
+        let focus = vec![focus_record(42, "2024-06-15T08:00:00Z", 30_000, 12_000)];
+        merge_focus_into_apps(&mut apps, focus);
+        assert_eq!(apps[0].get("focus_time_ms"), Some(&serde_json::Value::Number(30_000_u64.into())));
+        assert_eq!(apps[0].get("user_input_time_ms"), Some(&serde_json::Value::Number(12_000_u64.into())));
+    }
+
+    #[test]
+    fn merge_focus_does_not_inject_when_no_match() {
+        let mut apps = vec![serde_json::json!({
+            "table": "apps",
+            "app_id": 42,
+            "timestamp": "2024-06-15T08:00:00Z",
+        })];
+        let focus = vec![focus_record(99, "2024-06-15T08:00:00Z", 30_000, 0)];
+        merge_focus_into_apps(&mut apps, focus);
+        assert!(apps[0].get("focus_time_ms").is_none());
+    }
+
+    #[test]
+    fn merge_focus_does_not_inject_when_timestamp_differs() {
+        let mut apps = vec![serde_json::json!({
+            "table": "apps",
+            "app_id": 42,
+            "timestamp": "2024-06-15T08:00:00Z",
+        })];
+        let focus = vec![focus_record(42, "2024-06-15T09:00:00Z", 30_000, 0)];
+        merge_focus_into_apps(&mut apps, focus);
+        assert!(apps[0].get("focus_time_ms").is_none());
+    }
+
+    #[test]
+    fn merge_focus_preserves_existing_apps_fields() {
+        let mut apps = vec![serde_json::json!({
+            "table": "apps",
+            "app_id": 7,
+            "timestamp": "2024-06-15T08:00:00Z",
+            "background_cycles": 500_u64,
+        })];
+        let focus = vec![focus_record(7, "2024-06-15T08:00:00Z", 5_000, 2_000)];
+        merge_focus_into_apps(&mut apps, focus);
+        assert_eq!(apps[0].get("background_cycles"), Some(&serde_json::Value::Number(500_u64.into())));
+        assert_eq!(apps[0].get("table"), Some(&serde_json::Value::String("apps".into())));
+    }
+
+    #[test]
+    fn merge_focus_does_not_overwrite_app_id_or_timestamp() {
+        let mut apps = vec![serde_json::json!({
+            "table": "apps",
+            "app_id": 42,
+            "timestamp": "2024-06-15T08:00:00Z",
+        })];
+        let focus = vec![focus_record(42, "2024-06-15T08:00:00Z", 1_000, 500)];
+        merge_focus_into_apps(&mut apps, focus);
+        assert_eq!(apps[0].get("app_id"), Some(&serde_json::Value::Number(42.into())));
+        assert_eq!(apps[0].get("timestamp"), Some(&serde_json::Value::String("2024-06-15T08:00:00Z".into())));
     }
 }

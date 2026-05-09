@@ -333,62 +333,22 @@ fn sr_notifications_nonexistent_stderr_has_error_prefix() {
     );
 }
 
-// ── sr focus ───────────────────────────────────────────────────────────
+// ── sr focus removed — focus data merged into sr apps records ─────────────────
 
 #[test]
-fn sr_focus_help_exits_success() {
-    let status = sr_bin()
-        .args(["focus", "--help"])
-        .status()
-        .expect("run sr focus --help");
-    assert!(status.success(), "sr focus --help should exit 0");
-}
-
-#[test]
-fn sr_focus_nonexistent_exits_nonzero() {
-    let status = sr_bin()
-        .args(["focus", "/nonexistent/SRUDB.dat"])
-        .status()
-        .expect("run sr focus");
-    assert!(!status.success(), "sr must exit nonzero for missing file");
-}
-
-#[test]
-fn sr_focus_nonexistent_stderr_has_error_prefix() {
+fn sr_focus_subcommand_is_gone() {
     let out = sr_bin()
         .args(["focus", "/nonexistent/SRUDB.dat"])
         .output()
         .expect("run sr focus");
+    assert!(
+        !out.status.success(),
+        "sr focus must exit nonzero — subcommand was removed"
+    );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains("error:"),
-        "stderr must contain 'error:' prefix, got: {stderr}"
-    );
-}
-
-#[test]
-fn sr_focus_help_shows_format_flag() {
-    let out = sr_bin()
-        .args(["focus", "--help"])
-        .output()
-        .expect("run sr focus --help");
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(
-        stdout.contains("format"),
-        "sr focus --help must document --format, got: {stdout}"
-    );
-}
-
-#[test]
-fn sr_focus_help_shows_resolve_flag() {
-    let out = sr_bin()
-        .args(["focus", "--help"])
-        .output()
-        .expect("run sr focus --help");
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(
-        stdout.contains("resolve"),
-        "sr focus --help must document --resolve, got: {stdout}"
+        stderr.contains("unrecognized subcommand"),
+        "sr focus must report unrecognized subcommand, got: {stderr}"
     );
 }
 
