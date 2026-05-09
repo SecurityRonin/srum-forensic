@@ -116,6 +116,23 @@ enum Cmd {
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
+    /// Parse Application Timeline records — in-focus and user-input duration per app.
+    ///
+    /// Records come from the {7ACBBAA3-D029-4BE4-9A7A-0885927F1D8F} table.
+    /// Available since Windows 10 Anniversary Update (1607).
+    #[command(name = "app-timeline")]
+    AppTimeline {
+        /// Path to SRUDB.dat (or a forensic copy of it).
+        path: PathBuf,
+        /// Resolve `app_id` and `user_id` to names from `SruDbIdMapTable`.
+        ///
+        /// Adds `app_name` and `user_name` fields to each record.
+        #[arg(long)]
+        resolve: bool,
+        /// Output format (json or csv).
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
+    },
     /// Merge all SRUM tables into a single chronological timeline.
     ///
     /// Reads network, apps, connectivity, energy, notifications, and focus
@@ -480,6 +497,20 @@ fn run() -> anyhow::Result<()> {
                 let id_map = load_id_map(&path);
                 values = values.into_iter().map(|r| enrich(r, &id_map)).collect();
             }
+            print_values(&values, &format)?;
+        }
+        Cmd::AppTimeline {
+            path,
+            resolve,
+            format,
+        } => {
+            let records = srum_parser::parse_app_timeline(&path)?;
+            let values: Vec<serde_json::Value> = if resolve {
+                let id_map = load_id_map(&path);
+                records.into_iter().map(|r| enrich(r, &id_map)).collect()
+            } else {
+                records_to_values(records)?
+            };
             print_values(&values, &format)?;
         }
         Cmd::Timeline {
