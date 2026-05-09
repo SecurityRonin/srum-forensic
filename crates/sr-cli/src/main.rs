@@ -414,3 +414,62 @@ fn main() {
         std::process::exit(1);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn apps_record(bg: u64, fg: u64) -> serde_json::Value {
+        serde_json::json!({
+            "table": "apps",
+            "app_id": 1,
+            "background_cycles": bg,
+            "foreground_cycles": fg,
+        })
+    }
+
+    #[test]
+    fn apply_heuristics_flags_dominant_background_cpu() {
+        let mut values = vec![apps_record(10_000, 0)];
+        apply_heuristics(&mut values);
+        assert_eq!(
+            values[0].get("background_cpu_dominant"),
+            Some(&serde_json::Value::Bool(true))
+        );
+    }
+
+    #[test]
+    fn apply_heuristics_flags_ten_to_one_ratio() {
+        let mut values = vec![apps_record(1_000, 100)];
+        apply_heuristics(&mut values);
+        assert_eq!(
+            values[0].get("background_cpu_dominant"),
+            Some(&serde_json::Value::Bool(true))
+        );
+    }
+
+    #[test]
+    fn apply_heuristics_does_not_flag_equal_cycles() {
+        let mut values = vec![apps_record(100, 100)];
+        apply_heuristics(&mut values);
+        assert!(values[0].get("background_cpu_dominant").is_none());
+    }
+
+    #[test]
+    fn apply_heuristics_does_not_flag_non_apps_table() {
+        let mut values = vec![serde_json::json!({
+            "table": "network",
+            "background_cycles": 99_999,
+            "foreground_cycles": 0,
+        })];
+        apply_heuristics(&mut values);
+        assert!(values[0].get("background_cpu_dominant").is_none());
+    }
+
+    #[test]
+    fn apply_heuristics_preserves_other_fields() {
+        let mut values = vec![apps_record(10_000, 0)];
+        apply_heuristics(&mut values);
+        assert_eq!(values[0].get("app_id"), Some(&serde_json::Value::Number(1.into())));
+    }
+}

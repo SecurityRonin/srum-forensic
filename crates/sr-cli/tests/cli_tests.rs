@@ -333,32 +333,32 @@ fn sr_notifications_nonexistent_stderr_has_error_prefix() {
     );
 }
 
-// ── sr app-timeline ───────────────────────────────────────────────────────────
+// ── sr focus ───────────────────────────────────────────────────────────
 
 #[test]
-fn sr_app_timeline_help_exits_success() {
+fn sr_focus_help_exits_success() {
     let status = sr_bin()
-        .args(["app-timeline", "--help"])
+        .args(["focus", "--help"])
         .status()
-        .expect("run sr app-timeline --help");
-    assert!(status.success(), "sr app-timeline --help should exit 0");
+        .expect("run sr focus --help");
+    assert!(status.success(), "sr focus --help should exit 0");
 }
 
 #[test]
-fn sr_app_timeline_nonexistent_exits_nonzero() {
+fn sr_focus_nonexistent_exits_nonzero() {
     let status = sr_bin()
-        .args(["app-timeline", "/nonexistent/SRUDB.dat"])
+        .args(["focus", "/nonexistent/SRUDB.dat"])
         .status()
-        .expect("run sr app-timeline");
+        .expect("run sr focus");
     assert!(!status.success(), "sr must exit nonzero for missing file");
 }
 
 #[test]
-fn sr_app_timeline_nonexistent_stderr_has_error_prefix() {
+fn sr_focus_nonexistent_stderr_has_error_prefix() {
     let out = sr_bin()
-        .args(["app-timeline", "/nonexistent/SRUDB.dat"])
+        .args(["focus", "/nonexistent/SRUDB.dat"])
         .output()
-        .expect("run sr app-timeline");
+        .expect("run sr focus");
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
         stderr.contains("error:"),
@@ -367,28 +367,28 @@ fn sr_app_timeline_nonexistent_stderr_has_error_prefix() {
 }
 
 #[test]
-fn sr_app_timeline_help_shows_format_flag() {
+fn sr_focus_help_shows_format_flag() {
     let out = sr_bin()
-        .args(["app-timeline", "--help"])
+        .args(["focus", "--help"])
         .output()
-        .expect("run sr app-timeline --help");
+        .expect("run sr focus --help");
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
         stdout.contains("format"),
-        "sr app-timeline --help must document --format, got: {stdout}"
+        "sr focus --help must document --format, got: {stdout}"
     );
 }
 
 #[test]
-fn sr_app_timeline_help_shows_resolve_flag() {
+fn sr_focus_help_shows_resolve_flag() {
     let out = sr_bin()
-        .args(["app-timeline", "--help"])
+        .args(["focus", "--help"])
         .output()
-        .expect("run sr app-timeline --help");
+        .expect("run sr focus --help");
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
         stdout.contains("resolve"),
-        "sr app-timeline --help must document --resolve, got: {stdout}"
+        "sr focus --help must document --resolve, got: {stdout}"
     );
 }
 
