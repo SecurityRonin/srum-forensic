@@ -1096,6 +1096,28 @@ mod tests {
         assert!(all[0].get("user_present").is_none());
     }
 
+    #[test]
+    fn cross_table_signals_flags_exfil_when_focus_field_absent() {
+        // When the Application Timeline table is unavailable, focus_time_ms is
+        // never merged in. The signal must still fire on network + background CPU
+        // — absence of exculpatory focus data should not suppress the signal.
+        let mut all = vec![
+            network_record(42, "2024-06-15T08:00:00Z", 200 * 1024 * 1024, 0),
+            serde_json::json!({
+                "table": "apps", "app_id": 42, "timestamp": "2024-06-15T08:00:00Z",
+                "background_cycles": 5000_u64, "foreground_cycles": 0_u64,
+                // no focus_time_ms field — Timeline table unavailable
+            }),
+        ];
+        apply_cross_table_signals(&mut all);
+        let apps_rec = all.iter().find(|v| v.get("table").and_then(|t| t.as_str()) == Some("apps")).unwrap();
+        assert_eq!(
+            apps_rec.get("exfil_signal"),
+            Some(&serde_json::Value::Bool(true)),
+            "exfil_signal must fire even when focus_time_ms is absent"
+        );
+    }
+
     // ── merge_focus_into_apps ─────────────────────────────────────────────────
 
     #[test]
