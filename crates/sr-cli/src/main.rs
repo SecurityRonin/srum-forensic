@@ -979,6 +979,91 @@ mod tests {
         assert_eq!(apps_rec.get("exfil_signal"), Some(&serde_json::Value::Bool(true)));
     }
 
+    // ── annotate_user_presence ────────────────────────────────────────────────
+
+    #[test]
+    fn user_presence_annotates_all_records_in_interval_when_input_above_threshold() {
+        // Two records at same timestamp: apps with 15_000 ms input, and a network record.
+        // Both should get user_present: true because aggregate (15_000) > 10_000.
+        let ts = "2024-06-15T08:00:00Z";
+        let mut all = vec![
+            serde_json::json!({
+                "table": "apps", "app_id": 1, "timestamp": ts,
+                "user_input_time_ms": 15_000_u64,
+            }),
+            serde_json::json!({
+                "table": "network", "app_id": 1, "timestamp": ts,
+                "bytes_sent": 1024_u64,
+            }),
+        ];
+        annotate_user_presence(&mut all);
+        for rec in &all {
+            assert_eq!(
+                rec.get("user_present"),
+                Some(&serde_json::Value::Bool(true)),
+                "all records in a user-present interval must be annotated: {rec}"
+            );
+        }
+    }
+
+    #[test]
+    fn user_presence_does_not_annotate_when_input_below_threshold() {
+        let ts = "2024-06-15T08:00:00Z";
+        let mut all = vec![serde_json::json!({
+            "table": "apps", "app_id": 1, "timestamp": ts,
+            "user_input_time_ms": 9_999_u64,
+        })];
+        annotate_user_presence(&mut all);
+        assert!(all[0].get("user_present").is_none());
+    }
+
+    #[test]
+    fn user_presence_aggregates_across_multiple_apps_in_same_interval() {
+        // Two apps each contribute 6_000 ms → total 12_000 > 10_000 → user_present
+        let ts = "2024-06-15T08:00:00Z";
+        let mut all = vec![
+            serde_json::json!({"table": "apps", "app_id": 1, "timestamp": ts, "user_input_time_ms": 6_000_u64}),
+            serde_json::json!({"table": "apps", "app_id": 2, "timestamp": ts, "user_input_time_ms": 6_000_u64}),
+        ];
+        annotate_user_presence(&mut all);
+        assert_eq!(all[0].get("user_present"), Some(&serde_json::Value::Bool(true)));
+        assert_eq!(all[1].get("user_present"), Some(&serde_json::Value::Bool(true)));
+    }
+
+    #[test]
+    fn user_presence_annotates_exactly_at_threshold() {
+        let ts = "2024-06-15T08:00:00Z";
+        let mut all = vec![serde_json::json!({
+            "table": "apps", "app_id": 1, "timestamp": ts,
+            "user_input_time_ms": USER_PRESENCE_THRESHOLD_MS,
+        })];
+        annotate_user_presence(&mut all);
+        assert_eq!(all[0].get("user_present"), Some(&serde_json::Value::Bool(true)));
+    }
+
+    #[test]
+    fn user_presence_different_intervals_annotated_independently() {
+        // T1 has input > threshold, T2 does not
+        let mut all = vec![
+            serde_json::json!({"table": "apps", "app_id": 1, "timestamp": "2024-06-15T08:00:00Z", "user_input_time_ms": 20_000_u64}),
+            serde_json::json!({"table": "apps", "app_id": 1, "timestamp": "2024-06-15T09:00:00Z", "user_input_time_ms": 500_u64}),
+        ];
+        annotate_user_presence(&mut all);
+        assert_eq!(all[0].get("user_present"), Some(&serde_json::Value::Bool(true)));
+        assert!(all[1].get("user_present").is_none());
+    }
+
+    #[test]
+    fn user_presence_non_apps_record_without_matching_apps_gets_no_annotation() {
+        // A network record at a timestamp that has no apps activity
+        let mut all = vec![serde_json::json!({
+            "table": "network", "app_id": 5, "timestamp": "2024-06-15T08:00:00Z",
+            "bytes_sent": 1024_u64,
+        })];
+        annotate_user_presence(&mut all);
+        assert!(all[0].get("user_present").is_none());
+    }
+
     // ── merge_focus_into_apps ─────────────────────────────────────────────────
 
     #[test]
