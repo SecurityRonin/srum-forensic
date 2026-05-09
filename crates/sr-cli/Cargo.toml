@@ -11,6 +11,7 @@ name = "sr"
 path = "src/main.rs"
 
 [dependencies]
+forensicnomicon.workspace = true
 srum-parser.workspace = true
 srum-core.workspace = true
 clap.workspace = true

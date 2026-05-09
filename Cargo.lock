@@ -457,6 +457,7 @@ dependencies = [
  "anyhow",
  "clap",
  "csv",
+ "forensicnomicon",
  "serde",
  "serde_json",
  "srum-core",

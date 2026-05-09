@@ -121,8 +121,8 @@ enum Cmd {
     /// Records come from the {7ACBBAA3-D029-4BE4-9A7A-0885927F1D8F} table.
     /// Available since Windows 10 Anniversary Update (1607).
     /// CPU cycles in `apps` with zero focus_time_ms here → background-only execution.
-    #[command(name = "app-timeline")]
-    AppTimeline {
+    #[command(name = "focus")]
+    Focus {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
         /// Resolve `app_id` and `user_id` to names from `SruDbIdMapTable`.
@@ -136,12 +136,20 @@ enum Cmd {
     },
     /// Merge all SRUM tables into a single chronological timeline.
     ///
-    /// Reads network, apps, connectivity, energy, and notification records,
-    /// injects a `table` field on each entry, and sorts by timestamp.
+    /// Reads network, apps, connectivity, energy, notifications, and focus
+    /// records, injects a `table` field on each entry, and sorts by timestamp.
+    /// Apps records are automatically flagged with `background_cpu_dominant`
+    /// where background CPU dominates foreground (forensicnomicon heuristic).
     /// Tables that are absent or unreadable are silently skipped.
     Timeline {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
+        /// Resolve `app_id` and `user_id` to names from `SruDbIdMapTable`.
+        ///
+        /// Adds `app_name` and `user_name` fields to all records that carry
+        /// those integer IDs.
+        #[arg(long)]
+        resolve: bool,
         /// Output format (json or csv).
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
@@ -267,11 +275,43 @@ fn print_values(values: &[serde_json::Value], format: &OutputFormat) -> anyhow::
     Ok(())
 }
 
+/// Apply forensic heuristics from `forensicnomicon` to a merged timeline.
+///
+/// Currently flags `apps` records where background CPU dominates foreground
+/// by injecting `"background_cpu_dominant": true`.
+fn apply_heuristics(values: &mut Vec<serde_json::Value>) {
+    use forensicnomicon::heuristics::srum::is_background_cpu_dominant;
+    for v in values.iter_mut() {
+        if v.get("table").and_then(|t| t.as_str()) == Some("apps") {
+            if let Some(obj) = v.as_object_mut() {
+                let bg = obj
+                    .get("background_cycles")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(0);
+                let fg = obj
+                    .get("foreground_cycles")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(0);
+                if is_background_cpu_dominant(bg, fg) {
+                    obj.insert(
+                        "background_cpu_dominant".to_owned(),
+                        serde_json::Value::Bool(true),
+                    );
+                }
+            }
+        }
+    }
+}
+
 /// Build a merged, chronologically sorted timeline from all SRUM tables.
 ///
 /// Each record has a `table` field injected to identify its source.
+/// Heuristic flags (e.g. `background_cpu_dominant`) are applied automatically.
 /// Tables that cannot be read are silently skipped (best-effort).
-fn build_timeline(path: &std::path::Path) -> Vec<serde_json::Value> {
+fn build_timeline(
+    path: &std::path::Path,
+    id_map: Option<&HashMap<i32, String>>,
+) -> Vec<serde_json::Value> {
     let mut all: Vec<serde_json::Value> = Vec::new();
 
     macro_rules! load_table {
@@ -297,7 +337,13 @@ fn build_timeline(path: &std::path::Path) -> Vec<serde_json::Value> {
     load_table!("connectivity", srum_parser::parse_network_connectivity);
     load_table!("energy", srum_parser::parse_energy_usage);
     load_table!("notifications", srum_parser::parse_push_notifications);
-    load_table!("app-timeline", srum_parser::parse_app_timeline);
+    load_table!("focus", srum_parser::parse_app_timeline);
+
+    if let Some(map) = id_map {
+        all = all.into_iter().map(|v| enrich(v, map)).collect();
+    }
+
+    apply_heuristics(&mut all);
 
     all.sort_by(|a, b| {
         let ta = a.get("timestamp").and_then(|v| v.as_str()).unwrap_or("");
@@ -386,7 +432,7 @@ fn run() -> anyhow::Result<()> {
             }
             print_values(&values, &format)?;
         }
-        Cmd::AppTimeline {
+        Cmd::Focus {
             path,
             resolve,
             format,
@@ -400,8 +446,13 @@ fn run() -> anyhow::Result<()> {
             };
             print_values(&values, &format)?;
         }
-        Cmd::Timeline { path, format } => {
-            let all = build_timeline(&path);
+        Cmd::Timeline {
+            path,
+            resolve,
+            format,
+        } => {
+            let id_map = resolve.then(|| load_id_map(&path));
+            let all = build_timeline(&path, id_map.as_ref());
             print_values(&all, &format)?;
         }
     }
