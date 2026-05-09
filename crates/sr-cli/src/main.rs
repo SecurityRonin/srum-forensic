@@ -677,6 +677,63 @@ mod tests {
         );
     }
 
+    // ── apply_heuristics: phantom_foreground ──────────────────────────────────
+
+    #[test]
+    fn apply_heuristics_flags_phantom_foreground_fg_cycles_no_focus() {
+        // fg ≥ 1000, focus = 0, focus field present → phantom_foreground: true
+        let mut values = vec![apps_record_with_focus(0, 1_000, 0, 0)];
+        apply_heuristics(&mut values);
+        assert_eq!(
+            values[0].get("phantom_foreground"),
+            Some(&serde_json::Value::Bool(true))
+        );
+    }
+
+    #[test]
+    fn apply_heuristics_phantom_foreground_not_set_when_focus_present() {
+        // fg cycles but actual focus time → not suspicious
+        let mut values = vec![apps_record_with_focus(0, 1_000, 30_000, 5_000)];
+        apply_heuristics(&mut values);
+        assert!(values[0].get("phantom_foreground").is_none());
+    }
+
+    #[test]
+    fn apply_heuristics_phantom_foreground_absent_when_focus_field_missing() {
+        // No focus_time_ms key at all → unknown, not suspicious
+        let mut values = vec![serde_json::json!({
+            "table": "apps",
+            "app_id": 1,
+            "foreground_cycles": 2_000_u64,
+            "background_cycles": 0_u64,
+        })];
+        apply_heuristics(&mut values);
+        assert!(values[0].get("phantom_foreground").is_none());
+    }
+
+    #[test]
+    fn apply_heuristics_phantom_foreground_not_set_below_min_cycles() {
+        // fg < PHANTOM_FOREGROUND_MIN_CYCLES (1000) → not flagged
+        let mut values = vec![apps_record_with_focus(0, 999, 0, 0)];
+        apply_heuristics(&mut values);
+        assert!(values[0].get("phantom_foreground").is_none());
+    }
+
+    #[test]
+    fn apply_heuristics_phantom_foreground_set_alongside_no_focus_with_cpu() {
+        // bg > 0, fg ≥ 1000, focus = 0 → both no_focus_with_cpu AND phantom_foreground
+        let mut values = vec![apps_record_with_focus(5_000, 1_000, 0, 0)];
+        apply_heuristics(&mut values);
+        assert_eq!(
+            values[0].get("no_focus_with_cpu"),
+            Some(&serde_json::Value::Bool(true))
+        );
+        assert_eq!(
+            values[0].get("phantom_foreground"),
+            Some(&serde_json::Value::Bool(true))
+        );
+    }
+
     // ── merge_focus_into_apps ─────────────────────────────────────────────────
 
     #[test]
