@@ -370,6 +370,47 @@ fn apply_heuristics(values: &mut Vec<serde_json::Value>) {
     }
 }
 
+/// Inject `exfil_signal: true` into `apps` records where the matching network
+/// record shows exfiltration-level bytes, the app ran in the background, and
+/// the user had no focus time — the three-way signature of data theft.
+fn apply_cross_table_signals(all: &mut Vec<serde_json::Value>) {
+    use forensicnomicon::heuristics::srum::{is_exfil_ratio, is_exfil_volume};
+
+    let mut net_map: HashMap<(i64, String), (u64, u64)> = HashMap::new();
+    for v in all.iter() {
+        if v.get("table").and_then(|t| t.as_str()) == Some("network") {
+            if let (Some(app_id), Some(ts), Some(sent), Some(recv)) = (
+                v.get("app_id").and_then(serde_json::Value::as_i64),
+                v.get("timestamp").and_then(serde_json::Value::as_str).map(str::to_owned),
+                v.get("bytes_sent").and_then(serde_json::Value::as_u64),
+                v.get("bytes_received").and_then(serde_json::Value::as_u64),
+            ) {
+                net_map.insert((app_id, ts), (sent, recv));
+            }
+        }
+    }
+
+    for v in all.iter_mut() {
+        if v.get("table").and_then(|t| t.as_str()) == Some("apps") {
+            if let Some(obj) = v.as_object_mut() {
+                let key = obj
+                    .get("app_id").and_then(serde_json::Value::as_i64)
+                    .zip(obj.get("timestamp").and_then(serde_json::Value::as_str).map(str::to_owned));
+                if let Some((app_id, ts)) = key {
+                    if let Some(&(sent, recv)) = net_map.get(&(app_id, ts)) {
+                        let net_exfil = is_exfil_volume(sent) || is_exfil_ratio(sent, recv);
+                        let bg = obj.get("background_cycles").and_then(serde_json::Value::as_u64).unwrap_or(0);
+                        let focus_ms = obj.get("focus_time_ms").and_then(serde_json::Value::as_u64);
+                        if net_exfil && bg > 0 && focus_ms == Some(0) {
+                            obj.insert("exfil_signal".to_owned(), serde_json::Value::Bool(true));
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Build a merged, chronologically sorted timeline from all SRUM tables.
 ///
 /// Each record has a `table` field injected to identify its source.
@@ -430,6 +471,7 @@ fn build_timeline(
     }
 
     apply_heuristics(&mut all);
+    apply_cross_table_signals(&mut all);
 
     all.sort_by(|a, b| {
         let ta = a.get("timestamp").and_then(|v| v.as_str()).unwrap_or("");
