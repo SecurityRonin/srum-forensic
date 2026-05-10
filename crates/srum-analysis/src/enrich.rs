@@ -51,41 +51,8 @@ pub fn load_id_map(path: &Path) -> HashMap<i32, String> {
 /// alongside the existing integer ID fields. Records whose IDs are absent
 /// from `id_map` receive no extra field (not `null`).
 pub fn enrich<T: Serialize>(record: T, id_map: &HashMap<i32, String>) -> serde_json::Value {
-    let mut v = serde_json::to_value(record).unwrap_or(serde_json::Value::Null);
-    if let Some(obj) = v.as_object_mut() {
-        if let Some(name) = obj
-            .get("app_id")
-            .and_then(serde_json::Value::as_i64)
-            .and_then(|id| i32::try_from(id).ok())
-            .and_then(|id| id_map.get(&id))
-        {
-            obj.insert("app_name".to_owned(), serde_json::Value::String(name.clone()));
-            if name.contains('\\') || name.contains('/') {
-                use forensicnomicon::heuristics::srum::{is_process_masquerade, is_suspicious_path};
-                if is_suspicious_path(name) {
-                    obj.insert("suspicious_path".to_owned(), serde_json::Value::Bool(true));
-                }
-                let (dir, bin) = split_windows_path(name);
-                if is_process_masquerade(bin, dir) {
-                    obj.insert("masquerade_candidate".to_owned(), serde_json::Value::Bool(true));
-                }
-            }
-        }
-        if let Some(name) = obj
-            .get("user_id")
-            .and_then(serde_json::Value::as_i64)
-            .and_then(|id| i32::try_from(id).ok())
-            .and_then(|id| id_map.get(&id))
-        {
-            obj.insert("user_name".to_owned(), serde_json::Value::String(name.clone()));
-            if name.starts_with("S-") {
-                if let Some(acct_type) = classify_sid(name) {
-                    obj.insert("account_type".to_owned(), serde_json::Value::String(acct_type.to_owned()));
-                }
-            }
-        }
-    }
-    v
+    let v = serde_json::to_value(record).unwrap_or(serde_json::Value::Null);
+    enrich_value(v, id_map)
 }
 
 /// Inject `app_name`, `user_name`, and `profile_name` into a connectivity record.
@@ -210,5 +177,16 @@ mod tests {
         id_map.insert(1, r"C:\Users\user\AppData\Local\Temp\malware.exe".to_owned());
         let v = enrich(R { app_id: 1 }, &id_map);
         assert_eq!(v["suspicious_path"], json!(true));
+    }
+
+    #[test]
+    fn enrich_injects_account_type_for_known_sid() {
+        #[derive(Serialize)]
+        struct R { user_id: i32 }
+        let mut id_map = std::collections::HashMap::new();
+        id_map.insert(5, "S-1-5-18".to_owned());  // SYSTEM
+        let v = enrich(R { user_id: 5 }, &id_map);
+        assert_eq!(v["user_name"], json!("S-1-5-18"));
+        assert_eq!(v["account_type"], json!("system"));
     }
 }
