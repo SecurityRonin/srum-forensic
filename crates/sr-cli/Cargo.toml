@@ -13,7 +13,6 @@ path = "src/main.rs"
 [dependencies]
 srum-analysis.workspace = true
 srum-parser.workspace = true
-srum-core.workspace = true
 ese-core.workspace = true
 clap.workspace = true
 anyhow.workspace = true

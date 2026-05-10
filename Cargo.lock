@@ -3055,7 +3055,6 @@ dependencies = [
  "serde_json",
  "sha2",
  "srum-analysis",
- "srum-core",
  "srum-parser",
  "tempfile",
 ]
