@@ -8,6 +8,7 @@ members = [
     "crates/srum-core",
     "crates/srum-parser",
     "crates/sr-cli",
+    "crates/sr-gui/src-tauri",
 ]
 
 [workspace.package]
@@ -52,6 +53,11 @@ ese-test-fixtures = { path = "crates/ese-test-fixtures" }
 forensicnomicon   = { path = "../forensicnomicon" }
 srum-core         = { path = "crates/srum-core" }
 srum-parser       = { path = "crates/srum-parser" }
+
+# GUI
+tauri               = { version = "2" }
+tauri-build         = { version = "2" }
+tauri-plugin-dialog = "2"
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
