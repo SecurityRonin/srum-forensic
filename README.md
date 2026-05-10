@@ -230,26 +230,26 @@ Every alternative either requires Windows, needs a Python environment, or costs 
 
 | | srum-forensic | KAPE + EZTools | python-libESE | Arsenal SRUM |
 |--|:-:|:-:|:-:|:-:|
-| Runs on Linux / macOS | ✓ | — | ✓ | — |
-| Single static binary | ✓ | — | — | — |
-| No Python runtime | ✓ | — | — | ✓ |
-| Free & open source | ✓ | partial | ✓ | — |
-| JSON output | ✓ | — | — | — |
-| CSV output | ✓ | ✓ | — | ✓ |
-| 6 SRUM tables | ✓ | ✓ | — | ✓ |
-| Application Timeline | ✓ | — | — | — |
-| Focus + input time merged into apps | ✓ | — | — | — |
-| User engagement detection | ✓ | — | — | — |
-| Inline ID resolution | ✓ | — | — | — |
-| Unified timeline | ✓ | — | — | — |
-| Forensic heuristics (10 signals) | ✓ | — | — | — |
-| Cross-table exfiltration detection | ✓ | — | — | — |
-| User presence annotation | ✓ | — | — | — |
-| Pipe-friendly | ✓ | — | — | — |
-| Zero-copy mmap I/O | ✓ | — | — | — |
-| ESE parsed in Rust | ✓ | — | — | — |
-| Structural integrity checks | ✓ | — | — | — |
-| Forensic copy support | ✓ | ✓ | ✓ | ✓ |
+| Runs on Linux / macOS | ✅ | — | ✅ | — |
+| Single static binary | ✅ | — | — | — |
+| No Python runtime | ✅ | — | — | ✅ |
+| Free & open source | ✅ | partial | ✅ | — |
+| JSON output | ✅ | — | — | — |
+| CSV output | ✅ | ✅ | — | ✅ |
+| 6 SRUM tables | ✅ | ✅ | — | ✅ |
+| Application Timeline | ✅ | — | — | — |
+| Focus + input time merged into apps | ✅ | — | — | — |
+| User engagement detection | ✅ | — | — | — |
+| Inline ID resolution | ✅ | — | — | — |
+| Unified timeline | ✅ | — | — | — |
+| Forensic heuristics (10 signals) | ✅ | — | — | — |
+| Cross-table exfiltration detection | ✅ | — | — | — |
+| User presence annotation | ✅ | — | — | — |
+| Pipe-friendly | ✅ | — | — | — |
+| Zero-copy mmap I/O | ✅ | — | — | — |
+| ESE parsed in Rust | ✅ | — | — | — |
+| Structural integrity checks | ✅ | — | — | — |
+| Forensic copy support | ✅ | ✅ | ✅ | ✅ |
 
 ---
 
