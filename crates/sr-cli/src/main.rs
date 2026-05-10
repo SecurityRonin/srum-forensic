@@ -715,10 +715,10 @@ fn build_stats(all: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
             // timestamps
             if let Some(ts) = v.get("timestamp").and_then(|x| x.as_str()) {
                 let ts = ts.to_owned();
-                if entry.first_seen.as_deref().map_or(true, |f| ts.as_str() < f) {
+                if entry.first_seen.as_deref().map_or(true, |f: &str| ts.as_str() < f) {
                     entry.first_seen = Some(ts.clone());
                 }
-                if entry.last_seen.as_deref().map_or(true, |l| ts.as_str() > l) {
+                if entry.last_seen.as_deref().map_or(true, |l: &str| ts.as_str() > l) {
                     entry.last_seen = Some(ts);
                 }
             }
