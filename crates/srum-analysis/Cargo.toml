@@ -1,0 +1,19 @@
+[package]
+name = "srum-analysis"
+version = "0.1.0"
+description = "SRUM forensic analysis pipeline — shared between sr-cli and sr-gui"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+srum-parser     = { workspace = true }
+srum-core       = { workspace = true }
+forensicnomicon = { workspace = true }
+serde_json      = { workspace = true }
+serde           = { workspace = true }
+chrono          = { workspace = true }
+anyhow          = { workspace = true }
+
+[lints]
+workspace = true

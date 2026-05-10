@@ -3077,6 +3077,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "srum-analysis"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "forensicnomicon",
+ "serde",
+ "serde_json",
+ "srum-core",
+ "srum-parser",
+]
+
+[[package]]
 name = "srum-core"
 version = "0.1.0"
 dependencies = [
