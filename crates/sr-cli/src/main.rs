@@ -880,8 +880,95 @@ fn make_session(start: &str, end: &str, input_ms: u64) -> serde_json::Value {
 /// Returns gap objects sorted by `start`. Two gap types:
 /// - `system_off`: all tables with records share the same gap window.
 /// - `selective_gap`: only one table has a gap while others have records.
-fn detect_gaps(_all: &[serde_json::Value], _threshold_hours: u64) -> Vec<serde_json::Value> {
-    vec![]
+fn detect_gaps(all: &[serde_json::Value], threshold_hours: u64) -> Vec<serde_json::Value> {
+    use std::collections::{BTreeSet, HashMap};
+
+    let threshold_secs = (threshold_hours * 3600) as i64;
+
+    // Collect timestamps per table
+    let mut by_table: HashMap<String, BTreeSet<String>> = HashMap::new();
+    for v in all {
+        if let (Some(table), Some(ts)) = (
+            v.get("table").and_then(|x| x.as_str()),
+            v.get("timestamp").and_then(|x| x.as_str()),
+        ) {
+            by_table.entry(table.to_owned()).or_default().insert(ts.to_owned());
+        }
+    }
+
+    if by_table.is_empty() {
+        return vec![];
+    }
+
+    // For each table, find consecutive gaps > threshold
+    struct Gap {
+        table: String,
+        start: String,
+        end: String,
+    }
+    let mut all_gaps: Vec<Gap> = Vec::new();
+
+    for (table, timestamps) in &by_table {
+        let ts_vec: Vec<&String> = timestamps.iter().collect();
+        for w in ts_vec.windows(2) {
+            let diff = iso_diff_secs(w[0], w[1]);
+            if diff >= threshold_secs {
+                all_gaps.push(Gap {
+                    table: table.clone(),
+                    start: w[0].clone(),
+                    end: w[1].clone(),
+                });
+            }
+        }
+    }
+
+    let tables: Vec<String> = by_table.keys().cloned().collect();
+
+    // Group gaps by (start, end) to determine system_off vs selective
+    let mut gap_map: HashMap<(String, String), Vec<String>> = HashMap::new();
+    for g in all_gaps {
+        gap_map.entry((g.start, g.end)).or_default().push(g.table);
+    }
+
+    let mut result: Vec<serde_json::Value> = Vec::new();
+
+    for ((start, end), affected_tables) in &gap_map {
+        let gap_secs = iso_diff_secs(start, end).max(0);
+        let gap_hours = gap_secs / 3600;
+        if affected_tables.len() == tables.len() {
+            // system_off: all tables share this gap
+            let mut at = affected_tables.clone();
+            at.sort();
+            result.push(serde_json::json!({
+                "type": "system_off",
+                "start": start,
+                "end": end,
+                "gap_hours": gap_hours,
+                "tables_affected": at,
+            }));
+        } else {
+            // selective_gap: only some tables affected
+            for t in affected_tables {
+                result.push(serde_json::json!({
+                    "type": "selective_gap",
+                    "start": start,
+                    "end": end,
+                    "gap_hours": gap_hours,
+                    "table": t,
+                    "other_tables_active": true,
+                }));
+            }
+        }
+    }
+
+    // Sort by start timestamp
+    result.sort_by(|a, b| {
+        let sa = a.get("start").and_then(|v| v.as_str()).unwrap_or("");
+        let sb = b.get("start").and_then(|v| v.as_str()).unwrap_or("");
+        sa.cmp(sb)
+    });
+
+    result
 }
 
 /// Filter a timeline to records matching `app` by integer app_id or name substring.
