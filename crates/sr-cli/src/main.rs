@@ -21,15 +21,35 @@ enum OutputFormat {
 }
 
 /// Classify a SID string into a well-known account type, or return `None`.
-fn classify_sid(_sid: &str) -> Option<&'static str> {
-    None
+fn classify_sid(sid: &str) -> Option<&'static str> {
+    match sid {
+        "S-1-5-18" => Some("system"),
+        "S-1-5-19" => Some("local_service"),
+        "S-1-5-20" => Some("network_service"),
+        "S-1-1-0"  => Some("everyone"),
+        _ if sid.starts_with("S-1-5-21-") && sid.ends_with("-500") => Some("local_admin"),
+        _ if sid.starts_with("S-1-5-21-") => Some("domain_user"),
+        _ => None,
+    }
 }
 
 /// Return MITRE ATT&CK technique IDs applicable to the heuristic flags present in `obj`.
 fn mitre_techniques_for(
-    _obj: &serde_json::Map<String, serde_json::Value>,
+    obj: &serde_json::Map<String, serde_json::Value>,
 ) -> Vec<&'static str> {
-    vec![]
+    let mut techs: Vec<&'static str> = Vec::new();
+    if obj.contains_key("background_cpu_dominant") { techs.push("T1496"); }
+    if obj.contains_key("no_focus_with_cpu")       { techs.push("T1564"); }
+    if obj.contains_key("phantom_foreground")       { techs.push("T1036"); }
+    if obj.contains_key("automated_execution")      { techs.push("T1059"); }
+    if obj.contains_key("exfil_signal")             { techs.push("T1048"); }
+    if obj.contains_key("beaconing")                { techs.push("T1071"); }
+    if obj.contains_key("notification_c2")          { techs.push("T1092"); }
+    if obj.contains_key("suspicious_path")          { techs.push("T1036.005"); }
+    if obj.contains_key("masquerade_candidate")     { techs.push("T1036.005"); }
+    techs.sort_unstable();
+    techs.dedup();
+    techs
 }
 
 /// SRUM forensic analysis tool.
@@ -209,6 +229,14 @@ fn enrich<T: Serialize>(record: T, id_map: &HashMap<i32, String>) -> serde_json:
                 "user_name".to_owned(),
                 serde_json::Value::String(name.clone()),
             );
+            if name.starts_with("S-") {
+                if let Some(acct_type) = classify_sid(name) {
+                    obj.insert(
+                        "account_type".to_owned(),
+                        serde_json::Value::String(acct_type.to_owned()),
+                    );
+                }
+            }
         }
     }
     v
@@ -384,6 +412,14 @@ fn apply_heuristics(values: &mut Vec<serde_json::Value>) {
                         }
                     }
                 }
+                let techs = mitre_techniques_for(obj);
+                if !techs.is_empty() {
+                    let arr: Vec<serde_json::Value> = techs
+                        .iter()
+                        .map(|&t| serde_json::Value::String(t.to_owned()))
+                        .collect();
+                    obj.insert("mitre_techniques".to_owned(), serde_json::Value::Array(arr));
+                }
             }
         }
     }
@@ -453,6 +489,17 @@ fn apply_cross_table_signals(all: &mut Vec<serde_json::Value>) {
                         let focus_ms = obj.get("focus_time_ms").and_then(serde_json::Value::as_u64);
                         if net_exfil && bg > 0 && focus_ms.map_or(true, |ms| ms == 0) {
                             obj.insert("exfil_signal".to_owned(), serde_json::Value::Bool(true));
+                            let techs = mitre_techniques_for(obj);
+                            if !techs.is_empty() {
+                                let arr: Vec<serde_json::Value> = techs
+                                    .iter()
+                                    .map(|&t| serde_json::Value::String(t.to_owned()))
+                                    .collect();
+                                obj.insert(
+                                    "mitre_techniques".to_owned(),
+                                    serde_json::Value::Array(arr),
+                                );
+                            }
                         }
                     }
                 }
