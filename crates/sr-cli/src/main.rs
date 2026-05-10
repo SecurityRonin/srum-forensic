@@ -210,6 +210,25 @@ enum Cmd {
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
+    /// Detect temporal gaps in SRUM records — identifies system-off periods and
+    /// potential targeted record deletion.
+    ///
+    /// Analyses timestamps from the merged timeline to detect two kinds of
+    /// suspicious gaps:
+    ///   - `system_off`: ALL tables have a gap at the same time window.
+    ///   - `selective_gap`: Only ONE specific table has a gap while others have records.
+    ///
+    /// Best-effort: always exits 0 even for nonexistent files.
+    Gaps {
+        /// Path to SRUDB.dat (or a forensic copy of it).
+        path: PathBuf,
+        /// Minimum gap size in hours to report (default: 2).
+        #[arg(long, default_value_t = 2u64)]
+        threshold_hours: u64,
+        /// Output format (json, csv, or ndjson).
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
+    },
     /// Merge all SRUM tables into a single chronological timeline.
     ///
     /// Reads network, apps, connectivity, energy, notifications, and focus
@@ -856,6 +875,15 @@ fn make_session(start: &str, end: &str, input_ms: u64) -> serde_json::Value {
     })
 }
 
+/// Detect temporal gaps in a merged SRUM timeline.
+///
+/// Returns gap objects sorted by `start`. Two gap types:
+/// - `system_off`: all tables with records share the same gap window.
+/// - `selective_gap`: only one table has a gap while others have records.
+fn detect_gaps(_all: &[serde_json::Value], _threshold_hours: u64) -> Vec<serde_json::Value> {
+    vec![]
+}
+
 /// Filter a timeline to records matching `app` by integer app_id or name substring.
 fn filter_by_app(all: Vec<serde_json::Value>, app: &str) -> Vec<serde_json::Value> {
     let app_lower = app.to_lowercase();
@@ -999,6 +1027,11 @@ fn run() -> anyhow::Result<()> {
             let all = build_timeline(&path, id_map.as_ref());
             let filtered = filter_by_app(all, &app);
             print_values(&filtered, &format)?;
+        }
+        Cmd::Gaps { path, threshold_hours, format } => {
+            let all = build_timeline(&path, None);
+            let gaps = detect_gaps(&all, threshold_hours);
+            print_values(&gaps, &format)?;
         }
     }
     Ok(())
@@ -1731,6 +1764,91 @@ mod tests {
             "background_cycles": 0u64,
             "foreground_cycles": 0u64,
         })
+    }
+
+    // ── detect_gaps ───────────────────────────────────────────────────────────────
+
+    fn record_at(table: &str, ts: &str) -> serde_json::Value {
+        serde_json::json!({"table": table, "timestamp": ts, "app_id": 1})
+    }
+
+    #[test]
+    fn gaps_empty_timeline_produces_no_gaps() {
+        let gaps = detect_gaps(&[], 2);
+        assert!(gaps.is_empty());
+    }
+
+    #[test]
+    fn gaps_contiguous_hourly_records_no_gaps() {
+        let records = vec![
+            record_at("apps", "2024-01-15T08:00:00Z"),
+            record_at("apps", "2024-01-15T09:00:00Z"),
+            record_at("apps", "2024-01-15T10:00:00Z"),
+        ];
+        let gaps = detect_gaps(&records, 2);
+        assert!(gaps.is_empty());
+    }
+
+    #[test]
+    fn gaps_detects_system_off_all_tables() {
+        // Both tables have a gap at the same time
+        let records = vec![
+            record_at("apps",    "2024-01-15T08:00:00Z"),
+            record_at("network", "2024-01-15T08:00:00Z"),
+            record_at("apps",    "2024-01-15T14:00:00Z"), // 6h gap
+            record_at("network", "2024-01-15T14:00:00Z"), // 6h gap
+        ];
+        let gaps = detect_gaps(&records, 2);
+        assert!(!gaps.is_empty());
+        assert!(gaps.iter().any(|g| g.get("type").and_then(|t| t.as_str()) == Some("system_off")));
+    }
+
+    #[test]
+    fn gaps_detects_selective_gap_one_table() {
+        // Only network has a gap; apps is continuous
+        let records = vec![
+            record_at("apps",    "2024-01-15T08:00:00Z"),
+            record_at("network", "2024-01-15T08:00:00Z"),
+            record_at("apps",    "2024-01-15T09:00:00Z"),
+            // network has no 09:00 record
+            record_at("apps",    "2024-01-15T10:00:00Z"),
+            record_at("network", "2024-01-15T13:00:00Z"), // 5h gap in network only
+        ];
+        let gaps = detect_gaps(&records, 2);
+        // The gap in network (08:00 to 13:00, 5h) should be selective because apps had records
+        assert!(gaps.iter().any(|g| {
+            g.get("type").and_then(|t| t.as_str()) == Some("selective_gap")
+            && g.get("table").and_then(|t| t.as_str()) == Some("network")
+        }));
+    }
+
+    #[test]
+    fn gaps_below_threshold_not_reported() {
+        // 1h gap with threshold=2 should not appear
+        let records = vec![
+            record_at("apps", "2024-01-15T08:00:00Z"),
+            record_at("apps", "2024-01-15T09:00:00Z"), // only 1h
+        ];
+        let gaps = detect_gaps(&records, 2);
+        assert!(gaps.is_empty());
+    }
+
+    #[test]
+    fn gaps_result_sorted_by_start() {
+        let records = vec![
+            record_at("apps", "2024-01-15T00:00:00Z"),
+            record_at("apps", "2024-01-15T10:00:00Z"), // 10h gap
+            record_at("network", "2024-01-15T05:00:00Z"),
+            record_at("network", "2024-01-15T20:00:00Z"), // 15h gap
+        ];
+        let gaps = detect_gaps(&records, 2);
+        // All gaps sorted by start
+        let starts: Vec<&str> = gaps.iter()
+            .map(|g| g.get("start").and_then(|v| v.as_str()).unwrap_or(""))
+            .collect();
+        let mut sorted = starts.clone();
+        sorted.sort();
+        assert_eq!(starts, sorted);
     }
 
     // ── build_stats ───────────────────────────────────────────────────────────────

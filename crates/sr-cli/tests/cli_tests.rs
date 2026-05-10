@@ -503,6 +503,32 @@ fn sr_sessions_nonexistent_exits_zero_best_effort() {
     assert!(stdout.contains('['), "must output JSON array: {stdout}");
 }
 
+// ── sr gaps ──────────────────────────────────────────────────────────────────
+
+#[test]
+fn sr_gaps_help_exits_success() {
+    let status = sr_bin().args(["gaps", "--help"]).status().expect("run");
+    assert!(status.success());
+}
+
+#[test]
+fn sr_gaps_nonexistent_exits_zero_best_effort() {
+    let out = sr_bin()
+        .args(["gaps", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run");
+    assert!(out.status.success(), "gaps must exit 0 (best-effort)");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains('['), "must output JSON array: {stdout}");
+}
+
+#[test]
+fn sr_gaps_format_flag_exists() {
+    let out = sr_bin().args(["gaps", "--help"]).output().expect("run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("format"));
+}
+
 // ── sr app-timeline ──────────────────────────────────────────────────────────
 
 #[test]
