@@ -598,3 +598,33 @@ fn sr_hunt_all_nonexistent_exits_zero_best_effort() {
         .expect("run");
     assert!(out.status.success());
 }
+
+// ── sr compare ───────────────────────────────────────────────────────────────
+
+#[test]
+fn sr_compare_help_exits_success() {
+    let status = sr_bin().args(["compare", "--help"]).status().expect("run");
+    assert!(status.success());
+}
+
+#[test]
+fn sr_compare_both_nonexistent_exits_zero_best_effort() {
+    // Both files missing → both timelines empty → valid diff with all empty sections
+    let out = sr_bin()
+        .args(["compare", "/nonexistent/baseline.dat", "/nonexistent/suspect.dat"])
+        .output()
+        .expect("run");
+    assert!(out.status.success(), "compare must exit 0 (best-effort): {:?}", out.status);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("new_processes"),
+        "must output diff object with new_processes: {stdout}"
+    );
+}
+
+#[test]
+fn sr_compare_resolve_flag_exists() {
+    let out = sr_bin().args(["compare", "--help"]).output().expect("run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("resolve"));
+}

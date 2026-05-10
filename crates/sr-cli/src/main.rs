@@ -271,6 +271,21 @@ enum Cmd {
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
+    /// Compare two SRUDB.dat files and surface what changed between them.
+    ///
+    /// Detects new processes, departed processes, and processes whose behaviour
+    /// changed (new heuristic flags, significant byte-count deltas).
+    Compare {
+        /// Baseline SRUDB.dat (before the incident).
+        baseline: PathBuf,
+        /// Suspect SRUDB.dat (after the incident).
+        suspect: PathBuf,
+        /// Resolve app_id/user_id to names for process matching.
+        #[arg(long)]
+        resolve: bool,
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
+    },
     /// Merge all SRUM tables into a single chronological timeline.
     ///
     /// Reads network, apps, connectivity, energy, notifications, and focus
@@ -1061,6 +1076,24 @@ fn hunt_filter(all: Vec<serde_json::Value>, sig: &HuntSignature) -> Vec<serde_js
     }).collect()
 }
 
+/// Compare per-process aggregates from two SRUM databases and return a diff.
+///
+/// Returns a JSON object with three arrays:
+/// - `new_processes`: processes present in `suspect` but not in `baseline`
+/// - `departed_processes`: processes present in `baseline` but not in `suspect`
+/// - `changed`: processes present in both with new heuristic flags or byte deltas
+fn compare_databases(
+    _baseline_stats: Vec<serde_json::Value>,
+    _suspect_stats: Vec<serde_json::Value>,
+) -> serde_json::Value {
+    // TODO: implement — stub returns empty diff
+    serde_json::json!({
+        "new_processes": [],
+        "departed_processes": [],
+        "changed": [],
+    })
+}
+
 fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
@@ -1194,6 +1227,45 @@ fn run() -> anyhow::Result<()> {
             let all = build_timeline(&path, id_map.as_ref());
             let filtered = hunt_filter(all, &signature);
             print_values(&filtered, &format)?;
+        }
+        Cmd::Compare { baseline, suspect, resolve, format } => {
+            let id_map_baseline = resolve.then(|| load_id_map(&baseline));
+            let id_map_suspect  = resolve.then(|| load_id_map(&suspect));
+            let baseline_timeline = build_timeline(&baseline, id_map_baseline.as_ref());
+            let suspect_timeline  = build_timeline(&suspect,  id_map_suspect.as_ref());
+            let baseline_stats = build_stats(baseline_timeline);
+            let suspect_stats  = build_stats(suspect_timeline);
+            let result = compare_databases(baseline_stats, suspect_stats);
+            // compare outputs a single object, not an array — handle directly.
+            match &format {
+                OutputFormat::Json  => println!("{}", serde_json::to_string_pretty(&result)?),
+                OutputFormat::Ndjson => println!("{}", serde_json::to_string(&result)?),
+                OutputFormat::Csv   => {
+                    let mut flat: Vec<serde_json::Value> = Vec::new();
+                    if let Some(arr) = result.get("new_processes").and_then(|v| v.as_array()) {
+                        for r in arr {
+                            let mut r = r.clone();
+                            r.as_object_mut().unwrap().insert("diff_type".into(), "new".into());
+                            flat.push(r);
+                        }
+                    }
+                    if let Some(arr) = result.get("changed").and_then(|v| v.as_array()) {
+                        for r in arr {
+                            let mut r = r.clone();
+                            r.as_object_mut().unwrap().insert("diff_type".into(), "changed".into());
+                            flat.push(r);
+                        }
+                    }
+                    if let Some(arr) = result.get("departed_processes").and_then(|v| v.as_array()) {
+                        for r in arr {
+                            let mut r = r.clone();
+                            r.as_object_mut().unwrap().insert("diff_type".into(), "departed".into());
+                            flat.push(r);
+                        }
+                    }
+                    print!("{}", values_to_csv(&flat)?);
+                }
+            }
         }
     }
     Ok(())
@@ -2268,5 +2340,73 @@ mod tests {
         let records = vec![flagged_record("beaconing")];
         let result = hunt_filter(records, &HuntSignature::Beaconing);
         assert_eq!(result.len(), 1);
+    }
+
+    // ── compare_databases ─────────────────────────────────────────────────────
+
+    fn stat_record(app_id: i64, bg_cycles: u64, bytes_sent: u64, flags: &[&str]) -> serde_json::Value {
+        serde_json::json!({
+            "app_id": app_id,
+            "total_background_cycles": bg_cycles,
+            "total_bytes_sent": bytes_sent,
+            "heuristic_flags": flags,
+            "flag_count": flags.len(),
+        })
+    }
+
+    #[test]
+    fn compare_detects_new_process() {
+        let baseline = vec![stat_record(1, 1000, 0, &[])];
+        let suspect  = vec![stat_record(1, 1000, 0, &[]), stat_record(42, 5000, 0, &[])];
+        let result = compare_databases(baseline, suspect);
+        let new = result.get("new_processes").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(new.len(), 1);
+        assert_eq!(new[0].get("app_id").and_then(|v| v.as_i64()), Some(42));
+    }
+
+    #[test]
+    fn compare_detects_departed_process() {
+        let baseline = vec![stat_record(1, 1000, 0, &[]), stat_record(7, 500, 0, &[])];
+        let suspect  = vec![stat_record(1, 1000, 0, &[])];
+        let result = compare_databases(baseline, suspect);
+        let departed = result.get("departed_processes").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(departed.len(), 1);
+        assert_eq!(departed[0].get("app_id").and_then(|v| v.as_i64()), Some(7));
+    }
+
+    #[test]
+    fn compare_same_databases_no_diff() {
+        let stats = vec![stat_record(1, 1000, 500, &[])];
+        let result = compare_databases(stats.clone(), stats);
+        let new = result.get("new_processes").and_then(|v| v.as_array()).unwrap();
+        let departed = result.get("departed_processes").and_then(|v| v.as_array()).unwrap();
+        let changed = result.get("changed").and_then(|v| v.as_array()).unwrap();
+        assert!(new.is_empty());
+        assert!(departed.is_empty());
+        assert!(changed.is_empty());
+    }
+
+    #[test]
+    fn compare_detects_new_flags() {
+        let baseline = vec![stat_record(1, 1000, 0, &[])];
+        let suspect  = vec![stat_record(1, 1000, 0, &["exfil_signal"])];
+        let result = compare_databases(baseline, suspect);
+        let changed = result.get("changed").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(changed.len(), 1);
+        let new_flags = changed[0].get("new_flags").and_then(|v| v.as_array()).unwrap();
+        assert!(new_flags.iter().any(|f| f.as_str() == Some("exfil_signal")));
+    }
+
+    #[test]
+    fn compare_detects_byte_delta() {
+        let baseline = vec![stat_record(1, 1000, 100, &[])];
+        let suspect  = vec![stat_record(1, 1000, 52_428_900, &[])];
+        let result = compare_databases(baseline, suspect);
+        let changed = result.get("changed").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(changed.len(), 1);
+        assert_eq!(
+            changed[0].get("delta_bytes_sent").and_then(|v| v.as_i64()),
+            Some(52_428_800)
+        );
     }
 }
