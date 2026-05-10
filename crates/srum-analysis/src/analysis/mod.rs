@@ -4,6 +4,7 @@ pub mod hunt;
 pub mod sessions;
 pub mod stats;
 
+pub use compare::compare_databases;
 pub use gaps::{detect_autoinc_gaps_from_ids, detect_gaps};
 pub use hunt::{filter_by_app, hunt_filter, HuntSignature};
 pub use sessions::build_sessions;
