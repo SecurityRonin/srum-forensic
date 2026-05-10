@@ -13,6 +13,10 @@ pub fn compute_findings(timeline: &[AnnotatedRecord]) -> Vec<FindingCard> {
                 mitre: rec.mitre_techniques.clone(),
             });
             agg.count += 1;
+            // Promote to the highest severity seen for this flag
+            if rec.severity > agg.severity {
+                agg.severity = rec.severity.clone();
+            }
         }
     }
 
@@ -132,6 +136,18 @@ mod tests {
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].filter_flag, "automated_execution");
         assert_eq!(findings[0].severity, Severity::Critical);
+    }
+
+    #[test]
+    fn severity_promoted_to_max_across_records() {
+        let records = vec![
+            make_record(vec!["beaconing"], Severity::Suspicious),
+            make_record(vec!["beaconing"], Severity::Critical),
+        ];
+        let findings = compute_findings(&records);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].severity, Severity::Critical); // must be max, not first-seen
+        assert_eq!(findings[0].count, 2);
     }
 
     #[test]
