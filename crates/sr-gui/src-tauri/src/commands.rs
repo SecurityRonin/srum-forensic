@@ -27,8 +27,8 @@ fn parse_srum(path: &Path) -> anyhow::Result<SrumFile> {
                     table_names.push($table_name.to_string());
                     let mut rows: Vec<serde_json::Value> = records
                         .into_iter()
-                        .map(|r| serde_json::to_value(r))
-                        .collect::<Result<_, _>>()?;
+                        .filter_map(|r| serde_json::to_value(r).ok())
+                        .collect();
                     for row in &mut rows {
                         if let Some(obj) = row.as_object_mut() {
                             let app_id = obj
