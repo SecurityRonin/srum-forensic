@@ -19,11 +19,8 @@ tauri               = { workspace = true }
 tauri-plugin-dialog = { workspace = true }
 serde               = { workspace = true }
 serde_json          = { workspace = true }
-srum-parser         = { workspace = true }
-srum-core           = { workspace = true }
-forensicnomicon     = { workspace = true }
+srum-analysis       = { workspace = true }
 anyhow              = { workspace = true }
-chrono              = { workspace = true }
 
 [build-dependencies]
 tauri-build = { workspace = true }

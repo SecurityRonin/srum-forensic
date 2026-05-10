@@ -3064,12 +3064,9 @@ name = "sr-gui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "chrono",
- "forensicnomicon",
  "serde",
  "serde_json",
- "srum-core",
- "srum-parser",
+ "srum-analysis",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

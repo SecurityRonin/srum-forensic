@@ -1,5 +1,4 @@
 mod commands;
-mod findings;
 mod timeline;
 pub mod types;
 

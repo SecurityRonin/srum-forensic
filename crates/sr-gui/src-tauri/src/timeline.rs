@@ -1,4 +1,4 @@
-use crate::types::{Severity, TimelineRecord};
+use srum_analysis::record::{AnnotatedRecord, Severity};
 
 pub fn severity_from_flags(flags: &[String]) -> Severity {
     const CRITICAL: &[&str] = &[
@@ -34,7 +34,7 @@ pub fn severity_from_flags(flags: &[String]) -> Severity {
     severity
 }
 
-pub fn interpret(record: &TimelineRecord) -> Option<String> {
+pub fn interpret(record: &AnnotatedRecord) -> Option<String> {
     if record.flags.is_empty() {
         return None;
     }
@@ -100,13 +100,16 @@ pub fn interpret(record: &TimelineRecord) -> Option<String> {
     Some(format!("Heuristic flags: {}.", record.flags.join(", ")))
 }
 
-pub fn value_to_timeline_record(
-    value: serde_json::Value,
-    source_table: &str,
-) -> Option<TimelineRecord> {
+pub fn value_to_timeline_record(value: serde_json::Value) -> Option<AnnotatedRecord> {
     let raw = value.clone();
     let obj = value.as_object()?;
     let timestamp = obj.get("timestamp")?.as_str()?.to_string();
+
+    let source_table = obj
+        .get("source_table")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
 
     let app_id = obj
         .get("app_id")
@@ -115,7 +118,7 @@ pub fn value_to_timeline_record(
         .unwrap_or(0);
     let app_name = obj.get("app_name").and_then(|v| v.as_str()).map(str::to_string);
 
-    let (key_metric_label, key_metric_value) = key_metric(obj, source_table);
+    let (key_metric_label, key_metric_value) = key_metric(obj, &source_table);
 
     let flags: Vec<String> = obj
         .iter()
@@ -145,9 +148,9 @@ pub fn value_to_timeline_record(
         })
         .unwrap_or_default();
 
-    let mut rec = TimelineRecord {
+    let mut rec = AnnotatedRecord {
         timestamp,
-        source_table: source_table.to_string(),
+        source_table,
         app_id,
         app_name,
         key_metric_label,
@@ -225,12 +228,13 @@ mod tests {
     fn value_to_timeline_record_network_record() {
         let val = json!({
             "timestamp": "2024-06-15T08:00:00Z",
+            "source_table": "network",
             "app_id": 42,
             "app_name": "chrome.exe",
             "bytes_sent": 1_000_000,
             "bytes_recv": 500_000,
         });
-        let rec = value_to_timeline_record(val, "network").unwrap();
+        let rec = value_to_timeline_record(val).unwrap();
         assert_eq!(rec.source_table, "network");
         assert_eq!(rec.app_id, 42);
         assert_eq!(rec.key_metric_label, "bytes_sent");
@@ -239,13 +243,13 @@ mod tests {
 
     #[test]
     fn value_to_timeline_record_missing_timestamp_returns_none() {
-        let val = json!({ "app_id": 1 });
-        assert!(value_to_timeline_record(val, "network").is_none());
+        let val = json!({ "app_id": 1, "source_table": "network" });
+        assert!(value_to_timeline_record(val).is_none());
     }
 
     #[test]
     fn interpret_automated_execution() {
-        let rec = TimelineRecord {
+        let rec = AnnotatedRecord {
             timestamp: "2024-01-01T00:00:00Z".into(),
             source_table: "apps".into(),
             app_id: 1,
