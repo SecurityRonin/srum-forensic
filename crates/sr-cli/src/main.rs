@@ -703,6 +703,15 @@ fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Split a Windows (or Unix) path into (directory, binary_name) at the last
+/// path separator.  Returns `("", path)` when no separator is present.
+fn split_windows_path(path: &str) -> (&str, &str) {
+    match path.rfind(|c| c == '\\' || c == '/') {
+        Some(idx) => (&path[..idx], &path[idx + 1..]),
+        None => ("", path),
+    }
+}
+
 fn main() {
     if let Err(err) = run() {
         eprintln!("error: {err:#}");
@@ -1271,6 +1280,77 @@ mod tests {
         map.insert("masquerade_candidate".to_owned(), serde_json::Value::Bool(true));
         let techs = mitre_techniques_for(&map);
         assert_eq!(techs.iter().filter(|&&t| t == "T1036.005").count(), 1);
+    }
+
+    // ── enrich: path-based forensic signals ──────────────────────────────────
+
+    fn make_id_map(entries: &[(i32, &str)]) -> HashMap<i32, String> {
+        entries.iter().map(|&(id, name)| (id, name.to_owned())).collect()
+    }
+
+    // ── suspicious_path signal ────────────────────────────────────────────────
+
+    #[test]
+    fn enrich_suspicious_path_for_temp_exe() {
+        let id_map = make_id_map(&[(42, r"C:\Users\User\AppData\Local\Temp\payload.exe")]);
+        let record = serde_json::json!({"app_id": 42});
+        let result = enrich(record, &id_map);
+        assert_eq!(result.get("suspicious_path"), Some(&serde_json::Value::Bool(true)));
+    }
+
+    #[test]
+    fn enrich_no_suspicious_path_for_system32() {
+        let id_map = make_id_map(&[(1, r"C:\Windows\System32\svchost.exe")]);
+        let record = serde_json::json!({"app_id": 1});
+        let result = enrich(record, &id_map);
+        assert_eq!(result.get("suspicious_path"), None);
+    }
+
+    #[test]
+    fn enrich_no_suspicious_path_when_name_not_a_path() {
+        // plain name with no slashes — not treated as path
+        let id_map = make_id_map(&[(5, "S-1-5-18")]);
+        let record = serde_json::json!({"app_id": 5});
+        let result = enrich(record, &id_map);
+        assert_eq!(result.get("suspicious_path"), None);
+    }
+
+    // ── masquerade_candidate signal ───────────────────────────────────────────
+
+    #[test]
+    fn enrich_masquerade_candidate_for_svch0st() {
+        let id_map = make_id_map(&[(43, r"C:\Users\User\svch0st.exe")]);
+        let record = serde_json::json!({"app_id": 43});
+        let result = enrich(record, &id_map);
+        assert_eq!(result.get("masquerade_candidate"), Some(&serde_json::Value::Bool(true)));
+    }
+
+    #[test]
+    fn enrich_no_masquerade_for_legitimate_svchost() {
+        let id_map = make_id_map(&[(2, r"C:\Windows\System32\svchost.exe")]);
+        let record = serde_json::json!({"app_id": 2});
+        let result = enrich(record, &id_map);
+        assert_eq!(result.get("masquerade_candidate"), None);
+    }
+
+    #[test]
+    fn enrich_no_masquerade_for_unrelated_app() {
+        let id_map = make_id_map(&[(10, r"C:\Program Files\MyApp\myapp.exe")]);
+        let record = serde_json::json!({"app_id": 10});
+        let result = enrich(record, &id_map);
+        assert_eq!(result.get("masquerade_candidate"), None);
+    }
+
+    // ── both signals can fire together ────────────────────────────────────────
+
+    #[test]
+    fn enrich_both_signals_for_masquerade_in_temp() {
+        // svch0st.exe in Windows\Temp — both suspicious path AND masquerade
+        let id_map = make_id_map(&[(99, r"C:\Windows\Temp\svch0st.exe")]);
+        let record = serde_json::json!({"app_id": 99});
+        let result = enrich(record, &id_map);
+        assert_eq!(result.get("suspicious_path"), Some(&serde_json::Value::Bool(true)));
+        assert_eq!(result.get("masquerade_candidate"), Some(&serde_json::Value::Bool(true)));
     }
 
     // ── apply_heuristics injects mitre_techniques ────────────────────────────────
