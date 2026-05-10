@@ -394,6 +394,34 @@ fn sr_timeline_format_flag_exists() {
     );
 }
 
+// ── NDJSON format ────────────────────────────────────────────────────────────
+
+#[test]
+fn sr_network_format_ndjson_nonexistent_exits_nonzero() {
+    let status = sr_bin()
+        .args(["network", "--format", "ndjson", "/nonexistent/SRUDB.dat"])
+        .status()
+        .expect("run");
+    assert!(!status.success(), "must exit nonzero for missing file");
+}
+
+#[test]
+fn sr_timeline_format_ndjson_nonexistent_exits_zero() {
+    // timeline is best-effort
+    let out = sr_bin()
+        .args(["timeline", "--format", "ndjson", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run");
+    assert!(out.status.success(), "timeline ndjson must exit 0 (best-effort)");
+}
+
+#[test]
+fn sr_network_help_shows_ndjson_format() {
+    let out = sr_bin().args(["network", "--help"]).output().expect("run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("ndjson"), "sr network --help must document ndjson format");
+}
+
 // ── sr app-timeline ──────────────────────────────────────────────────────────
 
 #[test]

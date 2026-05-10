@@ -17,6 +17,19 @@ enum OutputFormat {
     #[default]
     Json,
     Csv,
+    Ndjson,
+}
+
+/// Classify a SID string into a well-known account type, or return `None`.
+fn classify_sid(_sid: &str) -> Option<&'static str> {
+    None
+}
+
+/// Return MITRE ATT&CK technique IDs applicable to the heuristic flags present in `obj`.
+fn mitre_techniques_for(
+    _obj: &serde_json::Map<String, serde_json::Value>,
+) -> Vec<&'static str> {
+    vec![]
 }
 
 /// SRUM forensic analysis tool.
@@ -270,6 +283,12 @@ fn print_values(values: &[serde_json::Value], format: &OutputFormat) -> anyhow::
     match format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(values)?),
         OutputFormat::Csv => print!("{}", values_to_csv(values)?),
+        OutputFormat::Ndjson => {
+            // stub — real implementation in GREEN
+            for v in values {
+                println!("{}", serde_json::to_string(v)?);
+            }
+        }
     }
     Ok(())
 }
@@ -1129,6 +1148,104 @@ mod tests {
             Some(&serde_json::Value::Bool(true)),
             "exfil_signal must fire even when focus_time_ms is absent"
         );
+    }
+
+    // ── classify_sid ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn classify_sid_system() {
+        assert_eq!(classify_sid("S-1-5-18"), Some("system"));
+    }
+
+    #[test]
+    fn classify_sid_local_service() {
+        assert_eq!(classify_sid("S-1-5-19"), Some("local_service"));
+    }
+
+    #[test]
+    fn classify_sid_network_service() {
+        assert_eq!(classify_sid("S-1-5-20"), Some("network_service"));
+    }
+
+    #[test]
+    fn classify_sid_everyone() {
+        assert_eq!(classify_sid("S-1-1-0"), Some("everyone"));
+    }
+
+    #[test]
+    fn classify_sid_local_admin() {
+        assert_eq!(classify_sid("S-1-5-21-111-222-333-500"), Some("local_admin"));
+    }
+
+    #[test]
+    fn classify_sid_domain_user() {
+        assert_eq!(classify_sid("S-1-5-21-111-222-333-1000"), Some("domain_user"));
+    }
+
+    #[test]
+    fn classify_sid_non_sid_returns_none() {
+        assert_eq!(classify_sid("C:\\Windows\\explorer.exe"), None);
+    }
+
+    #[test]
+    fn classify_sid_empty_returns_none() {
+        assert_eq!(classify_sid(""), None);
+    }
+
+    // ── mitre_techniques_for ─────────────────────────────────────────────────
+
+    #[test]
+    fn mitre_for_background_cpu_dominant() {
+        let mut map = serde_json::Map::new();
+        map.insert("background_cpu_dominant".to_owned(), serde_json::Value::Bool(true));
+        let techs = mitre_techniques_for(&map);
+        assert!(techs.contains(&"T1496"));
+    }
+
+    #[test]
+    fn mitre_for_exfil_signal() {
+        let mut map = serde_json::Map::new();
+        map.insert("exfil_signal".to_owned(), serde_json::Value::Bool(true));
+        let techs = mitre_techniques_for(&map);
+        assert!(techs.contains(&"T1048"));
+    }
+
+    #[test]
+    fn mitre_for_empty_returns_empty() {
+        let map = serde_json::Map::new();
+        let techs = mitre_techniques_for(&map);
+        assert!(techs.is_empty());
+    }
+
+    #[test]
+    fn mitre_deduplicates_t1036_005() {
+        let mut map = serde_json::Map::new();
+        map.insert("suspicious_path".to_owned(), serde_json::Value::Bool(true));
+        map.insert("masquerade_candidate".to_owned(), serde_json::Value::Bool(true));
+        let techs = mitre_techniques_for(&map);
+        assert_eq!(techs.iter().filter(|&&t| t == "T1036.005").count(), 1);
+    }
+
+    // ── apply_heuristics injects mitre_techniques ────────────────────────────────
+
+    #[test]
+    fn apply_heuristics_injects_mitre_for_background_cpu() {
+        let mut values = vec![apps_record(10_000, 0)];
+        apply_heuristics(&mut values);
+        let techs = values[0]
+            .get("mitre_techniques")
+            .expect("mitre_techniques must be present")
+            .as_array()
+            .expect("must be array");
+        assert!(techs.iter().any(|t| t.as_str() == Some("T1496")));
+    }
+
+    #[test]
+    fn apply_heuristics_no_mitre_when_no_flags() {
+        // Equal CPU: not dominant, no flags
+        let mut values = vec![apps_record(100, 100)];
+        apply_heuristics(&mut values);
+        assert!(values[0].get("mitre_techniques").is_none());
     }
 
     // ── merge_focus_into_apps ─────────────────────────────────────────────────
