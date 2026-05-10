@@ -505,7 +505,7 @@ The Application Timeline table records two fields that no other SRUM parser expo
 
 **[Mark Russinovich](https://www.linkedin.com/in/markrussinovich/)** and the Windows Internals team whose documentation of ESE/JET Blue made this possible without reverse engineering.
 
-**Yogesh Khatri** (@SwiftForensics) whose [srum-dump](https://github.com/MarkBaggett/srum-dump) Python tool proved the forensic value of SRUM data and documented the table schemas.
+**[Yogesh Khatri](https://www.linkedin.com/in/ydkhatri/)** (@SwiftForensics) whose [srum-dump](https://github.com/MarkBaggett/srum-dump) Python tool proved the forensic value of SRUM data and documented the table schemas.
 
 **Mark Baggett** whose original Python scripts brought SRUM analysis into mainstream DFIR workflows.
 
