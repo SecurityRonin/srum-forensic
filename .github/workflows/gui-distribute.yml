@@ -1,0 +1,63 @@
+name: SRUM Examiner Distribution
+
+on:
+  workflow_run:
+    workflows: ["SRUM Examiner Release"]
+    types: [completed]
+    branches: ["main"]
+
+jobs:
+  winget:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: SecurityRonin.SRUMExaminer
+          installers-regex: '\.msi$'
+          token: ${{ secrets.WINGET_TOKEN }}
+          fork-user: securityronin-bot
+
+  cloudsmith:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: srum-examiner-x86_64-unknown-linux-gnu
+          path: debs
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Cloudsmith CLI
+        run: pip install --user cloudsmith-cli==1.16.0
+
+      - name: Push .deb to Cloudsmith
+        env:
+          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+        run: |
+          find debs -name '*.deb' | while read f; do
+            cloudsmith push deb securityronin/srum-examiner/any-distro/any-version "$f"
+          done
+
+# Homebrew cask formula (add to SecurityRonin/homebrew-tap repository, not here):
+#
+# cask "srum-examiner" do
+#   version "0.1.0"
+#   sha256 arm:   "PLACEHOLDER_ARM64_SHA256",
+#          intel: "PLACEHOLDER_X86_64_SHA256"
+#
+#   url "https://github.com/SecurityRonin/srum-forensic/releases/download/gui-v#{version}/SRUM.Examiner_#{version}_aarch64.dmg",
+#       arm:   true,
+#       intel: false
+#   url "https://github.com/SecurityRonin/srum-forensic/releases/download/gui-v#{version}/SRUM.Examiner_#{version}_x64.dmg",
+#       arm:   false,
+#       intel: true
+#
+#   name "SRUM Examiner"
+#   desc "Graphical SRUM forensic investigation tool"
+#   homepage "https://github.com/SecurityRonin/srum-forensic"
+#
+#   app "SRUM Examiner.app"
+# end
