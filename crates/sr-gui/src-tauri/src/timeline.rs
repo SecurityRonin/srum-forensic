@@ -101,52 +101,44 @@ pub fn interpret(record: &AnnotatedRecord) -> Option<String> {
 }
 
 pub fn value_to_timeline_record(value: serde_json::Value) -> Option<AnnotatedRecord> {
-    let raw = value.clone();
-    let obj = value.as_object()?;
-    let timestamp = obj.get("timestamp")?.as_str()?.to_string();
-
-    let source_table = obj
-        .get("source_table")
-        .and_then(|v| v.as_str())
-        .unwrap_or("unknown")
-        .to_string();
-
-    let app_id = obj
-        .get("app_id")
-        .and_then(|v| v.as_i64())
-        .and_then(|v| i32::try_from(v).ok())
-        .unwrap_or(0);
-    let app_name = obj.get("app_name").and_then(|v| v.as_str()).map(str::to_string);
-
-    let (key_metric_label, key_metric_value) = key_metric(obj, &source_table);
-
-    let flags: Vec<String> = obj
-        .iter()
-        .filter_map(|(k, v)| {
-            if v.as_bool() == Some(true) {
-                Some(k.clone())
-            } else {
-                None
-            }
-        })
-        .collect();
+    // Extract all fields from a borrowed reference, then drop the borrow
+    let (timestamp, source_table, app_id, app_name, key_metric_label, key_metric_value,
+         flags, background_cycles, foreground_cycles, focus_time_ms, user_input_time_ms,
+         mitre_techniques) = {
+        let obj = value.as_object()?;
+        let timestamp = obj.get("timestamp")?.as_str()?.to_string();
+        let source_table = obj
+            .get("source_table")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+        let app_id = obj
+            .get("app_id")
+            .and_then(|v| v.as_i64())
+            .and_then(|v| i32::try_from(v).ok())
+            .unwrap_or(0);
+        let app_name = obj.get("app_name").and_then(|v| v.as_str()).map(str::to_string);
+        let (key_metric_label, key_metric_value) = key_metric(obj, &source_table);
+        let flags: Vec<String> = obj
+            .iter()
+            .filter_map(|(k, v)| if v.as_bool() == Some(true) { Some(k.clone()) } else { None })
+            .collect();
+        let background_cycles = obj.get("background_cycles").and_then(|v| v.as_u64());
+        let foreground_cycles = obj.get("foreground_cycles").and_then(|v| v.as_u64());
+        let focus_time_ms = obj.get("focus_time_ms").and_then(|v| v.as_u64());
+        let user_input_time_ms = obj.get("user_input_time_ms").and_then(|v| v.as_u64());
+        let mitre_techniques: Vec<String> = obj
+            .get("mitre_techniques")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(str::to_string)).collect())
+            .unwrap_or_default();
+        (timestamp, source_table, app_id, app_name, key_metric_label, key_metric_value,
+         flags, background_cycles, foreground_cycles, focus_time_ms, user_input_time_ms,
+         mitre_techniques)
+    }; // obj borrow dropped here — value is no longer borrowed
 
     let severity = severity_from_flags(&flags);
-
-    let background_cycles = obj.get("background_cycles").and_then(|v| v.as_u64());
-    let foreground_cycles = obj.get("foreground_cycles").and_then(|v| v.as_u64());
-    let focus_time_ms = obj.get("focus_time_ms").and_then(|v| v.as_u64());
-    let user_input_time_ms = obj.get("user_input_time_ms").and_then(|v| v.as_u64());
-
-    let mitre_techniques: Vec<String> = obj
-        .get("mitre_techniques")
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(str::to_string))
-                .collect()
-        })
-        .unwrap_or_default();
+    let raw = value; // now safe to move without cloning
 
     let mut rec = AnnotatedRecord {
         timestamp,
