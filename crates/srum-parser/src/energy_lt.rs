@@ -1,6 +1,6 @@
 //! [`EnergyLtRecord`] decoder — same binary layout as [`super::energy`].
 
-use srum_core::{EnergyLtRecord, ENERGY_RECORD_SIZE};
+use srum_core::EnergyLtRecord;
 
 use crate::SrumError;
 
@@ -15,6 +15,7 @@ pub fn decode_energy_lt_record(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use srum_core::ENERGY_RECORD_SIZE;
 
     #[test]
     fn decode_energy_lt_too_short_returns_err() {

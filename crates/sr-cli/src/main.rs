@@ -1329,6 +1329,7 @@ fn guid_to_table_name(guid: &str) -> Option<&'static str> {
         "{5C8CF1C7-7257-4F13-B223-970EF5939312}" => Some("apps"),
         "{DD6636C4-8929-4683-974E-22C046A43763}" => Some("connectivity"),
         "{FEE4E14F-02A9-4550-B5CE-5FA2DA202E37}" => Some("energy"),
+        "{FEE4E14F-02A9-4550-B5CE-5FA2DA202E37}LT" => Some("energy-lt"),
         "{D10CA2FE-6FCF-4F6D-848E-B2E99266FA89}" => Some("notifications"),
         "{7ACBBAA3-D029-4BE4-9A7A-0885927F1D8F}" => Some("app-timeline"),
         "SruDbIdMapTable"                         => Some("idmap"),
@@ -1499,7 +1500,13 @@ fn run() -> anyhow::Result<()> {
             resolve,
             format,
         } => {
-            todo!("energy-lt not yet implemented")
+            let records = srum_parser::parse_energy_lt(&path)?;
+            let mut values = records_to_values(records)?;
+            if resolve {
+                let id_map = load_id_map(&path);
+                values = values.into_iter().map(|r| enrich(r, &id_map)).collect();
+            }
+            print_values(&values, &format)?;
         }
         Cmd::Notifications {
             path,
