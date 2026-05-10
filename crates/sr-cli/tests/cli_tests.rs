@@ -628,3 +628,41 @@ fn sr_compare_resolve_flag_exists() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("resolve"));
 }
+
+// ── sr metadata ───────────────────────────────────────────────────────────────
+
+#[test]
+fn sr_metadata_help_exits_success() {
+    let status = sr_bin().args(["metadata", "--help"]).status().expect("run");
+    assert!(status.success());
+}
+
+#[test]
+fn sr_metadata_nonexistent_exits_nonzero() {
+    // metadata is NOT best-effort — it must hard-fail for missing file
+    let status = sr_bin()
+        .args(["metadata", "/nonexistent/SRUDB.dat"])
+        .status()
+        .expect("run");
+    assert!(!status.success(), "sr metadata must exit nonzero for missing file");
+}
+
+#[test]
+fn sr_metadata_nonexistent_stderr_has_error_prefix() {
+    let out = sr_bin()
+        .args(["metadata", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("error:"),
+        "stderr must contain 'error:', got: {stderr}"
+    );
+}
+
+#[test]
+fn sr_metadata_format_flag_exists() {
+    let out = sr_bin().args(["metadata", "--help"]).output().expect("run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("format"));
+}

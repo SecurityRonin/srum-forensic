@@ -306,6 +306,13 @@ enum Cmd {
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
+    /// Extract metadata from a SRUDB.dat file: SHA-256 hash, table enumeration,
+    /// record counts, temporal span, and Windows version hint.
+    Metadata {
+        path: PathBuf,
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
+    },
 }
 
 /// Build an id→name lookup from the id-map table in `path`.
@@ -1193,6 +1200,21 @@ fn compare_databases(
     })
 }
 
+/// Map a SRUM table GUID (or well-known name) to its friendly table name.
+fn guid_to_table_name(_guid: &str) -> Option<&'static str> {
+    None // stub — GREEN will implement
+}
+
+/// Derive a Windows version hint from the set of known table names present.
+fn windows_version_hint(_known_tables: &[String]) -> &'static str {
+    "" // stub — GREEN will implement
+}
+
+/// Collect metadata about a SRUDB.dat without parsing individual records.
+fn collect_metadata(_path: &std::path::Path) -> anyhow::Result<serde_json::Value> {
+    Ok(serde_json::json!({})) // stub — GREEN will implement
+}
+
 fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
@@ -1363,6 +1385,16 @@ fn run() -> anyhow::Result<()> {
                         }
                     }
                     print!("{}", values_to_csv(&flat)?);
+                }
+            }
+        }
+        Cmd::Metadata { path, format } => {
+            let meta = collect_metadata(&path)?;
+            match &format {
+                OutputFormat::Json   => println!("{}", serde_json::to_string_pretty(&meta)?),
+                OutputFormat::Ndjson => println!("{}", serde_json::to_string(&meta)?),
+                OutputFormat::Csv    => {
+                    print!("{}", values_to_csv(&[meta])?);
                 }
             }
         }
@@ -2507,5 +2539,37 @@ mod tests {
             changed[0].get("delta_bytes_sent").and_then(|v| v.as_i64()),
             Some(52_428_800)
         );
+    }
+
+    // ── guid_to_table_name ────────────────────────────────────────────────────
+
+    #[test]
+    fn guid_to_table_name_known_guids() {
+        assert_eq!(guid_to_table_name("{973F5D5C-1D90-4944-BE8E-24B22A728CF2}"), Some("network"));
+        assert_eq!(guid_to_table_name("{5C8CF1C7-7257-4F13-B223-970EF5939312}"), Some("apps"));
+        assert_eq!(guid_to_table_name("{7ACBBAA3-D029-4BE4-9A7A-0885927F1D8F}"), Some("app-timeline"));
+        assert_eq!(guid_to_table_name("SruDbIdMapTable"), Some("idmap"));
+    }
+
+    #[test]
+    fn guid_to_table_name_unknown_returns_none() {
+        assert_eq!(guid_to_table_name("{B6D82AF1-FFFF-FFFF-FFFF-FFFFFFFFFFFF}"), None);
+        assert_eq!(guid_to_table_name(""), None);
+    }
+
+    // ── windows_version_hint ──────────────────────────────────────────────────
+
+    #[test]
+    fn windows_version_hint_with_app_timeline() {
+        let tables = vec!["apps".to_owned(), "network".to_owned(), "app-timeline".to_owned()];
+        let hint = windows_version_hint(&tables);
+        assert!(hint.contains("1607"), "hint must mention 1607");
+    }
+
+    #[test]
+    fn windows_version_hint_without_app_timeline() {
+        let tables = vec!["apps".to_owned(), "network".to_owned()];
+        let hint = windows_version_hint(&tables);
+        assert!(!hint.contains("1607"), "must not mention 1607 without app-timeline");
     }
 }
