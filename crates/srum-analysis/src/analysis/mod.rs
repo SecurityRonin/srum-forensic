@@ -5,7 +5,9 @@ pub mod sessions;
 pub mod stats;
 
 pub use gaps::{detect_autoinc_gaps_from_ids, detect_gaps};
+pub use hunt::{filter_by_app, hunt_filter, HuntSignature};
 pub use sessions::build_sessions;
+pub use stats::build_stats;
 
 /// Absolute difference in seconds between two RFC-3339 timestamps.
 /// Returns 0 if either string fails to parse.
