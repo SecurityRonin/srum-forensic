@@ -622,8 +622,24 @@ fn build_timeline(
 }
 
 /// Filter a timeline to records matching `app` by integer app_id or name substring.
-fn filter_by_app(_all: Vec<serde_json::Value>, _app: &str) -> Vec<serde_json::Value> {
-    vec![]
+fn filter_by_app(all: Vec<serde_json::Value>, app: &str) -> Vec<serde_json::Value> {
+    let app_lower = app.to_lowercase();
+    let app_id_filter: Option<i64> = app.parse().ok();
+    all.into_iter().filter(|v| {
+        // match by integer app_id
+        if let Some(id) = app_id_filter {
+            if v.get("app_id").and_then(|x| x.as_i64()) == Some(id) {
+                return true;
+            }
+        }
+        // match by app_name substring (case-insensitive)
+        if let Some(name) = v.get("app_name").and_then(|x| x.as_str()) {
+            if name.to_lowercase().contains(&app_lower) {
+                return true;
+            }
+        }
+        false
+    }).collect()
 }
 
 fn run() -> anyhow::Result<()> {
@@ -732,7 +748,12 @@ fn run() -> anyhow::Result<()> {
             let all = build_timeline(&path, id_map.as_ref());
             print_values(&all, &format)?;
         }
-        Cmd::Process { .. } => {}
+        Cmd::Process { app, path, resolve, format } => {
+            let id_map = resolve.then(|| load_id_map(&path));
+            let all = build_timeline(&path, id_map.as_ref());
+            let filtered = filter_by_app(all, &app);
+            print_values(&filtered, &format)?;
+        }
     }
     Ok(())
 }
