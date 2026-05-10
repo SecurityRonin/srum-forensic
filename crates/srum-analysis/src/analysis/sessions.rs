@@ -74,7 +74,7 @@ mod tests {
 
     #[test]
     fn build_sessions_no_user_present_returns_empty() {
-        let all = vec![json!({"source_table": "apps", "timestamp": "2024-01-01T00:00:00Z"})];
+        let all = vec![json!({"source_table": "apps", "timestamp": "2024-01-01T00:00:00Z", "user_present": false})];
         assert!(build_sessions(&all).is_empty());
     }
 }
