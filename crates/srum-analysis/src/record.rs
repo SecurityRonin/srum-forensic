@@ -1,23 +1,17 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {
-    Critical,
-    Suspicious,
+    Clean,           // lowest — declaration order is severity order
     Informational,
-    Clean,
+    Suspicious,
+    Critical,        // highest
 }
 
 impl Severity {
     pub fn max(self, other: Self) -> Self {
-        use Severity::*;
-        match (self, other) {
-            (Critical, _) | (_, Critical) => Critical,
-            (Suspicious, _) | (_, Suspicious) => Suspicious,
-            (Informational, _) | (_, Informational) => Informational,
-            _ => Clean,
-        }
+        if self >= other { self } else { other }
     }
 }
 
@@ -51,7 +45,7 @@ pub struct FindingCard {
     pub count: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TemporalSpan {
     pub first: String,
     pub last: String,
