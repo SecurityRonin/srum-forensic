@@ -458,6 +458,51 @@ fn sr_process_resolve_flag_exists() {
     assert!(stdout.contains("resolve"), "sr process --help must document --resolve");
 }
 
+// ── sr stats ─────────────────────────────────────────────────────────────────
+
+#[test]
+fn sr_stats_help_exits_success() {
+    let status = sr_bin().args(["stats", "--help"]).status().expect("run");
+    assert!(status.success());
+}
+
+#[test]
+fn sr_stats_nonexistent_exits_zero_best_effort() {
+    let out = sr_bin()
+        .args(["stats", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run");
+    assert!(out.status.success(), "stats must exit 0 (best-effort)");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains('['), "must output JSON array: {stdout}");
+}
+
+#[test]
+fn sr_stats_format_flag_exists() {
+    let out = sr_bin().args(["stats", "--help"]).output().expect("run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("format"));
+}
+
+// ── sr sessions ───────────────────────────────────────────────────────────────
+
+#[test]
+fn sr_sessions_help_exits_success() {
+    let status = sr_bin().args(["sessions", "--help"]).status().expect("run");
+    assert!(status.success());
+}
+
+#[test]
+fn sr_sessions_nonexistent_exits_zero_best_effort() {
+    let out = sr_bin()
+        .args(["sessions", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run");
+    assert!(out.status.success(), "sessions must exit 0 (best-effort)");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains('['), "must output JSON array: {stdout}");
+}
+
 // ── sr app-timeline ──────────────────────────────────────────────────────────
 
 #[test]

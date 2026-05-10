@@ -183,6 +183,33 @@ enum Cmd {
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
+    /// Aggregate per-process statistics across all SRUM tables.
+    ///
+    /// Builds a merged timeline and summarises each app's CPU cycles, bytes,
+    /// active intervals, and heuristic flags. Output sorted by flag_count desc,
+    /// then total_background_cycles desc. Best-effort: always exits 0.
+    Stats {
+        /// Path to SRUDB.dat (or a forensic copy of it).
+        path: PathBuf,
+        /// Resolve `app_id` to names from `SruDbIdMapTable`.
+        #[arg(long)]
+        resolve: bool,
+        /// Output format (json, csv, or ndjson).
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
+    },
+    /// Derive user keyboard sessions from the SRUM timeline.
+    ///
+    /// A session is a contiguous run of timestamps where `user_present: true`.
+    /// A gap > 2 hours between timestamps starts a new session. Best-effort:
+    /// always exits 0.
+    Sessions {
+        /// Path to SRUDB.dat (or a forensic copy of it).
+        path: PathBuf,
+        /// Output format (json, csv, or ndjson).
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
+    },
     /// Merge all SRUM tables into a single chronological timeline.
     ///
     /// Reads network, apps, connectivity, energy, notifications, and focus
@@ -621,6 +648,45 @@ fn build_timeline(
     all
 }
 
+const HEURISTIC_KEYS: &[&str] = &[
+    "background_cpu_dominant",
+    "no_focus_with_cpu",
+    "phantom_foreground",
+    "automated_execution",
+    "exfil_signal",
+    "beaconing",
+    "notification_c2",
+    "suspicious_path",
+    "masquerade_candidate",
+    "user_present",
+];
+
+/// Aggregate per-process statistics from a merged timeline.
+///
+/// Returns a `Vec` sorted by `flag_count` descending, then
+/// `total_background_cycles` descending.
+fn build_stats(_all: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
+    vec![]
+}
+
+/// Derive user-presence sessions from a merged timeline.
+///
+/// A session is a contiguous run of `user_present: true` timestamps where the
+/// gap between successive timestamps is ≤ 2 hours.
+fn build_sessions(_all: &[serde_json::Value]) -> Vec<serde_json::Value> {
+    vec![]
+}
+
+/// Compute the signed difference in seconds between two RFC-3339 timestamps.
+fn iso_diff_secs(_a: &str, _b: &str) -> i64 {
+    0
+}
+
+/// Serialise a single session span into a JSON object.
+fn make_session(_start: &str, _end: &str, _input_ms: u64) -> serde_json::Value {
+    serde_json::json!({})
+}
+
 /// Filter a timeline to records matching `app` by integer app_id or name substring.
 fn filter_by_app(all: Vec<serde_json::Value>, app: &str) -> Vec<serde_json::Value> {
     let app_lower = app.to_lowercase();
@@ -738,6 +804,17 @@ fn run() -> anyhow::Result<()> {
                 records_to_values(records)?
             };
             print_values(&values, &format)?;
+        }
+        Cmd::Stats { path, resolve, format } => {
+            let id_map = resolve.then(|| load_id_map(&path));
+            let all = build_timeline(&path, id_map.as_ref());
+            let stats = build_stats(all);
+            print_values(&stats, &format)?;
+        }
+        Cmd::Sessions { path, format } => {
+            let all = build_timeline(&path, None);
+            let sessions = build_sessions(&all);
+            print_values(&sessions, &format)?;
         }
         Cmd::Timeline {
             path,
@@ -1473,6 +1550,109 @@ mod tests {
         let result = enrich(record, &id_map);
         assert_eq!(result.get("suspicious_path"), Some(&serde_json::Value::Bool(true)));
         assert_eq!(result.get("masquerade_candidate"), Some(&serde_json::Value::Bool(true)));
+    }
+
+    fn apps_record_at(ts: &str, app_id: i64, input_ms: u64) -> serde_json::Value {
+        serde_json::json!({
+            "table": "apps",
+            "app_id": app_id,
+            "timestamp": ts,
+            "user_input_time_ms": input_ms,
+            "user_present": true,
+            "background_cycles": 0u64,
+            "foreground_cycles": 0u64,
+        })
+    }
+
+    // ── build_stats ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn stats_aggregates_background_cycles() {
+        let records = vec![
+            serde_json::json!({"table":"apps","app_id":1,"background_cycles":5000u64,"foreground_cycles":500u64,"timestamp":"2024-01-01T00:00:00Z"}),
+            serde_json::json!({"table":"apps","app_id":1,"background_cycles":3000u64,"foreground_cycles":300u64,"timestamp":"2024-01-01T01:00:00Z"}),
+        ];
+        let stats = build_stats(records);
+        assert_eq!(stats.len(), 1);
+        assert_eq!(stats[0].get("total_background_cycles").and_then(|v| v.as_u64()), Some(8000));
+        assert_eq!(stats[0].get("active_intervals").and_then(|v| v.as_u64()), Some(2));
+    }
+
+    #[test]
+    fn stats_collects_heuristic_flags() {
+        let records = vec![
+            serde_json::json!({"table":"apps","app_id":1,"background_cpu_dominant":true,"timestamp":"2024-01-01T00:00:00Z","background_cycles":0u64,"foreground_cycles":0u64}),
+            serde_json::json!({"table":"network","app_id":1,"exfil_signal":true,"timestamp":"2024-01-01T01:00:00Z"}),
+        ];
+        let stats = build_stats(records);
+        let flags = stats[0].get("heuristic_flags").and_then(|v| v.as_array()).unwrap();
+        let flag_strs: Vec<&str> = flags.iter().map(|f| f.as_str().unwrap()).collect();
+        assert!(flag_strs.contains(&"background_cpu_dominant"));
+        assert!(flag_strs.contains(&"exfil_signal"));
+        assert_eq!(stats[0].get("flag_count").and_then(|v| v.as_u64()), Some(2));
+    }
+
+    #[test]
+    fn stats_sorted_by_flag_count_desc() {
+        let records = vec![
+            serde_json::json!({"table":"apps","app_id":1,"background_cycles":100u64,"foreground_cycles":0u64,"timestamp":"2024-01-01T00:00:00Z"}),
+            serde_json::json!({"table":"apps","app_id":2,"background_cycles":50u64,"foreground_cycles":0u64,"background_cpu_dominant":true,"exfil_signal":true,"timestamp":"2024-01-01T00:00:00Z"}),
+        ];
+        let stats = build_stats(records);
+        // app_id 2 has 2 flags, so it should come first
+        assert_eq!(stats[0].get("app_id").and_then(|v| v.as_i64()), Some(2));
+    }
+
+    #[test]
+    fn stats_empty_timeline_returns_empty() {
+        let stats = build_stats(vec![]);
+        assert!(stats.is_empty());
+    }
+
+    // ── build_sessions ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn sessions_contiguous_hours_form_one_session() {
+        let records = vec![
+            apps_record_at("2024-01-15T08:00:00Z", 1, 30000),
+            apps_record_at("2024-01-15T09:00:00Z", 1, 20000),
+            apps_record_at("2024-01-15T10:00:00Z", 1, 15000),
+        ];
+        let sessions = build_sessions(&records);
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].get("session_start").and_then(|v| v.as_str()), Some("2024-01-15T08:00:00Z"));
+        assert_eq!(sessions[0].get("session_end").and_then(|v| v.as_str()), Some("2024-01-15T10:00:00Z"));
+    }
+
+    #[test]
+    fn sessions_gap_over_two_hours_splits_session() {
+        let records = vec![
+            apps_record_at("2024-01-15T08:00:00Z", 1, 30000),
+            apps_record_at("2024-01-15T09:00:00Z", 1, 20000),
+            // 8-hour gap
+            apps_record_at("2024-01-15T17:00:00Z", 1, 25000),
+            apps_record_at("2024-01-15T18:00:00Z", 1, 10000),
+        ];
+        let sessions = build_sessions(&records);
+        assert_eq!(sessions.len(), 2);
+    }
+
+    #[test]
+    fn sessions_empty_input_returns_empty() {
+        let sessions = build_sessions(&[]);
+        assert!(sessions.is_empty());
+    }
+
+    #[test]
+    fn sessions_sums_input_ms() {
+        let records = vec![
+            apps_record_at("2024-01-15T08:00:00Z", 1, 30000),
+            apps_record_at("2024-01-15T09:00:00Z", 2, 20000),
+        ];
+        let sessions = build_sessions(&records);
+        assert_eq!(sessions.len(), 1);
+        // Total input: 30000 + 20000 = 50000
+        assert_eq!(sessions[0].get("input_ms_total").and_then(|v| v.as_u64()), Some(50000));
     }
 
     // ── apply_heuristics injects mitre_techniques ────────────────────────────────
