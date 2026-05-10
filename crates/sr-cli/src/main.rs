@@ -218,6 +218,17 @@ fn enrich<T: Serialize>(record: T, id_map: &HashMap<i32, String>) -> serde_json:
                 "app_name".to_owned(),
                 serde_json::Value::String(name.clone()),
             );
+            // path-based signals — only when name looks like a path
+            if name.contains('\\') || name.contains('/') {
+                use forensicnomicon::heuristics::srum::{is_process_masquerade, is_suspicious_path};
+                if is_suspicious_path(name) {
+                    obj.insert("suspicious_path".to_owned(), serde_json::Value::Bool(true));
+                }
+                let (dir, bin) = split_windows_path(name);
+                if is_process_masquerade(bin, dir) {
+                    obj.insert("masquerade_candidate".to_owned(), serde_json::Value::Bool(true));
+                }
+            }
         }
         if let Some(name) = obj
             .get("user_id")
