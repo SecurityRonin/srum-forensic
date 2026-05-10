@@ -1,18 +1,183 @@
 use crate::types::{Severity, TimelineRecord};
 
 pub fn severity_from_flags(flags: &[String]) -> Severity {
-    todo!()
+    const CRITICAL: &[&str] = &[
+        "automated_execution",
+        "beaconing",
+        "masquerade_candidate",
+        "selective_gap",
+        "notification_c2",
+    ];
+    const SUSPICIOUS: &[&str] = &[
+        "background_cpu_dominant",
+        "exfil_signal",
+        "exfil_ratio",
+        "no_focus_with_cpu",
+        "phantom_foreground",
+        "suspicious_path",
+    ];
+    const INFORMATIONAL: &[&str] = &["autoinc_gap"];
+
+    let mut severity = Severity::Clean;
+    for flag in flags {
+        let s = if CRITICAL.contains(&flag.as_str()) {
+            Severity::Critical
+        } else if SUSPICIOUS.contains(&flag.as_str()) {
+            Severity::Suspicious
+        } else if INFORMATIONAL.contains(&flag.as_str()) {
+            Severity::Informational
+        } else {
+            Severity::Clean
+        };
+        severity = severity.max(s);
+    }
+    severity
 }
 
 pub fn interpret(record: &TimelineRecord) -> Option<String> {
-    todo!()
+    if record.flags.is_empty() {
+        return None;
+    }
+
+    let name = record.app_name.as_deref().unwrap_or("this process");
+
+    if record.flags.contains(&"automated_execution".to_string()) {
+        let focus_min = record.focus_time_ms.unwrap_or(0) / 60_000;
+        return Some(format!(
+            "{name} held focus for {focus_min} minutes with zero keyboard or mouse input. \
+             Consistent with scripted or automated execution — no human was present."
+        ));
+    }
+    if record.flags.contains(&"beaconing".to_string()) {
+        return Some(format!(
+            "{name} made network connections at regular intervals. \
+             Regular timing is a hallmark of command-and-control beaconing."
+        ));
+    }
+    if record.flags.contains(&"background_cpu_dominant".to_string()) {
+        return Some(format!(
+            "{name} consumed significant CPU in the background with little or no foreground activity. \
+             Possible mining, covert computation, or malware hiding behind a cover process."
+        ));
+    }
+    if record.flags.contains(&"phantom_foreground".to_string()) {
+        return Some(format!(
+            "{name} was billed foreground CPU cycles but the Application Timeline records no focus time. \
+             Possible SetForegroundWindow abuse to appear interactive while running covertly."
+        ));
+    }
+    if record.flags.contains(&"exfil_signal".to_string()) {
+        let sent_mb = record
+            .raw
+            .get("bytes_sent")
+            .and_then(|v| v.as_f64())
+            .map(|b| b / 1_048_576.0)
+            .unwrap_or(0.0);
+        return Some(format!(
+            "{name} sent {sent_mb:.1} MB with no corresponding foreground or focus activity. \
+             Data transfer occurring while the user was not interacting — possible exfiltration."
+        ));
+    }
+    if record.flags.contains(&"suspicious_path".to_string()) {
+        return Some(format!(
+            "{name} ran from a suspicious location (temp directory, downloads, UNC path, \
+             or root of a drive). Legitimate software rarely executes from these locations."
+        ));
+    }
+    if record.flags.contains(&"masquerade_candidate".to_string()) {
+        return Some(format!(
+            "The process name is very similar to a known Windows system binary but ran from \
+             an unexpected directory. Possible process name masquerading."
+        ));
+    }
+    if record.flags.contains(&"notification_c2".to_string()) {
+        return Some(format!(
+            "{name} generated an unusually high number of push notifications with background CPU \
+             and no user focus. Notifications may be used as a covert C2 channel."
+        ));
+    }
+
+    Some(format!("Heuristic flags: {}.", record.flags.join(", ")))
 }
 
 pub fn value_to_timeline_record(
     value: serde_json::Value,
     source_table: &str,
 ) -> Option<TimelineRecord> {
-    todo!()
+    let raw = value.clone();
+    let obj = value.as_object()?;
+    let timestamp = obj.get("timestamp")?.as_str()?.to_string();
+
+    let app_id = obj.get("app_id").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+    let app_name = obj.get("app_name").and_then(|v| v.as_str()).map(str::to_string);
+
+    let (key_metric_label, key_metric_value) = key_metric(obj, source_table);
+
+    let flags: Vec<String> = obj
+        .iter()
+        .filter_map(|(k, v)| {
+            if v.as_bool() == Some(true) {
+                Some(k.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let severity = severity_from_flags(&flags);
+
+    let background_cycles = obj.get("background_cycles").and_then(|v| v.as_u64());
+    let foreground_cycles = obj.get("foreground_cycles").and_then(|v| v.as_u64());
+    let focus_time_ms = obj.get("focus_time_ms").and_then(|v| v.as_u64());
+    let user_input_time_ms = obj.get("user_input_time_ms").and_then(|v| v.as_u64());
+
+    let mitre_techniques: Vec<String> = obj
+        .get("mitre_techniques")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let mut rec = TimelineRecord {
+        timestamp,
+        source_table: source_table.to_string(),
+        app_id,
+        app_name,
+        key_metric_label,
+        key_metric_value,
+        flags,
+        severity,
+        raw,
+        background_cycles,
+        foreground_cycles,
+        focus_time_ms,
+        user_input_time_ms,
+        interpretation: None,
+        mitre_techniques,
+    };
+    rec.interpretation = interpret(&rec);
+    Some(rec)
+}
+
+fn key_metric(obj: &serde_json::Map<String, serde_json::Value>, table: &str) -> (String, f64) {
+    let candidates: &[&str] = match table {
+        "network" => &["bytes_sent", "bytes_recv"],
+        "apps" => &["background_cycles", "foreground_cycles"],
+        "energy" | "energy-lt" => &["energy_consumed", "charge_level"],
+        "notifications" => &["notification_count"],
+        "connectivity" => &["connected_time_ms"],
+        "app-timeline" => &["focus_time_ms", "user_input_time_ms"],
+        _ => &[],
+    };
+    for &label in candidates {
+        if let Some(v) = obj.get(label).and_then(|v| v.as_f64()) {
+            return (label.to_string(), v);
+        }
+    }
+    ("value".to_string(), 0.0)
 }
 
 #[cfg(test)]
