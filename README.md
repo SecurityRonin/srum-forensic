@@ -507,7 +507,7 @@ The Application Timeline table records two fields that no other SRUM parser expo
 
 **[Yogesh Khatri](https://www.linkedin.com/in/ydkhatri/)** (@SwiftForensics) whose [srum-dump](https://github.com/MarkBaggett/srum-dump) Python tool proved the forensic value of SRUM data and documented the table schemas.
 
-**Mark Baggett** whose original Python scripts brought SRUM analysis into mainstream DFIR workflows.
+**[Mark Baggett](https://www.linkedin.com/in/mark-baggett/)** whose original Python scripts brought SRUM analysis into mainstream DFIR workflows.
 
 The Rust [binrw](https://github.com/jam1garner/binrw) team for making binary parsing declarative and safe.
 
