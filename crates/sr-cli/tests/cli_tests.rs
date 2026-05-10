@@ -699,3 +699,25 @@ fn sr_metadata_format_flag_exists() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("format"));
 }
+
+// ── source_table field standardisation ──────────────────────────────────────
+
+#[test]
+fn timeline_json_has_source_table_field() {
+    // This test verifies the field name standardisation from "table" → "source_table"
+    let db_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/SRUDB.dat");
+    if !db_path.exists() { return; } // skip if no fixture
+
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_sr"))
+        .args(["timeline", db_path.to_str().unwrap(), "--format", "ndjson"])
+        .output()
+        .expect("failed to run sr");
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    if stdout.is_empty() { return; } // skip if fixture is empty
+
+    let first_line: serde_json::Value = serde_json::from_str(stdout.lines().next().unwrap()).unwrap();
+    assert!(first_line.get("source_table").is_some(), "timeline output must have source_table field");
+    assert!(first_line.get("table").is_none(), "timeline output must not have old 'table' field");
+}
