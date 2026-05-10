@@ -29,6 +29,8 @@ jobs:
         run: |
           cargo doc \
             --workspace \
+            --exclude sr-gui \
+            --exclude ese-test-fixtures \
             --no-deps \
             --document-private-items
         env:
