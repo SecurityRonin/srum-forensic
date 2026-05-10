@@ -648,9 +648,107 @@ fn apply_cross_table_signals(all: &mut Vec<serde_json::Value>) {
 
 const NOTIFICATION_C2_MIN_COUNT: u64 = 10;
 
-fn apply_beaconing_signals(_all: &mut Vec<serde_json::Value>) {}
+fn apply_beaconing_signals(all: &mut Vec<serde_json::Value>) {
+    use forensicnomicon::heuristics::srum::is_beaconing;
+    use std::collections::HashMap;
 
-fn apply_notification_c2_signal(_all: &mut Vec<serde_json::Value>) {}
+    // Collect timestamps per app_id (network table only)
+    let mut net_ts: HashMap<i64, Vec<String>> = HashMap::new();
+    for v in all.iter() {
+        if v.get("table").and_then(|t| t.as_str()) == Some("network") {
+            if let (Some(app_id), Some(ts)) = (
+                v.get("app_id").and_then(|x| x.as_i64()),
+                v.get("timestamp").and_then(|x| x.as_str()),
+            ) {
+                net_ts.entry(app_id).or_default().push(ts.to_owned());
+            }
+        }
+    }
+
+    // Sort timestamps and check for beaconing
+    let mut beaconing_apps: std::collections::HashSet<i64> = std::collections::HashSet::new();
+    for (app_id, mut timestamps) in net_ts {
+        timestamps.sort();
+        // Convert ISO8601 strings to Unix seconds
+        let secs: Vec<i64> = timestamps.iter()
+            .filter_map(|ts| {
+                chrono::DateTime::parse_from_rfc3339(ts).ok().map(|dt| dt.timestamp())
+            })
+            .collect();
+        if is_beaconing(&secs) {
+            beaconing_apps.insert(app_id);
+        }
+    }
+
+    // Inject flag on matching network records
+    for v in all.iter_mut() {
+        if v.get("table").and_then(|t| t.as_str()) == Some("network") {
+            if let Some(app_id) = v.get("app_id").and_then(|x| x.as_i64()) {
+                if beaconing_apps.contains(&app_id) {
+                    if let Some(obj) = v.as_object_mut() {
+                        obj.insert("beaconing".to_owned(), serde_json::Value::Bool(true));
+                        // Add MITRE T1071 to mitre_techniques
+                        let techs = obj.entry("mitre_techniques")
+                            .or_insert_with(|| serde_json::Value::Array(Vec::new()));
+                        if let serde_json::Value::Array(arr) = techs {
+                            let t1071 = serde_json::Value::String("T1071".to_owned());
+                            if !arr.contains(&t1071) {
+                                arr.push(t1071);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn apply_notification_c2_signal(all: &mut Vec<serde_json::Value>) {
+    use std::collections::HashMap;
+
+    // Build notification count map: (app_id, timestamp) -> count
+    let mut notif_map: HashMap<(i64, String), u64> = HashMap::new();
+    for v in all.iter() {
+        if v.get("table").and_then(|t| t.as_str()) == Some("notifications") {
+            if let (Some(app_id), Some(ts)) = (
+                v.get("app_id").and_then(|x| x.as_i64()),
+                v.get("timestamp").and_then(|x| x.as_str()).map(str::to_owned),
+            ) {
+                let count = v.get("notification_count").and_then(|x| x.as_u64()).unwrap_or(1);
+                *notif_map.entry((app_id, ts)).or_insert(0) += count;
+            }
+        }
+    }
+
+    for v in all.iter_mut() {
+        if v.get("table").and_then(|t| t.as_str()) == Some("apps") {
+            if let Some(obj) = v.as_object_mut() {
+                let key = obj.get("app_id").and_then(|x| x.as_i64())
+                    .zip(obj.get("timestamp").and_then(|x| x.as_str()).map(str::to_owned));
+                if let Some((app_id, ts)) = key {
+                    if let Some(&count) = notif_map.get(&(app_id, ts)) {
+                        if count > NOTIFICATION_C2_MIN_COUNT {
+                            let bg = obj.get("background_cycles").and_then(|x| x.as_u64()).unwrap_or(0);
+                            let focus_ms = obj.get("focus_time_ms").and_then(|x| x.as_u64());
+                            if bg > 0 && focus_ms.map_or(true, |ms| ms == 0) {
+                                obj.insert("notification_c2".to_owned(), serde_json::Value::Bool(true));
+                                // Add MITRE T1092
+                                let techs = obj.entry("mitre_techniques")
+                                    .or_insert_with(|| serde_json::Value::Array(Vec::new()));
+                                if let serde_json::Value::Array(arr) = techs {
+                                    let t1092 = serde_json::Value::String("T1092".to_owned());
+                                    if !arr.contains(&t1092) {
+                                        arr.push(t1092);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 /// Build a merged, chronologically sorted timeline from all SRUM tables.
 ///
