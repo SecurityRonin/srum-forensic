@@ -1611,6 +1611,13 @@ fn main() {
     }
 }
 
+/// Detect gaps in a sorted-or-unsorted sequence of AutoIncId values.
+/// Stub: always returns empty — implementation comes in GREEN commit.
+#[allow(unused_variables)]
+fn detect_autoinc_gaps_from_ids(table: &str, ids: &[u32]) -> Vec<serde_json::Value> {
+    vec![]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2896,5 +2903,66 @@ mod tests {
         let techs = apps.get("mitre_techniques").and_then(|v| v.as_array());
         assert!(techs.is_some());
         assert!(techs.unwrap().iter().any(|t| t.as_str() == Some("T1092")));
+    }
+
+    // ── detect_autoinc_gaps_from_ids ──────────────────────────────────────────
+
+    #[test]
+    fn autoinc_gaps_empty_returns_empty() {
+        let gaps = detect_autoinc_gaps_from_ids("apps", &[]);
+        assert!(gaps.is_empty());
+    }
+
+    #[test]
+    fn autoinc_gaps_contiguous_returns_empty() {
+        let ids = vec![1u32, 2, 3, 4, 5];
+        let gaps = detect_autoinc_gaps_from_ids("apps", &ids);
+        assert!(gaps.is_empty());
+    }
+
+    #[test]
+    fn autoinc_gaps_detects_deletion() {
+        // IDs: 1, 2, 10 — gap from 3 to 9 (7 deleted)
+        let ids = vec![1u32, 2, 10];
+        let gaps = detect_autoinc_gaps_from_ids("apps", &ids);
+        assert_eq!(gaps.len(), 1);
+        assert_eq!(gaps[0].get("type").and_then(|v| v.as_str()), Some("autoinc_gap"));
+        assert_eq!(gaps[0].get("table").and_then(|v| v.as_str()), Some("apps"));
+        assert_eq!(gaps[0].get("deleted_count").and_then(|v| v.as_u64()), Some(7));
+    }
+
+    #[test]
+    fn autoinc_gaps_multiple_gaps() {
+        // IDs: 1, 5, 10 — gap 2-4 (3 deleted), gap 6-9 (4 deleted)
+        let ids = vec![1u32, 5, 10];
+        let gaps = detect_autoinc_gaps_from_ids("apps", &ids);
+        assert_eq!(gaps.len(), 2);
+    }
+
+    #[test]
+    fn autoinc_gaps_single_record_returns_empty() {
+        let gaps = detect_autoinc_gaps_from_ids("apps", &[42u32]);
+        assert!(gaps.is_empty());
+    }
+
+    #[test]
+    fn autoinc_gaps_gap_start_end_correct() {
+        // IDs: 100, 200 — gap 101..199 = 99 deleted
+        let ids = vec![100u32, 200];
+        let gaps = detect_autoinc_gaps_from_ids("network", &ids);
+        assert_eq!(gaps.len(), 1);
+        assert_eq!(gaps[0].get("gap_start").and_then(|v| v.as_u64()), Some(101));
+        assert_eq!(gaps[0].get("gap_end").and_then(|v| v.as_u64()), Some(199));
+        assert_eq!(gaps[0].get("deleted_count").and_then(|v| v.as_u64()), Some(99));
+        assert_eq!(gaps[0].get("table").and_then(|v| v.as_str()), Some("network"));
+    }
+
+    #[test]
+    fn autoinc_gaps_unsorted_input_handled() {
+        // Input out-of-order: 10, 1, 2 — should behave like 1,2,10
+        let ids = vec![10u32, 1, 2];
+        let gaps = detect_autoinc_gaps_from_ids("energy", &ids);
+        assert_eq!(gaps.len(), 1);
+        assert_eq!(gaps[0].get("deleted_count").and_then(|v| v.as_u64()), Some(7));
     }
 }
