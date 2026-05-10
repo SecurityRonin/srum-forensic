@@ -97,3 +97,102 @@ fn parse_srum(path: &Path) -> anyhow::Result<SrumFile> {
         table_names,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn merge_focus_injects_fields_into_matching_apps_row() {
+        let mut all = vec![json!({
+            "source_table": "apps",
+            "app_id": 42_i64,
+            "timestamp": "2024-06-15T08:00:00Z",
+            "background_cycles": 1_000_000_u64,
+        })];
+        let focus = vec![json!({
+            "app_id": 42_i64,
+            "timestamp": "2024-06-15T08:00:00Z",
+            "focus_time_ms": 3_600_000_u64,
+            "user_input_time_ms": 0_u64,
+        })];
+        merge_focus_into_apps(&mut all, focus);
+        assert_eq!(all[0]["focus_time_ms"], json!(3_600_000_u64));
+        assert_eq!(all[0]["user_input_time_ms"], json!(0_u64));
+    }
+
+    #[test]
+    fn merge_focus_only_targets_apps_source_table() {
+        let mut all = vec![json!({
+            "source_table": "network",
+            "app_id": 42_i64,
+            "timestamp": "2024-06-15T08:00:00Z",
+        })];
+        let focus = vec![json!({
+            "app_id": 42_i64,
+            "timestamp": "2024-06-15T08:00:00Z",
+            "focus_time_ms": 3_600_000_u64,
+            "user_input_time_ms": 500_u64,
+        })];
+        merge_focus_into_apps(&mut all, focus);
+        assert!(all[0].get("focus_time_ms").is_none(), "network rows must not receive focus data");
+    }
+
+    #[test]
+    fn apply_heuristics_flags_background_cpu_dominant() {
+        let mut values = vec![json!({
+            "source_table": "apps",
+            "app_id": 1_i64,
+            "timestamp": "2024-01-01T00:00:00Z",
+            "background_cycles": 10_000_000_u64,
+            "foreground_cycles": 100_000_u64,
+        })];
+        apply_heuristics(&mut values);
+        assert_eq!(values[0]["background_cpu_dominant"], json!(true));
+    }
+
+    #[test]
+    fn apply_heuristics_uses_source_table_not_table() {
+        let mut values = vec![json!({
+            "table": "apps",
+            "app_id": 1_i64,
+            "timestamp": "2024-01-01T00:00:00Z",
+            "background_cycles": 10_000_000_u64,
+            "foreground_cycles": 0_u64,
+        })];
+        apply_heuristics(&mut values);
+        assert!(
+            values[0].get("background_cpu_dominant").is_none(),
+            "'table' key must not trigger heuristics — GUI uses 'source_table'"
+        );
+    }
+
+    #[test]
+    fn apply_heuristics_flags_automated_execution() {
+        let mut values = vec![json!({
+            "source_table": "apps",
+            "app_id": 1_i64,
+            "timestamp": "2024-01-01T00:00:00Z",
+            "background_cycles": 100_000_u64,
+            "foreground_cycles": 50_000_u64,
+            "focus_time_ms": 3_600_000_u64,
+            "user_input_time_ms": 0_u64,
+        })];
+        apply_heuristics(&mut values);
+        assert_eq!(values[0]["automated_execution"], json!(true));
+    }
+
+    #[test]
+    fn apply_heuristics_skips_non_apps_rows() {
+        let mut values = vec![json!({
+            "source_table": "network",
+            "app_id": 1_i64,
+            "timestamp": "2024-01-01T00:00:00Z",
+            "background_cycles": 10_000_000_u64,
+            "foreground_cycles": 0_u64,
+        })];
+        apply_heuristics(&mut values);
+        assert!(values[0].get("background_cpu_dominant").is_none());
+    }
+}
