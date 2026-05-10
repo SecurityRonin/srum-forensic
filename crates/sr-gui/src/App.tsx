@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { SrumFile, TimelineRecord } from './types';
 import { DropZone } from './components/DropZone';
+import { Dashboard } from './components/Dashboard';
 
 export default function App() {
   const [srumFile, setSrumFile] = useState<SrumFile | null>(null);
@@ -19,7 +20,11 @@ export default function App() {
         <DropZone onFile={setSrumFile} />
       ) : (
         <>
-          <DashboardPlaceholder findings={srumFile.findings} onFilter={setFlagFilter} />
+          <Dashboard
+            findings={srumFile.findings}
+            activeFlag={flagFilter}
+            onFilter={setFlagFilter}
+          />
           <div style={{ flex: 1, padding: 16, color: '#C1C2C5' }}>
             {srumFile.path} — {filtered.length} records
           </div>
@@ -27,11 +32,4 @@ export default function App() {
       )}
     </div>
   );
-}
-
-function DashboardPlaceholder({ findings, onFilter }: { findings: any[]; onFilter: (flag: string | null) => void }) {
-  void onFilter;
-  return <div style={{ height: 140, borderBottom: '1px solid #373A40', display: 'flex', alignItems: 'center', padding: '0 16px', color: '#747D8C' }}>
-    Dashboard ({findings.length} findings)
-  </div>;
 }
