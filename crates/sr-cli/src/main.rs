@@ -162,6 +162,22 @@ enum Cmd {
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
+    /// Parse energy usage long-term records — same schema, longer accumulation window.
+    ///
+    /// Records come from the {FEE4E14F-02A9-4550-B5CE-5FA2DA202E37}LT table.
+    #[command(name = "energy-lt")]
+    EnergyLt {
+        /// Path to SRUDB.dat (or a forensic copy of it).
+        path: PathBuf,
+        /// Resolve `app_id` and `user_id` to names from `SruDbIdMapTable`.
+        ///
+        /// Adds `app_name` and `user_name` fields to each record.
+        #[arg(long)]
+        resolve: bool,
+        /// Output format (json or csv).
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
+    },
     /// Parse push notification records — app notification activity per interval.
     ///
     /// Records come from the {D10CA2FE-6FCF-4F6D-848E-B2E99266FA89} table.
@@ -1477,6 +1493,13 @@ fn run() -> anyhow::Result<()> {
                 values = values.into_iter().map(|r| enrich(r, &id_map)).collect();
             }
             print_values(&values, &format)?;
+        }
+        Cmd::EnergyLt {
+            path,
+            resolve,
+            format,
+        } => {
+            todo!("energy-lt not yet implemented")
         }
         Cmd::Notifications {
             path,

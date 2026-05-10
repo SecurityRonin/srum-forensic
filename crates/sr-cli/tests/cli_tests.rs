@@ -300,6 +300,39 @@ fn sr_energy_nonexistent_stderr_has_error_prefix() {
     );
 }
 
+// ── sr energy-lt ─────────────────────────────────────────────────────────────
+
+#[test]
+fn sr_energy_lt_help_exits_success() {
+    let status = sr_bin()
+        .args(["energy-lt", "--help"])
+        .status()
+        .expect("run sr energy-lt --help");
+    assert!(status.success(), "sr energy-lt --help should exit 0");
+}
+
+#[test]
+fn sr_energy_lt_nonexistent_exits_nonzero() {
+    let status = sr_bin()
+        .args(["energy-lt", "/nonexistent/SRUDB.dat"])
+        .status()
+        .expect("run sr energy-lt");
+    assert!(!status.success(), "sr must exit nonzero for missing file");
+}
+
+#[test]
+fn sr_energy_lt_nonexistent_stderr_has_error_prefix() {
+    let out = sr_bin()
+        .args(["energy-lt", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run sr energy-lt");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("error:"),
+        "stderr must contain 'error:' prefix, got: {stderr}"
+    );
+}
+
 // ── sr notifications ─────────────────────────────────────────────────────────
 
 #[test]

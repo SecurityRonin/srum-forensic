@@ -8,14 +8,15 @@ mod app_timeline;
 mod app_usage;
 mod connectivity;
 mod energy;
+mod energy_lt;
 mod id_map;
 mod network;
 mod push_notification;
 
 use ese_core::EseError;
 use forensicnomicon::srum::{
-    TABLE_APP_RESOURCE_USAGE, TABLE_APP_TIMELINE, TABLE_ENERGY_USAGE, TABLE_ID_MAP,
-    TABLE_NETWORK_CONNECTIVITY, TABLE_NETWORK_USAGE, TABLE_PUSH_NOTIFICATIONS,
+    TABLE_APP_RESOURCE_USAGE, TABLE_APP_TIMELINE, TABLE_ENERGY_USAGE, TABLE_ENERGY_USAGE_LT,
+    TABLE_ID_MAP, TABLE_NETWORK_CONNECTIVITY, TABLE_NETWORK_USAGE, TABLE_PUSH_NOTIFICATIONS,
 };
 
 /// Errors produced by the SRUM parser.
@@ -110,6 +111,21 @@ pub fn parse_energy_usage(
     collect_table(&db, TABLE_ENERGY_USAGE, energy::decode_energy_record)
 }
 
+/// Parse energy usage long-term records from a SRUDB.dat file.
+///
+/// Returns all records from the
+/// `{FEE4E14F-02A9-4550-B5CE-5FA2DA202E37}LT` table.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read or is not a valid ESE database.
+pub fn parse_energy_lt(
+    path: &std::path::Path,
+) -> anyhow::Result<Vec<srum_core::EnergyLtRecord>> {
+    let db = ese_core::EseDatabase::open(path)?;
+    collect_table(&db, TABLE_ENERGY_USAGE_LT, energy_lt::decode_energy_lt_record)
+}
+
 /// Parse push notification records from a SRUDB.dat file.
 ///
 /// Returns all records from the
@@ -164,6 +180,25 @@ pub fn parse_id_map(path: &std::path::Path) -> anyhow::Result<Vec<srum_core::IdM
 mod tests {
     use super::*;
     use tempfile::NamedTempFile;
+
+    #[test]
+    fn nonexistent_file_energy_lt_returns_err() {
+        let result = parse_energy_lt(std::path::Path::new("/nonexistent/SRUDB.dat"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn empty_file_energy_lt_returns_err() {
+        let tmp = NamedTempFile::new().expect("tempfile");
+        let result = parse_energy_lt(tmp.path());
+        assert!(result.is_err(), "empty file must return Err");
+    }
+
+    #[test]
+    fn energy_lt_result_type() {
+        let _: anyhow::Result<Vec<srum_core::EnergyLtRecord>> =
+            parse_energy_lt(std::path::Path::new("/nonexistent/SRUDB.dat"));
+    }
 
     #[test]
     fn nonexistent_file_app_timeline_returns_err() {
