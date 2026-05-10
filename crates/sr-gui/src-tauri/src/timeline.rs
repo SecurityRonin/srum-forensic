@@ -1,4 +1,5 @@
 use srum_analysis::record::{AnnotatedRecord, Severity};
+use srum_analysis::HEURISTIC_KEYS;
 
 pub fn severity_from_flags(flags: &[String]) -> Severity {
     const CRITICAL: &[&str] = &[
@@ -119,9 +120,10 @@ pub fn value_to_timeline_record(value: serde_json::Value) -> Option<AnnotatedRec
             .unwrap_or(0);
         let app_name = obj.get("app_name").and_then(|v| v.as_str()).map(str::to_string);
         let (key_metric_label, key_metric_value) = key_metric(obj, &source_table);
-        let flags: Vec<String> = obj
+        let flags: Vec<String> = HEURISTIC_KEYS
             .iter()
-            .filter_map(|(k, v)| if v.as_bool() == Some(true) { Some(k.clone()) } else { None })
+            .filter(|&&k| obj.get(k).and_then(|v| v.as_bool()) == Some(true))
+            .map(|&k| k.to_owned())
             .collect();
         let background_cycles = obj.get("background_cycles").and_then(|v| v.as_u64());
         let foreground_cycles = obj.get("foreground_cycles").and_then(|v| v.as_u64());
