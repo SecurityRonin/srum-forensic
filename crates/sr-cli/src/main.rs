@@ -646,6 +646,12 @@ fn apply_cross_table_signals(all: &mut Vec<serde_json::Value>) {
     }
 }
 
+const NOTIFICATION_C2_MIN_COUNT: u64 = 10;
+
+fn apply_beaconing_signals(_all: &mut Vec<serde_json::Value>) {}
+
+fn apply_notification_c2_signal(_all: &mut Vec<serde_json::Value>) {}
+
 /// Build a merged, chronologically sorted timeline from all SRUM tables.
 ///
 /// Each record has a `table` field injected to identify its source.
@@ -720,6 +726,8 @@ fn build_timeline(
 
     apply_heuristics(&mut all);
     apply_cross_table_signals(&mut all);
+    apply_beaconing_signals(&mut all);
+    apply_notification_c2_signal(&mut all);
     annotate_user_presence(&mut all);
 
     all.sort_by(|a, b| {
@@ -2658,5 +2666,137 @@ mod tests {
         let tables = vec!["apps".to_owned(), "network".to_owned()];
         let hint = windows_version_hint(&tables);
         assert!(!hint.contains("1607"), "must not mention 1607 without app-timeline");
+    }
+
+    // ── apply_beaconing_signals ───────────────────────────────────────────────
+
+    fn net_record_at(ts: &str, app_id: i64, bytes_sent: u64) -> serde_json::Value {
+        serde_json::json!({
+            "table": "network",
+            "app_id": app_id,
+            "timestamp": ts,
+            "bytes_sent": bytes_sent,
+            "bytes_received": 100u64,
+        })
+    }
+
+    fn notif_record_with_count(ts: &str, app_id: i64, count: u64) -> serde_json::Value {
+        serde_json::json!({
+            "table": "notifications",
+            "app_id": app_id,
+            "timestamp": ts,
+            "notification_count": count,
+        })
+    }
+
+    fn apps_record_bg(ts: &str, app_id: i64, bg: u64) -> serde_json::Value {
+        serde_json::json!({
+            "table": "apps",
+            "app_id": app_id,
+            "timestamp": ts,
+            "background_cycles": bg,
+            "foreground_cycles": 0u64,
+        })
+    }
+
+    #[test]
+    fn beaconing_signal_injected_for_regular_hourly_network() {
+        // 10 hourly records for app 42 — CoV ≈ 0, should beacon
+        let mut values: Vec<serde_json::Value> = (0..10)
+            .map(|i| {
+                let ts = format!("2024-01-01T{:02}:00:00Z", i);
+                net_record_at(&ts, 42, 1000)
+            })
+            .collect();
+        apply_beaconing_signals(&mut values);
+        assert_eq!(values[0].get("beaconing"), Some(&serde_json::Value::Bool(true)));
+    }
+
+    #[test]
+    fn beaconing_signal_not_injected_for_insufficient_data() {
+        // Only 4 records — not enough for beaconing detection (need 6+)
+        let mut values: Vec<serde_json::Value> = (0..4)
+            .map(|i| {
+                let ts = format!("2024-01-01T{:02}:00:00Z", i);
+                net_record_at(&ts, 42, 1000)
+            })
+            .collect();
+        apply_beaconing_signals(&mut values);
+        assert_eq!(values[0].get("beaconing"), None);
+    }
+
+    #[test]
+    fn beaconing_signal_not_injected_for_apps_records() {
+        // Only apps records — beaconing only fires on network
+        let mut values: Vec<serde_json::Value> = (0..10)
+            .map(|i| {
+                let ts = format!("2024-01-01T{:02}:00:00Z", i);
+                serde_json::json!({"table":"apps","app_id":42,"timestamp":ts,"background_cycles":1000u64,"foreground_cycles":0u64})
+            })
+            .collect();
+        apply_beaconing_signals(&mut values);
+        assert_eq!(values[0].get("beaconing"), None);
+    }
+
+    #[test]
+    fn beaconing_adds_t1071_to_mitre_techniques() {
+        let mut values: Vec<serde_json::Value> = (0..10)
+            .map(|i| {
+                let ts = format!("2024-01-01T{:02}:00:00Z", i);
+                net_record_at(&ts, 42, 1000)
+            })
+            .collect();
+        apply_beaconing_signals(&mut values);
+        let techs = values[0].get("mitre_techniques").and_then(|v| v.as_array());
+        assert!(techs.is_some(), "mitre_techniques must be present");
+        assert!(techs.unwrap().iter().any(|t| t.as_str() == Some("T1071")));
+    }
+
+    // ── apply_notification_c2_signal ──────────────────────────────────────────
+
+    #[test]
+    fn notification_c2_flagged_when_high_notifications_and_background_cpu() {
+        let mut values = vec![
+            notif_record_with_count("2024-01-01T08:00:00Z", 42, 50),
+            apps_record_bg("2024-01-01T08:00:00Z", 42, 5_000_000),
+        ];
+        apply_notification_c2_signal(&mut values);
+        let apps = values.iter().find(|v| v.get("table").and_then(|t| t.as_str()) == Some("apps")).unwrap();
+        assert_eq!(apps.get("notification_c2"), Some(&serde_json::Value::Bool(true)));
+    }
+
+    #[test]
+    fn notification_c2_not_flagged_with_low_notification_count() {
+        let mut values = vec![
+            notif_record_with_count("2024-01-01T08:00:00Z", 42, 5),
+            apps_record_bg("2024-01-01T08:00:00Z", 42, 5_000_000),
+        ];
+        apply_notification_c2_signal(&mut values);
+        let apps = values.iter().find(|v| v.get("table").and_then(|t| t.as_str()) == Some("apps")).unwrap();
+        assert_eq!(apps.get("notification_c2"), None);
+    }
+
+    #[test]
+    fn notification_c2_not_flagged_when_no_background_cpu() {
+        let mut values = vec![
+            notif_record_with_count("2024-01-01T08:00:00Z", 42, 50),
+            serde_json::json!({"table":"apps","app_id":42,"timestamp":"2024-01-01T08:00:00Z","background_cycles":0u64,"foreground_cycles":1000u64}),
+        ];
+        apply_notification_c2_signal(&mut values);
+        let apps = values.iter().find(|v| v.get("table").and_then(|t| t.as_str()) == Some("apps")).unwrap();
+        assert_eq!(apps.get("notification_c2"), None);
+    }
+
+    #[test]
+    fn notification_c2_adds_t1092_to_mitre_techniques() {
+        let mut values = vec![
+            notif_record_with_count("2024-01-01T08:00:00Z", 42, 50),
+            apps_record_bg("2024-01-01T08:00:00Z", 42, 5_000_000),
+        ];
+        apply_notification_c2_signal(&mut values);
+        let apps = values.iter().find(|v| v.get("table").and_then(|t| t.as_str()) == Some("apps")).unwrap();
+        let techs = apps.get("mitre_techniques").and_then(|v| v.as_array());
+        assert!(techs.is_some());
+        assert!(techs.unwrap().iter().any(|t| t.as_str() == Some("T1092")));
     }
 }
