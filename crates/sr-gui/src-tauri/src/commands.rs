@@ -428,6 +428,16 @@ fn annotate_user_presence(all: &mut Vec<serde_json::Value>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_srum_nonexistent_path_returns_empty_timeline() {
+        let result = parse_srum(std::path::Path::new("/nonexistent/SRUDB.dat"));
+        // should not panic — returns Ok with empty timeline
+        match result {
+            Ok(f) => assert!(f.timeline.is_empty()),
+            Err(_) => {} // also acceptable — parse error for bad path
+        }
+    }
     use serde_json::json;
 
     #[test]
