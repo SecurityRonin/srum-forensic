@@ -52,6 +52,34 @@ fn mitre_techniques_for(
     techs
 }
 
+/// Named forensic hunt signature for `sr hunt`.
+#[derive(clap::ValueEnum, Clone, Debug)]
+enum HuntSignature {
+    /// Records with exfil_signal: true (cross-table exfiltration fingerprint)
+    Exfil,
+    /// Records with background_cpu_dominant: true (miner/persistent background process)
+    Miner,
+    /// Records with masquerade_candidate: true (lookalike process name)
+    Masquerade,
+    /// Records with suspicious_path: true (execution from temp/downloads/UNC)
+    #[value(name = "suspicious-path")]
+    SuspiciousPath,
+    /// Records with no_focus_with_cpu: true (CPU without keyboard focus)
+    #[value(name = "no-focus")]
+    NoFocus,
+    /// Records with phantom_foreground: true (foreground cycles but zero focus time)
+    Phantom,
+    /// Records with automated_execution: true (focus without user input)
+    Automated,
+    /// Records with beaconing: true (regular-interval network activity)
+    Beaconing,
+    /// Records with notification_c2: true (notification-as-C2 pattern)
+    #[value(name = "notification-c2")]
+    NotificationC2,
+    /// Any record with at least one heuristic flag set
+    All,
+}
+
 /// SRUM forensic analysis tool.
 ///
 /// Reads SRUDB.dat (Windows System Resource Usage Monitor database) and
@@ -226,6 +254,20 @@ enum Cmd {
         #[arg(long, default_value_t = 2u64)]
         threshold_hours: u64,
         /// Output format (json, csv, or ndjson).
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
+    },
+    /// Hunt for specific forensic patterns across all SRUM tables.
+    ///
+    /// Filters the merged timeline to records matching a named heuristic
+    /// signature. Best-effort: always exits 0 even for missing files.
+    Hunt {
+        /// Named forensic pattern to hunt for.
+        signature: HuntSignature,
+        /// Path to SRUDB.dat.
+        path: PathBuf,
+        #[arg(long)]
+        resolve: bool,
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
@@ -992,6 +1034,13 @@ fn filter_by_app(all: Vec<serde_json::Value>, app: &str) -> Vec<serde_json::Valu
     }).collect()
 }
 
+/// Filter timeline records matching a named forensic hunt signature.
+fn hunt_filter(all: Vec<serde_json::Value>, sig: &HuntSignature) -> Vec<serde_json::Value> {
+    // RED stub — always returns empty
+    let _ = (all, sig);
+    vec![]
+}
+
 fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
@@ -1119,6 +1168,12 @@ fn run() -> anyhow::Result<()> {
             let all = build_timeline(&path, None);
             let gaps = detect_gaps(&all, threshold_hours);
             print_values(&gaps, &format)?;
+        }
+        Cmd::Hunt { signature, path, resolve, format } => {
+            let id_map = resolve.then(|| load_id_map(&path));
+            let all = build_timeline(&path, id_map.as_ref());
+            let filtered = hunt_filter(all, &signature);
+            print_values(&filtered, &format)?;
         }
     }
     Ok(())
@@ -2116,5 +2171,82 @@ mod tests {
         merge_focus_into_apps(&mut apps, focus);
         assert_eq!(apps[0].get("app_id"), Some(&serde_json::Value::Number(42.into())));
         assert_eq!(apps[0].get("timestamp"), Some(&serde_json::Value::String("2024-06-15T08:00:00Z".into())));
+    }
+
+    // ── hunt_filter ───────────────────────────────────────────────────────────
+
+    fn flagged_record(flag: &str) -> serde_json::Value {
+        serde_json::json!({
+            "table": "apps",
+            "app_id": 1,
+            "timestamp": "2024-01-01T00:00:00Z",
+            flag: true,
+        })
+    }
+
+    fn unflagged_record() -> serde_json::Value {
+        serde_json::json!({"table": "apps", "app_id": 2, "timestamp": "2024-01-01T00:00:00Z"})
+    }
+
+    #[test]
+    fn hunt_exfil_returns_only_exfil_records() {
+        let records = vec![
+            flagged_record("exfil_signal"),
+            unflagged_record(),
+        ];
+        let result = hunt_filter(records, &HuntSignature::Exfil);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].get("exfil_signal"), Some(&serde_json::Value::Bool(true)));
+    }
+
+    #[test]
+    fn hunt_miner_returns_background_dominant_records() {
+        let records = vec![
+            flagged_record("background_cpu_dominant"),
+            unflagged_record(),
+        ];
+        let result = hunt_filter(records, &HuntSignature::Miner);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn hunt_all_returns_any_flagged_record() {
+        let records = vec![
+            flagged_record("exfil_signal"),
+            flagged_record("background_cpu_dominant"),
+            unflagged_record(),
+        ];
+        let result = hunt_filter(records, &HuntSignature::All);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn hunt_all_excludes_unflagged() {
+        let records = vec![unflagged_record(), unflagged_record()];
+        let result = hunt_filter(records, &HuntSignature::All);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn hunt_empty_timeline_returns_empty() {
+        let result = hunt_filter(vec![], &HuntSignature::Exfil);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn hunt_suspicious_path_matches_flag() {
+        let records = vec![
+            flagged_record("suspicious_path"),
+            unflagged_record(),
+        ];
+        let result = hunt_filter(records, &HuntSignature::SuspiciousPath);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn hunt_beaconing_matches_flag() {
+        let records = vec![flagged_record("beaconing")];
+        let result = hunt_filter(records, &HuntSignature::Beaconing);
+        assert_eq!(result.len(), 1);
     }
 }

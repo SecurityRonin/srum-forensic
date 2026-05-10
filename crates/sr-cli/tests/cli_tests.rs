@@ -561,3 +561,40 @@ fn sr_app_timeline_nonexistent_stderr_has_error_prefix() {
         "stderr must contain 'error:' prefix, got: {stderr}"
     );
 }
+
+// ── sr hunt ──────────────────────────────────────────────────────────────────
+
+#[test]
+fn sr_hunt_help_exits_success() {
+    let status = sr_bin().args(["hunt", "--help"]).status().expect("run");
+    assert!(status.success());
+}
+
+#[test]
+fn sr_hunt_exfil_nonexistent_exits_zero_best_effort() {
+    let out = sr_bin()
+        .args(["hunt", "exfil", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run");
+    assert!(out.status.success(), "hunt must exit 0 (best-effort)");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains('['), "must output JSON array: {stdout}");
+}
+
+#[test]
+fn sr_hunt_miner_nonexistent_exits_zero_best_effort() {
+    let out = sr_bin()
+        .args(["hunt", "miner", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run");
+    assert!(out.status.success());
+}
+
+#[test]
+fn sr_hunt_all_nonexistent_exits_zero_best_effort() {
+    let out = sr_bin()
+        .args(["hunt", "all", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run");
+    assert!(out.status.success());
+}
