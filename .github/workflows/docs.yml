@@ -17,10 +17,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Checkout forensicnomicon (path dependency)
-        uses: actions/checkout@v4
-        with:
-          repository: SecurityRonin/forensicnomicon
-          path: ../forensicnomicon
+        run: git clone --depth 1 https://github.com/SecurityRonin/forensicnomicon.git ../forensicnomicon
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@nightly
