@@ -166,6 +166,23 @@ enum Cmd {
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
+    /// Show all SRUM activity for a single process across all tables.
+    ///
+    /// Accepts an integer app_id or a substring of the resolved process name
+    /// (requires --resolve for name matching).
+    #[command(name = "process")]
+    Process {
+        /// App ID (integer) or name substring to filter by.
+        app: String,
+        /// Path to SRUDB.dat (or a forensic copy of it).
+        path: PathBuf,
+        /// Resolve app_id and user_id to names from SruDbIdMapTable.
+        #[arg(long)]
+        resolve: bool,
+        /// Output format (json, csv, or ndjson).
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
+    },
     /// Merge all SRUM tables into a single chronological timeline.
     ///
     /// Reads network, apps, connectivity, energy, notifications, and focus
@@ -604,6 +621,11 @@ fn build_timeline(
     all
 }
 
+/// Filter a timeline to records matching `app` by integer app_id or name substring.
+fn filter_by_app(_all: Vec<serde_json::Value>, _app: &str) -> Vec<serde_json::Value> {
+    vec![]
+}
+
 fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
@@ -710,6 +732,7 @@ fn run() -> anyhow::Result<()> {
             let all = build_timeline(&path, id_map.as_ref());
             print_values(&all, &format)?;
         }
+        Cmd::Process { .. } => {}
     }
     Ok(())
 }
@@ -762,6 +785,73 @@ mod tests {
             "focus_time_ms": focus_ms,
             "user_input_time_ms": input_ms,
         })
+    }
+
+    // ── filter_by_app ─────────────────────────────────────────────────────────
+
+    fn timeline_record(table: &str, app_id: i64) -> serde_json::Value {
+        serde_json::json!({"table": table, "app_id": app_id, "timestamp": "2024-01-01T00:00:00Z"})
+    }
+
+    fn timeline_record_with_name(table: &str, app_id: i64, app_name: &str) -> serde_json::Value {
+        serde_json::json!({"table": table, "app_id": app_id, "app_name": app_name, "timestamp": "2024-01-01T00:00:00Z"})
+    }
+
+    #[test]
+    fn filter_by_app_matches_integer_id() {
+        let records = vec![
+            timeline_record("apps", 42),
+            timeline_record("apps", 99),
+        ];
+        let result = filter_by_app(records, "42");
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].get("app_id").and_then(|v| v.as_i64()), Some(42));
+    }
+
+    #[test]
+    fn filter_by_app_matches_name_substring_case_insensitive() {
+        let records = vec![
+            timeline_record_with_name("apps", 1, r"C:\Windows\System32\svchost.exe"),
+            timeline_record_with_name("apps", 2, r"C:\Program Files\MyApp\myapp.exe"),
+        ];
+        let result = filter_by_app(records, "svchost");
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].get("app_id").and_then(|v| v.as_i64()), Some(1));
+    }
+
+    #[test]
+    fn filter_by_app_case_insensitive() {
+        let records = vec![
+            timeline_record_with_name("apps", 1, r"C:\Windows\svchost.exe"),
+        ];
+        let result = filter_by_app(records, "SVCHOST");
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn filter_by_app_returns_empty_when_no_match() {
+        let records = vec![timeline_record("apps", 1)];
+        let result = filter_by_app(records, "nonexistent");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn filter_by_app_matches_across_tables() {
+        // same app_id appears in multiple tables — all should match
+        let records = vec![
+            timeline_record("apps", 42),
+            timeline_record("network", 42),
+            timeline_record("apps", 99),
+        ];
+        let result = filter_by_app(records, "42");
+        assert_eq!(result.len(), 2);
+        assert!(result.iter().all(|r| r.get("app_id").and_then(|v| v.as_i64()) == Some(42)));
+    }
+
+    #[test]
+    fn filter_by_app_empty_timeline_returns_empty() {
+        let result = filter_by_app(vec![], "svchost");
+        assert!(result.is_empty());
     }
 
     // ── apply_heuristics: background_cpu_dominant ─────────────────────────────

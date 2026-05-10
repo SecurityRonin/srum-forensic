@@ -422,6 +422,42 @@ fn sr_network_help_shows_ndjson_format() {
     assert!(stdout.contains("ndjson"), "sr network --help must document ndjson format");
 }
 
+// ── sr process ───────────────────────────────────────────────────────────────
+
+#[test]
+fn sr_process_help_exits_success() {
+    let status = sr_bin()
+        .args(["process", "--help"])
+        .status()
+        .expect("run sr process --help");
+    assert!(status.success(), "sr process --help should exit 0");
+}
+
+#[test]
+fn sr_process_nonexistent_exits_zero_best_effort() {
+    let out = sr_bin()
+        .args(["process", "svchost", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run sr process");
+    assert!(out.status.success(), "sr process must exit 0 (best-effort like timeline)");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains('['), "must output JSON array even when empty: {stdout}");
+}
+
+#[test]
+fn sr_process_format_flag_exists() {
+    let out = sr_bin().args(["process", "--help"]).output().expect("run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("format"), "sr process --help must document --format");
+}
+
+#[test]
+fn sr_process_resolve_flag_exists() {
+    let out = sr_bin().args(["process", "--help"]).output().expect("run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("resolve"), "sr process --help must document --resolve");
+}
+
 // ── sr app-timeline ──────────────────────────────────────────────────────────
 
 #[test]
