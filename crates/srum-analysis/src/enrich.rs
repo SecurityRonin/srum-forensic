@@ -1,4 +1,156 @@
-// TODO: implementation
+use std::collections::HashMap;
+use std::path::Path;
+use anyhow::Result;
+use serde::Serialize;
+
+/// Classify a SID string into a well-known account type, or return `None`.
+pub fn classify_sid(sid: &str) -> Option<&'static str> {
+    match sid {
+        "S-1-5-18" => Some("system"),
+        "S-1-5-19" => Some("local_service"),
+        "S-1-5-20" => Some("network_service"),
+        "S-1-1-0"  => Some("everyone"),
+        _ if sid.starts_with("S-1-5-21-") && sid.ends_with("-500") => Some("local_admin"),
+        _ if sid.starts_with("S-1-5-21-") => Some("domain_user"),
+        _ => None,
+    }
+}
+
+/// Split a Windows (or Unix) path into (directory, binary_name) at the last
+/// path separator.  Returns `("", path)` when no separator is present.
+pub fn split_windows_path(path: &str) -> (&str, &str) {
+    match path.rfind(|c| c == '\\' || c == '/') {
+        Some(idx) => (&path[..idx], &path[idx + 1..]),
+        None => ("", path),
+    }
+}
+
+/// Serialise a vec of records into a `Vec<serde_json::Value>`.
+pub fn records_to_values<T: Serialize>(records: Vec<T>) -> Result<Vec<serde_json::Value>> {
+    records
+        .into_iter()
+        .map(|r| serde_json::to_value(r).map_err(Into::into))
+        .collect()
+}
+
+/// Build an id→name lookup from the id-map table in `path`.
+///
+/// Returns an empty map if the table cannot be read (non-fatal: resolution
+/// is best-effort and the caller still outputs the raw integer IDs).
+pub fn load_id_map(path: &Path) -> HashMap<i32, String> {
+    srum_parser::parse_id_map(path)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|e| (e.id, e.name))
+        .collect()
+}
+
+/// Inject `app_name` and `user_name` into a serialisable record.
+///
+/// Serialises `record` to a JSON object, then inserts resolved name fields
+/// alongside the existing integer ID fields. Records whose IDs are absent
+/// from `id_map` receive no extra field (not `null`).
+pub fn enrich<T: Serialize>(record: T, id_map: &HashMap<i32, String>) -> serde_json::Value {
+    let mut v = serde_json::to_value(record).unwrap_or(serde_json::Value::Null);
+    if let Some(obj) = v.as_object_mut() {
+        if let Some(name) = obj
+            .get("app_id")
+            .and_then(serde_json::Value::as_i64)
+            .and_then(|id| i32::try_from(id).ok())
+            .and_then(|id| id_map.get(&id))
+        {
+            obj.insert("app_name".to_owned(), serde_json::Value::String(name.clone()));
+            if name.contains('\\') || name.contains('/') {
+                use forensicnomicon::heuristics::srum::{is_process_masquerade, is_suspicious_path};
+                if is_suspicious_path(name) {
+                    obj.insert("suspicious_path".to_owned(), serde_json::Value::Bool(true));
+                }
+                let (dir, bin) = split_windows_path(name);
+                if is_process_masquerade(bin, dir) {
+                    obj.insert("masquerade_candidate".to_owned(), serde_json::Value::Bool(true));
+                }
+            }
+        }
+        if let Some(name) = obj
+            .get("user_id")
+            .and_then(serde_json::Value::as_i64)
+            .and_then(|id| i32::try_from(id).ok())
+            .and_then(|id| id_map.get(&id))
+        {
+            obj.insert("user_name".to_owned(), serde_json::Value::String(name.clone()));
+            if name.starts_with("S-") {
+                if let Some(acct_type) = classify_sid(name) {
+                    obj.insert("account_type".to_owned(), serde_json::Value::String(acct_type.to_owned()));
+                }
+            }
+        }
+    }
+    v
+}
+
+/// Inject `app_name`, `user_name`, and `profile_name` into a connectivity record.
+///
+/// Same pattern as [`enrich`] but also resolves `profile_id` to `profile_name`.
+pub fn enrich_connectivity(
+    mut v: serde_json::Value,
+    id_map: &HashMap<i32, String>,
+) -> serde_json::Value {
+    if let Some(obj) = v.as_object_mut() {
+        for &(id_key, name_key) in &[
+            ("app_id", "app_name"),
+            ("user_id", "user_name"),
+            ("profile_id", "profile_name"),
+        ] {
+            if let Some(name) = obj
+                .get(id_key)
+                .and_then(serde_json::Value::as_i64)
+                .and_then(|id| i32::try_from(id).ok())
+                .and_then(|id| id_map.get(&id))
+            {
+                obj.insert(name_key.to_owned(), serde_json::Value::String(name.clone()));
+            }
+        }
+    }
+    v
+}
+
+/// Enrich a pre-serialised JSON value in-place with app_name / user_name / path signals.
+pub fn enrich_value(mut v: serde_json::Value, id_map: &HashMap<i32, String>) -> serde_json::Value {
+    if let Some(obj) = v.as_object_mut() {
+        if let Some(name) = obj
+            .get("app_id")
+            .and_then(serde_json::Value::as_i64)
+            .and_then(|id| i32::try_from(id).ok())
+            .and_then(|id| id_map.get(&id))
+        {
+            obj.insert("app_name".to_owned(), serde_json::Value::String(name.clone()));
+            if name.contains('\\') || name.contains('/') {
+                use forensicnomicon::heuristics::srum::{is_process_masquerade, is_suspicious_path};
+                if is_suspicious_path(name) {
+                    obj.insert("suspicious_path".to_owned(), serde_json::Value::Bool(true));
+                }
+                let (dir, bin) = split_windows_path(name);
+                if is_process_masquerade(bin, dir) {
+                    obj.insert("masquerade_candidate".to_owned(), serde_json::Value::Bool(true));
+                }
+            }
+        }
+        if let Some(name) = obj
+            .get("user_id")
+            .and_then(serde_json::Value::as_i64)
+            .and_then(|id| i32::try_from(id).ok())
+            .and_then(|id| id_map.get(&id))
+        {
+            obj.insert("user_name".to_owned(), serde_json::Value::String(name.clone()));
+            if name.starts_with("S-") {
+                if let Some(acct_type) = classify_sid(name) {
+                    obj.insert("account_type".to_owned(), serde_json::Value::String(acct_type.to_owned()));
+                }
+            }
+        }
+    }
+    v
+}
 
 #[cfg(test)]
 mod tests {
