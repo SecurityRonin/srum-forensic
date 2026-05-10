@@ -509,7 +509,7 @@ The Application Timeline table records two fields that no other SRUM parser expo
 
 **[Mark Baggett](https://www.linkedin.com/in/mark-baggett/)** whose original Python scripts brought SRUM analysis into mainstream DFIR workflows.
 
-The Rust [binrw](https://github.com/jam1garner/binrw) team, especially [jam1garner](https://github.com/jam1garner), for making binary parsing declarative and safe.
+[jam1garner](https://github.com/jam1garner) for [binrw](https://github.com/jam1garner/binrw), which makes binary parsing declarative and safe.
 
 ---
 
