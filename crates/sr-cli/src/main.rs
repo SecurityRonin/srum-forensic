@@ -1036,9 +1036,29 @@ fn filter_by_app(all: Vec<serde_json::Value>, app: &str) -> Vec<serde_json::Valu
 
 /// Filter timeline records matching a named forensic hunt signature.
 fn hunt_filter(all: Vec<serde_json::Value>, sig: &HuntSignature) -> Vec<serde_json::Value> {
-    // RED stub — always returns empty
-    let _ = (all, sig);
-    vec![]
+    let flag_key: Option<&str> = match sig {
+        HuntSignature::Exfil          => Some("exfil_signal"),
+        HuntSignature::Miner          => Some("background_cpu_dominant"),
+        HuntSignature::Masquerade     => Some("masquerade_candidate"),
+        HuntSignature::SuspiciousPath => Some("suspicious_path"),
+        HuntSignature::NoFocus        => Some("no_focus_with_cpu"),
+        HuntSignature::Phantom        => Some("phantom_foreground"),
+        HuntSignature::Automated      => Some("automated_execution"),
+        HuntSignature::Beaconing      => Some("beaconing"),
+        HuntSignature::NotificationC2 => Some("notification_c2"),
+        HuntSignature::All            => None,
+    };
+
+    all.into_iter().filter(|v| {
+        match flag_key {
+            Some(key) => v.get(key).and_then(|x| x.as_bool()) == Some(true),
+            None => {
+                HEURISTIC_KEYS.iter().any(|&k| {
+                    v.get(k).and_then(|x| x.as_bool()) == Some(true)
+                })
+            }
+        }
+    }).collect()
 }
 
 fn run() -> anyhow::Result<()> {
