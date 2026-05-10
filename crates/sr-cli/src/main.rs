@@ -1533,7 +1533,23 @@ fn run() -> anyhow::Result<()> {
         }
         Cmd::Gaps { path, threshold_hours, format } => {
             let all = build_timeline(&path, None);
-            let gaps = detect_gaps(&all, threshold_hours);
+            let mut gaps = detect_gaps(&all, threshold_hours);
+
+            // AutoIncId gap detection (best-effort, appended after timestamp gaps).
+            // Uses ESE page number as AutoIncId proxy: gaps in page sequences
+            // indicate deleted records (anti-forensics / record tampering).
+            macro_rules! add_autoinc_gaps {
+                ($table:expr, $parser:expr) => {
+                    if let Ok(records) = $parser(&path) {
+                        let ids: Vec<u32> = records.iter().map(|r| r.auto_inc_id).collect();
+                        gaps.extend(detect_autoinc_gaps_from_ids($table, &ids));
+                    }
+                };
+            }
+            add_autoinc_gaps!("network", srum_parser::parse_network_usage);
+            add_autoinc_gaps!("apps",    srum_parser::parse_app_usage);
+            add_autoinc_gaps!("energy",  srum_parser::parse_energy_usage);
+
             print_values(&gaps, &format)?;
         }
         Cmd::Hunt { signature, path, resolve, format } => {
@@ -1611,11 +1627,33 @@ fn main() {
     }
 }
 
-/// Detect gaps in a sorted-or-unsorted sequence of AutoIncId values.
-/// Stub: always returns empty — implementation comes in GREEN commit.
-#[allow(unused_variables)]
+/// Detect gaps in a sorted-or-unsorted sequence of AutoIncId values for one
+/// SRUM table.  A gap > 1 between consecutive IDs indicates deleted records.
+///
+/// Returns one JSON object per gap:
+/// ```json
+/// { "type": "autoinc_gap", "table": "apps",
+///   "gap_start": 3, "gap_end": 9, "deleted_count": 7 }
+/// ```
 fn detect_autoinc_gaps_from_ids(table: &str, ids: &[u32]) -> Vec<serde_json::Value> {
-    vec![]
+    let mut sorted = ids.to_vec();
+    sorted.sort_unstable();
+    let mut gaps = Vec::new();
+    for w in sorted.windows(2) {
+        if w[1] > w[0] + 1 {
+            let gap_start = w[0] + 1;
+            let gap_end = w[1] - 1;
+            let deleted_count = u64::from(gap_end - gap_start + 1);
+            gaps.push(serde_json::json!({
+                "type": "autoinc_gap",
+                "table": table,
+                "gap_start": gap_start,
+                "gap_end": gap_end,
+                "deleted_count": deleted_count,
+            }));
+        }
+    }
+    gaps
 }
 
 #[cfg(test)]

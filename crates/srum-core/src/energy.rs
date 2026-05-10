@@ -21,4 +21,9 @@ pub struct EnergyUsageRecord {
     pub charge_level: u64,
     /// Energy consumed by this process in the interval (mWh).
     pub energy_consumed: u64,
+    /// ESE page number used as AutoIncId proxy for gap detection.
+    /// Gaps in this sequence indicate deleted records (anti-forensics).
+    /// Not serialised to JSON output.
+    #[serde(skip)]
+    pub auto_inc_id: u32,
 }

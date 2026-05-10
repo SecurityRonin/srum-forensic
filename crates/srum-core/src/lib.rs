@@ -89,6 +89,7 @@ mod tests {
             timestamp: chrono::DateTime::UNIX_EPOCH.with_timezone(&chrono::Utc),
             app_id: 1,
             user_id: 0,
+            auto_inc_id: 0,
         };
         assert_eq!(r.bytes_sent, 1024);
     }
@@ -101,6 +102,7 @@ mod tests {
             timestamp: chrono::DateTime::UNIX_EPOCH.with_timezone(&chrono::Utc),
             app_id: 1,
             user_id: 0,
+            auto_inc_id: 0,
         };
         assert_eq!(r.bytes_recv, 2048);
     }
@@ -114,6 +116,7 @@ mod tests {
             timestamp: ts,
             app_id: 1,
             user_id: 0,
+            auto_inc_id: 0,
         };
         let _ = r.timestamp;
     }
@@ -126,6 +129,7 @@ mod tests {
             timestamp: chrono::DateTime::UNIX_EPOCH.with_timezone(&chrono::Utc),
             app_id: 42,
             user_id: 0,
+            auto_inc_id: 0,
         };
         assert_eq!(r.app_id, 42_i32);
     }
@@ -138,6 +142,7 @@ mod tests {
             timestamp: chrono::DateTime::UNIX_EPOCH.with_timezone(&chrono::Utc),
             foreground_cycles: 999_000,
             background_cycles: 0,
+            auto_inc_id: 0,
         };
         assert_eq!(r.foreground_cycles, 999_000_u64);
     }
@@ -160,9 +165,12 @@ mod tests {
             timestamp: chrono::DateTime::UNIX_EPOCH.with_timezone(&chrono::Utc),
             app_id: 3,
             user_id: 1,
+            auto_inc_id: 0,
         };
         let json = serde_json::to_string(&r).expect("serialise to JSON");
         assert!(json.contains("bytes_sent"));
         assert!(json.contains("512"));
+        // auto_inc_id must NOT appear in JSON output (#[serde(skip)])
+        assert!(!json.contains("auto_inc_id"));
     }
 }

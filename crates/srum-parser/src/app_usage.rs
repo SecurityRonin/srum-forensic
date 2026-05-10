@@ -43,5 +43,6 @@ pub fn decode_app_record(data: &[u8], page: u32, tag: usize) -> Result<AppUsageR
         user_id,
         foreground_cycles,
         background_cycles,
+        auto_inc_id: page,
     })
 }

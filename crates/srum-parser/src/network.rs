@@ -50,5 +50,6 @@ pub fn decode_network_record(
         user_id,
         bytes_sent,
         bytes_recv,
+        auto_inc_id: page,
     })
 }

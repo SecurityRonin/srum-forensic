@@ -45,5 +45,6 @@ pub fn decode_energy_record(
         user_id,
         charge_level,
         energy_consumed,
+        auto_inc_id: page,
     })
 }

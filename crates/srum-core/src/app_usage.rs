@@ -19,4 +19,9 @@ pub struct AppUsageRecord {
     pub foreground_cycles: u64,
     /// CPU cycles consumed while the application was in the background.
     pub background_cycles: u64,
+    /// ESE page number used as AutoIncId proxy for gap detection.
+    /// Gaps in this sequence indicate deleted records (anti-forensics).
+    /// Not serialised to JSON output.
+    #[serde(skip)]
+    pub auto_inc_id: u32,
 }

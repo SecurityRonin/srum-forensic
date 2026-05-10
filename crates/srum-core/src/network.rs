@@ -21,4 +21,9 @@ pub struct NetworkUsageRecord {
     pub bytes_sent: u64,
     /// Bytes received by the process in this interval.
     pub bytes_recv: u64,
+    /// ESE page number used as AutoIncId proxy for gap detection.
+    /// Gaps in this sequence indicate deleted records (anti-forensics).
+    /// Not serialised to JSON output.
+    #[serde(skip)]
+    pub auto_inc_id: u32,
 }
