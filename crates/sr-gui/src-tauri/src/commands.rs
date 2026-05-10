@@ -34,7 +34,8 @@ fn parse_srum(path: &Path) -> anyhow::Result<SrumFile> {
                             let app_id = obj
                                 .get("app_id")
                                 .and_then(|v| v.as_i64())
-                                .unwrap_or(0) as i32;
+                                .and_then(|v| i32::try_from(v).ok())
+                                .unwrap_or(0);
                             if let Some(name) = name_for(app_id) {
                                 obj.insert(
                                     "app_name".to_string(),

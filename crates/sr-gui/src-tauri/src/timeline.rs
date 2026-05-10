@@ -108,7 +108,11 @@ pub fn value_to_timeline_record(
     let obj = value.as_object()?;
     let timestamp = obj.get("timestamp")?.as_str()?.to_string();
 
-    let app_id = obj.get("app_id").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+    let app_id = obj
+        .get("app_id")
+        .and_then(|v| v.as_i64())
+        .and_then(|v| i32::try_from(v).ok())
+        .unwrap_or(0);
     let app_name = obj.get("app_name").and_then(|v| v.as_str()).map(str::to_string);
 
     let (key_metric_label, key_metric_value) = key_metric(obj, source_table);
