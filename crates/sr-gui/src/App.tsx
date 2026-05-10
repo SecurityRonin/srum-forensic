@@ -4,16 +4,15 @@ import { DropZone } from './components/DropZone';
 import { Dashboard } from './components/Dashboard';
 import { FilterBar } from './components/FilterBar';
 import { Timeline } from './components/Timeline';
+import { RecordDetail } from './components/RecordDetail';
 
 export default function App() {
   const [srumFile, setSrumFile] = useState<SrumFile | null>(null);
-  const [flagFilter, setFlagFilter] = useState<string | null>(null);  // from Dashboard card click
+  const [flagFilter, setFlagFilter] = useState<string | null>(null);
   const [appFilter, setAppFilter] = useState('');
   const [tableFilter, setTableFilter] = useState('');
-  const [filterBarFlag, setFilterBarFlag] = useState('');  // from FilterBar dropdown
+  const [filterBarFlag, setFilterBarFlag] = useState('');
   const [selectedRecord, setSelectedRecord] = useState<TimelineRecord | null>(null);
-
-  void selectedRecord; // used in Task 12
 
   const filtered = srumFile
     ? srumFile.timeline.filter(r => {
@@ -55,7 +54,16 @@ export default function App() {
             totalRecords={srumFile.record_count}
             filteredRecords={filtered.length}
           />
-          <Timeline records={filtered} onSelect={setSelectedRecord} />
+          {/* Main content: Timeline + optional RecordDetail side panel */}
+          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            <Timeline records={filtered} onSelect={setSelectedRecord} />
+            {selectedRecord && (
+              <RecordDetail
+                record={selectedRecord}
+                onClose={() => setSelectedRecord(null)}
+              />
+            )}
+          </div>
         </>
       )}
     </div>
