@@ -5,8 +5,8 @@ mod fixtures;
 use ese_core::{DB_STATE_CLEAN_SHUTDOWN, DB_STATE_DIRTY_SHUTDOWN};
 use ese_integrity::{
     check_dirty_state, detect_autoinc_gaps, detect_orphaned_catalog, detect_timestamp_skew,
-    find_deleted_records, scan_slack_regions, verify_page_checksums, EseStructuralAnomaly,
-    Severity,
+    find_deleted_records, full_scan, scan_slack_regions, verify_page_checksums,
+    EseStructuralAnomaly, Severity,
 };
 
 // ── check_dirty_state ────────────────────────────────────────────────────────
@@ -400,5 +400,34 @@ fn detect_orphaned_catalog_reports_orphan_when_table_page_is_out_of_bounds() {
     assert!(
         found,
         "catalog entry with table_page=100 beyond file size must produce OrphanedCatalogEntry"
+    );
+}
+
+// ── full_scan (Phase 4, stories 19-20) ───────────────────────────────────────
+
+#[test]
+fn full_scan_empty_for_clean_database() {
+    // A clean minimal database should produce no anomalies via full_scan.
+    let tmp = fixtures::make_ese_with_db_state(DB_STATE_CLEAN_SHUTDOWN);
+    let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
+    let anomalies = full_scan(&db);
+    assert!(
+        anomalies.is_empty(),
+        "clean database must produce no anomalies from full_scan"
+    );
+}
+
+#[test]
+fn full_scan_detects_bad_checksum() {
+    // full_scan must include the output of verify_page_checksums.
+    let tmp = fixtures::make_ese_with_bad_checksum_on_page1();
+    let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
+    let anomalies = full_scan(&db);
+    let found = anomalies
+        .iter()
+        .any(|a| matches!(a, EseStructuralAnomaly::PageChecksumMismatch { .. }));
+    assert!(
+        found,
+        "full_scan must surface PageChecksumMismatch from verify_page_checksums"
     );
 }
