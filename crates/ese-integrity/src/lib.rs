@@ -376,6 +376,31 @@ pub fn verify_page_checksums(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
     anomalies
 }
 
+/// Check the catalog for table entries whose declared root page falls outside
+/// the file's page range.
+///
+/// For each catalog entry with `object_type == 1` (table), this checks whether
+/// `table_page >= page_count`. A hit means the catalog was updated but the
+/// corresponding data pages were never written — either truncation or tampering.
+///
+/// If `db.catalog_entries()` fails (e.g. page 4 is missing), returns an
+/// empty `Vec` rather than propagating the error.
+pub fn detect_orphaned_catalog(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
+    let Ok(entries) = db.catalog_entries() else {
+        return Vec::new();
+    };
+    let last_valid = db.page_count().saturating_sub(1) as u32;
+    entries
+        .iter()
+        .filter(|e| e.object_type == 1 && e.table_page > last_valid)
+        .map(|e| EseStructuralAnomaly::OrphanedCatalogEntry {
+            object_name: e.object_name.clone(),
+            declared_page: e.table_page,
+            last_valid_page: last_valid,
+        })
+        .collect()
+}
+
 /// Detect non-adjacent AutoIncId values in a sorted (or unsorted) id slice.
 ///
 /// Any pair of adjacent elements where `next > prev + 1` indicates that one or
