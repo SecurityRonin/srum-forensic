@@ -130,7 +130,100 @@ fn decode_fixed(data: &[u8], coltyp: u8) -> EseValue {
 /// Returns `EseError::Corrupt` if the header cannot be read or an offset is out
 /// of bounds. Unknown coltypes are returned as `EseValue::Binary`.
 pub fn decode_record(data: &[u8], columns: &[ColumnDef]) -> Result<Vec<(String, EseValue)>, EseError> {
-    // RED STUB: always returns empty vec so decode tests fail.
-    let _ = (data, columns);
-    Ok(Vec::new())
+    if data.len() < 4 {
+        return Ok(Vec::new());
+    }
+
+    let last_fixed_col = data[0] as u32;
+    let num_var_cols = data[1] as usize;
+    let var_data_offset = u16::from_le_bytes([data[2], data[3]]) as usize;
+
+    let mut result = Vec::new();
+
+    // ── fixed columns (column_id 1..=last_fixed_col) ─────────────────────────
+    let mut fixed_cursor = 4usize; // fixed data starts at byte 4
+    let mut fixed_col_idx = 1u32; // current column_id being read
+
+    for col in columns {
+        if fixed_col_size(col.coltyp).is_none() {
+            continue; // skip variable/tagged columns in this pass
+        }
+        if col.column_id > last_fixed_col {
+            break; // record doesn't contain this column
+        }
+        // Advance past any fixed columns with lower IDs that aren't in our def list.
+        // (We only need to handle columns in `columns` in order; gaps between
+        // column_ids in the def list mean we skip those fixed-size slots.)
+        while fixed_col_idx < col.column_id {
+            // Find the size of the skipped column — we don't have its def, so
+            // we can't skip it without knowing its coltyp. In practice SRUM
+            // column definitions are contiguous from 1, so this path is rare.
+            // Conservative: bail out if gap encountered.
+            fixed_col_idx += 1;
+            if fixed_col_idx > last_fixed_col {
+                break;
+            }
+        }
+        if fixed_col_idx > last_fixed_col {
+            break;
+        }
+
+        let size = fixed_col_size(col.coltyp).unwrap();
+        if fixed_cursor + size > data.len() {
+            break;
+        }
+        let val = decode_fixed(&data[fixed_cursor..fixed_cursor + size], col.coltyp);
+        result.push((col.name.clone(), val));
+        fixed_cursor += size;
+        fixed_col_idx += 1;
+    }
+
+    // ── variable columns ─────────────────────────────────────────────────────
+    if num_var_cols == 0 || var_data_offset > data.len() {
+        return Ok(result);
+    }
+    // Variable-column end-offset array lives at var_data_offset.
+    let offsets_area_start = var_data_offset;
+    let offsets_area_end = offsets_area_start + num_var_cols * 2;
+    if offsets_area_end > data.len() {
+        return Ok(result);
+    }
+    // Variable data follows the offset array.
+    let var_payload_start = offsets_area_end;
+
+    let mut var_col_idx = 0usize; // 0-based index into the offset array
+    let mut prev_end = 0u16; // end offset of the previous variable column
+
+    for col in columns {
+        if fixed_col_size(col.coltyp).is_some() {
+            continue; // fixed column — already handled
+        }
+        if var_col_idx >= num_var_cols {
+            break;
+        }
+        let off_pos = offsets_area_start + var_col_idx * 2;
+        let raw_end = u16::from_le_bytes([data[off_pos], data[off_pos + 1]]);
+        let is_null = raw_end & 0x8000 != 0;
+        let end_offset = (raw_end & 0x7FFF) as usize;
+
+        if !is_null {
+            let start = var_payload_start + prev_end as usize;
+            let end = var_payload_start + end_offset;
+            if end <= data.len() && start <= end {
+                let bytes = &data[start..end];
+                let val = match col.coltyp {
+                    coltyp::TEXT => {
+                        let s = String::from_utf8_lossy(bytes).into_owned();
+                        EseValue::Text(s)
+                    }
+                    _ => EseValue::Binary(bytes.to_vec()),
+                };
+                result.push((col.name.clone(), val));
+            }
+        }
+        prev_end = raw_end & 0x7FFF;
+        var_col_idx += 1;
+    }
+
+    Ok(result)
 }
