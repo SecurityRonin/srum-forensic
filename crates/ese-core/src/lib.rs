@@ -8,6 +8,7 @@ pub mod database;
 pub mod error;
 pub mod header;
 pub mod page;
+pub mod record;
 
 pub use catalog::CatalogEntry;
 pub use database::{EseDatabase, TableCursor};
@@ -16,9 +17,10 @@ pub use header::{
     EseHeader, DB_STATE_CLEAN_SHUTDOWN, DB_STATE_DIRTY_SHUTDOWN, DB_STATE_JUST_CREATED,
 };
 pub use page::{
-    EsePage, EsePageHeader, PAGE_FLAG_EMPTY, PAGE_FLAG_LEAF, PAGE_FLAG_PARENT, PAGE_FLAG_ROOT,
-    PAGE_FLAG_SPACE_TREE, PAGE_SIZE,
+    EsePage, EsePageHeader, PAGE_FLAG_EMPTY, PAGE_FLAG_LEAF, PAGE_FLAG_LONG_VALUE,
+    PAGE_FLAG_PARENT, PAGE_FLAG_ROOT, PAGE_FLAG_SPACE_TREE, PAGE_SIZE,
 };
+pub use record::{coltyp, decode_record, fixed_col_size, ColumnDef, EseValue};
 
 /// Open an ESE database file and return the parsed header.
 ///

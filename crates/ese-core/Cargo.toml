@@ -9,6 +9,7 @@ license.workspace = true
 [dependencies]
 thiserror.workspace = true
 memmap2.workspace = true
+serde.workspace = true
 
 [dev-dependencies]
 ese-test-fixtures.workspace = true
