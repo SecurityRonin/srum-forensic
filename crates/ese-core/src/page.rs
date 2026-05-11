@@ -137,6 +137,16 @@ impl EsePage {
             ]);
             let value_offset = (raw & 0x7FFF) as u16;
             let value_size = ((raw >> 16) & 0x7FFF) as u16;
+            // Guard: reject tags whose data range exceeds the page boundary.
+            let end = usize::from(value_offset) + usize::from(value_size);
+            if end > self.data.len() {
+                return Err(EseError::RecordTooShort {
+                    page: self.page_number,
+                    tag: i,
+                    got: self.data.len(),
+                    need: end,
+                });
+            }
             tags.push((value_offset, value_size));
         }
         Ok(tags)

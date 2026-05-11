@@ -67,13 +67,25 @@ impl EseHeader {
         ]);
         // db_state at offset 0x28 (4 bytes LE)
         let db_state = u32::from_le_bytes([data[0x28], data[0x29], data[0x2A], data[0x2B]]);
-        // Page size is at offset 0xEC = 236
+        // Page size is at offset 0xEC = 236.
+        // 0 is a special sentinel meaning "use the default 4096".
         let raw_page_size = u32::from_le_bytes([data[236], data[237], data[238], data[239]]);
         let page_size = if raw_page_size == 0 {
             4096
         } else {
             raw_page_size
         };
+        // Guard: only the four power-of-two sizes that ESE actually uses are valid.
+        // Any other value indicates a corrupt or crafted header.
+        const VALID_PAGE_SIZES: [u32; 4] = [4096, 8192, 16384, 32768];
+        if !VALID_PAGE_SIZES.contains(&page_size) {
+            return Err(EseError::Corrupt {
+                page: 0,
+                detail: format!(
+                    "invalid page_size {page_size}: must be one of 4096, 8192, 16384, 32768"
+                ),
+            });
+        }
         Ok(EseHeader {
             signature: sig,
             format_version,
