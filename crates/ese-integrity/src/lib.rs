@@ -6,6 +6,23 @@
 
 use ese_core::{EseDatabase, EseHeader};
 
+/// Forensic severity level for a detected structural anomaly.
+///
+/// Declaration order is ascending: `Info < Warning < Error < Critical`.
+/// This ordering is reflected in the derived [`Ord`] implementation so
+/// `anomaly.severity() >= Severity::Warning` works as a filter predicate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Severity {
+    /// Consistent with legitimate operation; worth noting.
+    Info,
+    /// Suspicious; plausible legitimate explanation but warrants investigation.
+    Warning,
+    /// Strong indicator of tampering or structural corruption.
+    Error,
+    /// Database cannot be reliably decoded; forensic conclusions unsupported.
+    Critical,
+}
+
 /// A raw structural anomaly detected in an ESE database binary.
 ///
 /// These are parsing-level observations, not forensic conclusions.
@@ -29,6 +46,55 @@ pub enum EseStructuralAnomaly {
         /// Number of non-zero slack bytes.
         length: u16,
     },
+    /// The XOR or ECC checksum stored in the page header does not match
+    /// the recomputed checksum over page bytes. Bytes changed after write.
+    PageChecksumMismatch {
+        page_number: u32,
+        expected: u32,
+        actual: u32,
+    },
+    /// A B-tree node's sibling-page pointer chain is broken: the declared
+    /// next/previous page does not reciprocate the link.
+    BTreeLinkBroken {
+        page_number: u32,
+        /// Page number that was supposed to link back.
+        broken_sibling: u32,
+    },
+    /// A page is reachable via the B-tree but its `page_flags` are
+    /// inconsistent with its position (e.g. leaf flag set on an internal node).
+    PageFlagInconsistency {
+        page_number: u32,
+        flags: u16,
+        context: &'static str,
+    },
+    /// A SRUM table identified by GUID in the catalog is referenced by
+    /// a record but no corresponding B-tree root page can be found.
+    OrphanedSrumTable { table_guid: String },
+    /// A required SRUM table (known GUID from forensicnomicon) is absent
+    /// from the catalog — the table was deleted or never populated.
+    MissingSrumTable {
+        table_guid: &'static str,
+        table_name: &'static str,
+    },
+    /// The file ends before the declared page count implies. The database
+    /// was truncated — either during acquisition or deliberately.
+    TruncatedDatabase {
+        declared_pages: u32,
+        actual_pages: u32,
+    },
+}
+
+impl EseStructuralAnomaly {
+    /// Return the forensic severity of this anomaly.
+    pub fn severity(&self) -> Severity {
+        // RED STUB: returns Info for every variant so severity tests fail.
+        Severity::Info
+    }
+
+    /// Return `true` if this anomaly's severity is at least `min`.
+    pub fn at_least(&self, min: Severity) -> bool {
+        self.severity() >= min
+    }
 }
 
 /// Check whether the database header indicates an unclean shutdown.

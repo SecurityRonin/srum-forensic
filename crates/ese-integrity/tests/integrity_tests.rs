@@ -7,7 +7,7 @@ mod fixtures;
 
 use ese_core::{DB_STATE_CLEAN_SHUTDOWN, DB_STATE_DIRTY_SHUTDOWN};
 use ese_integrity::{
-    check_dirty_state, detect_timestamp_skew, scan_slack_regions, EseStructuralAnomaly,
+    check_dirty_state, detect_timestamp_skew, scan_slack_regions, EseStructuralAnomaly, Severity,
 };
 
 // ── check_dirty_state ────────────────────────────────────────────────────────
@@ -85,6 +85,124 @@ fn timestamp_skew_detected_when_page_newer_than_header() {
         } if *header_db_time_low == 1000 && *page_db_time == 5000)
     });
     assert!(found, "TimestampSkew must carry correct field values");
+}
+
+// ── severity() ───────────────────────────────────────────────────────────────
+
+#[test]
+fn dirty_database_severity_is_info() {
+    let a = EseStructuralAnomaly::DirtyDatabase { db_state: 2 };
+    assert_eq!(a.severity(), Severity::Info);
+}
+
+#[test]
+fn timestamp_skew_severity_is_error() {
+    let a = EseStructuralAnomaly::TimestampSkew {
+        page_number: 1,
+        header_db_time_low: 100,
+        page_db_time: 500,
+    };
+    assert_eq!(a.severity(), Severity::Error);
+}
+
+#[test]
+fn slack_region_data_severity_is_warning() {
+    let a = EseStructuralAnomaly::SlackRegionData {
+        page_number: 2,
+        offset_in_page: 80,
+        length: 16,
+    };
+    assert_eq!(a.severity(), Severity::Warning);
+}
+
+#[test]
+fn page_checksum_mismatch_severity_is_error() {
+    let a = EseStructuralAnomaly::PageChecksumMismatch {
+        page_number: 3,
+        expected: 0xDEAD_BEEF,
+        actual: 0x1234_5678,
+    };
+    assert_eq!(a.severity(), Severity::Error);
+}
+
+#[test]
+fn btree_link_broken_severity_is_error() {
+    let a = EseStructuralAnomaly::BTreeLinkBroken {
+        page_number: 4,
+        broken_sibling: 99,
+    };
+    assert_eq!(a.severity(), Severity::Error);
+}
+
+#[test]
+fn page_flag_inconsistency_severity_is_warning() {
+    let a = EseStructuralAnomaly::PageFlagInconsistency {
+        page_number: 5,
+        flags: 0x0002,
+        context: "leaf flag on internal node",
+    };
+    assert_eq!(a.severity(), Severity::Warning);
+}
+
+#[test]
+fn orphaned_srum_table_severity_is_warning() {
+    let a = EseStructuralAnomaly::OrphanedSrumTable {
+        table_guid: "{deadbeef-dead-beef-dead-beefdeadbeef}".to_owned(),
+    };
+    assert_eq!(a.severity(), Severity::Warning);
+}
+
+#[test]
+fn missing_srum_table_severity_is_warning() {
+    let a = EseStructuralAnomaly::MissingSrumTable {
+        table_guid: "{d10ca2fe-6fcf-4f6d-848e-b2e99266fa89}",
+        table_name: "SruDbNetworkUsageTable",
+    };
+    assert_eq!(a.severity(), Severity::Warning);
+}
+
+#[test]
+fn truncated_database_severity_is_critical() {
+    let a = EseStructuralAnomaly::TruncatedDatabase {
+        declared_pages: 100,
+        actual_pages: 40,
+    };
+    assert_eq!(a.severity(), Severity::Critical);
+}
+
+// ── at_least() ───────────────────────────────────────────────────────────────
+
+#[test]
+fn at_least_exact_severity_returns_true() {
+    let a = EseStructuralAnomaly::TimestampSkew {
+        page_number: 1,
+        header_db_time_low: 100,
+        page_db_time: 500,
+    };
+    // severity() is Error; at_least(Error) must be true
+    assert!(a.at_least(Severity::Error));
+}
+
+#[test]
+fn at_least_lower_threshold_returns_true() {
+    let a = EseStructuralAnomaly::TimestampSkew {
+        page_number: 1,
+        header_db_time_low: 100,
+        page_db_time: 500,
+    };
+    // Error >= Warning: true
+    assert!(a.at_least(Severity::Warning));
+}
+
+#[test]
+fn at_least_higher_threshold_returns_false() {
+    let a = EseStructuralAnomaly::TimestampSkew {
+        page_number: 1,
+        header_db_time_low: 100,
+        page_db_time: 500,
+    };
+    // Error >= Critical: false
+    assert!(!a.at_least(Severity::Critical));
 }
 
 // ── scan_slack_regions ───────────────────────────────────────────────────────
