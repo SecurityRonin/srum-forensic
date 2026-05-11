@@ -853,6 +853,7 @@ version = "0.1.0"
 dependencies = [
  "ese-test-fixtures",
  "memmap2",
+ "serde",
  "tempfile",
  "thiserror 2.0.18",
 ]
@@ -3107,6 +3108,13 @@ dependencies = [
  "srum-core",
  "tempfile",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "srum-schema"
+version = "0.1.0"
+dependencies = [
+ "forensicnomicon",
 ]
 
 [[package]]

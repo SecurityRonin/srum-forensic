@@ -7,6 +7,7 @@ members = [
     "crates/ese-test-fixtures",
     "crates/srum-core",
     "crates/srum-parser",
+    "crates/srum-schema",
     "crates/srum-analysis",
     "crates/sr-cli",
     "crates/sr-gui/src-tauri",
@@ -54,6 +55,7 @@ ese-test-fixtures = { path = "crates/ese-test-fixtures" }
 forensicnomicon   = { path = "../forensicnomicon" }
 srum-core         = { path = "crates/srum-core" }
 srum-parser       = { path = "crates/srum-parser" }
+srum-schema       = { path = "crates/srum-schema" }
 srum-analysis     = { path = "crates/srum-analysis" }
 
 # GUI
