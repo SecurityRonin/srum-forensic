@@ -376,6 +376,23 @@ pub fn verify_page_checksums(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
     anomalies
 }
 
+/// Run all available structural integrity checks on `db` and aggregate results.
+///
+/// Combines the output of:
+/// - [`verify_page_checksums`] — XOR checksum mismatch detection
+/// - [`find_deleted_records`] — in-place deleted-tag scanning
+/// - [`detect_orphaned_catalog`] — catalog entries beyond file bounds
+///
+/// Note: [`detect_autoinc_gaps`] is a pure function operating on caller-
+/// supplied id slices and is not included here (it has no `EseDatabase` API).
+pub fn full_scan(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
+    let mut anomalies = Vec::new();
+    anomalies.extend(verify_page_checksums(db));
+    anomalies.extend(find_deleted_records(db));
+    anomalies.extend(detect_orphaned_catalog(db));
+    anomalies
+}
+
 /// Check the catalog for table entries whose declared root page falls outside
 /// the file's page range.
 ///
