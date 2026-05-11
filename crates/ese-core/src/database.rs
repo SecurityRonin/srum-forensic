@@ -166,16 +166,18 @@ impl EseDatabase {
     /// Returns [`EseError`] if the catalog page cannot be read or contains
     /// malformed records.
     pub fn catalog_entries(&self) -> Result<Vec<CatalogEntry>, EseError> {
-        const CATALOG_PAGE: u32 = 4;
-        let page = self.read_page(CATALOG_PAGE)?;
-        let tags = page.tags()?;
+        const CATALOG_ROOT: u32 = 4;
+        let leaf_pages = self.walk_leaf_pages(CATALOG_ROOT)?;
         let mut entries = Vec::new();
-        // Tag 0 is the page header tag — skip it; data records start at tag 1.
-        for i in 1..tags.len() {
-            let data = page.record_data(i)?;
-            if let Ok(entry) = CatalogEntry::from_bytes(data) {
-                entries.push(entry);
-                // silently skip malformed/padding records
+        for page_num in leaf_pages {
+            let page = self.read_page(page_num)?;
+            let tags = page.tags()?;
+            // Tag 0 is the page header tag — data records start at tag 1.
+            for i in 1..tags.len() {
+                let data = page.record_data(i)?;
+                if let Ok(entry) = CatalogEntry::from_bytes(data) {
+                    entries.push(entry);
+                }
             }
         }
         Ok(entries)
