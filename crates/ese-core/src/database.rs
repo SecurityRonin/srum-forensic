@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use memmap2::Mmap;
 
-use crate::{catalog::CatalogEntry, EseError, EseHeader, EsePage};
+use crate::{catalog::CatalogEntry, record::ColumnDef, EseError, EseHeader, EsePage};
 
 /// Iterator over raw record bytes across all leaf pages of a B-tree.
 ///
@@ -248,6 +248,38 @@ impl EseDatabase {
             page_idx: 0,
             tag_idx: 1,
         })
+    }
+
+    /// Return the column definitions for a named table from the catalog.
+    ///
+    /// Reads the catalog, finds the table entry (object_type 1) whose name
+    /// matches `table_name`, then collects all column entries (object_type 2)
+    /// whose `parent_object_id` equals the table's `object_id`. In the
+    /// synthetic catalog format, column entries store the JET coltyp in the
+    /// `table_page` field. Results are sorted ascending by `column_id`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EseError::TableNotFound`] if `table_name` is not in the
+    /// catalog, or any I/O / parse error from [`catalog_entries`][Self::catalog_entries].
+    pub fn table_columns(&self, table_name: &str) -> Result<Vec<ColumnDef>, EseError> {
+        let entries = self.catalog_entries()?;
+        let table = entries
+            .iter()
+            .find(|e| e.object_type == 1 && e.object_name == table_name)
+            .ok_or_else(|| EseError::TableNotFound { name: table_name.to_owned() })?;
+        let table_obj_id = table.object_id;
+        let mut cols: Vec<ColumnDef> = entries
+            .iter()
+            .filter(|e| e.object_type == 2 && e.parent_object_id == table_obj_id)
+            .map(|e| ColumnDef {
+                column_id: e.object_id,
+                name: e.object_name.clone(),
+                coltyp: e.table_page as u8,
+            })
+            .collect();
+        cols.sort_by_key(|c| c.column_id);
+        Ok(cols)
     }
 
     /// Open a cursor over all records in a named SRUM table.
