@@ -106,6 +106,65 @@ impl EseStructuralAnomaly {
     }
 }
 
+/// Read-only forensic analyser for a raw ESE database byte buffer.
+///
+/// Operates directly on raw bytes so it can detect anomalies that would
+/// prevent normal parsing (bad checksums, missing pages, truncation).
+/// [`analyse`](EseIntegrity::analyse) short-circuits after any `Critical`
+/// finding: a truncated file makes page-level checks meaningless.
+pub struct EseIntegrity<'a> {
+    data: &'a [u8],
+}
+
+impl<'a> EseIntegrity<'a> {
+    /// Wrap a raw ESE database byte buffer for forensic analysis.
+    pub fn new(data: &'a [u8]) -> Self {
+        Self { data }
+    }
+
+    /// Run all checks and return every detected anomaly.
+    ///
+    /// Returns an empty `Vec` for a structurally sound database.
+    /// Short-circuits after any `Critical` finding.
+    pub fn analyse(&self) -> Vec<EseStructuralAnomaly> {
+        // RED STUB: always returns empty Vec so TruncatedDatabase tests fail.
+        Vec::new()
+    }
+
+    /// Check for database layout problems (truncation).
+    pub fn check_layout(&self) -> Vec<EseStructuralAnomaly> {
+        Vec::new()
+    }
+
+    /// Check page-level integrity (checksums, timestamps, flags).
+    pub fn check_pages(&self) -> Vec<EseStructuralAnomaly> {
+        Vec::new()
+    }
+
+    /// Check B-tree sibling link consistency.
+    pub fn check_btree(&self) -> Vec<EseStructuralAnomaly> {
+        Vec::new()
+    }
+
+    /// Check catalog consistency (orphaned/missing SRUM tables).
+    pub fn check_catalog(&self) -> Vec<EseStructuralAnomaly> {
+        Vec::new()
+    }
+
+    /// Check header fields (dirty state, page size validity).
+    pub fn check_header(&self) -> Vec<EseStructuralAnomaly> {
+        Vec::new()
+    }
+}
+
+/// Filter `anomalies` to those at or above `min` severity.
+pub fn anomalies_at_least<'a>(
+    anomalies: &'a [EseStructuralAnomaly],
+    min: Severity,
+) -> Vec<&'a EseStructuralAnomaly> {
+    anomalies.iter().filter(|a| a.at_least(min)).collect()
+}
+
 /// Check whether the database header indicates an unclean shutdown.
 ///
 /// Returns `Some(DirtyDatabase)` if `db_state == 2`, `None` otherwise.
