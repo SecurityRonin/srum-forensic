@@ -1,13 +1,14 @@
 //! Integration tests for ese-integrity structural anomaly detection.
 //!
 //! Tests [`ese_integrity::check_dirty_state`], [`ese_integrity::detect_timestamp_skew`],
-//! and [`ese_integrity::scan_slack_regions`].
+//! [`ese_integrity::scan_slack_regions`], and [`ese_integrity::verify_page_checksums`].
 
 mod fixtures;
 
 use ese_core::{DB_STATE_CLEAN_SHUTDOWN, DB_STATE_DIRTY_SHUTDOWN};
 use ese_integrity::{
-    check_dirty_state, detect_timestamp_skew, scan_slack_regions, EseStructuralAnomaly, Severity,
+    check_dirty_state, detect_timestamp_skew, scan_slack_regions, verify_page_checksums,
+    EseStructuralAnomaly, Severity,
 };
 
 // ── check_dirty_state ────────────────────────────────────────────────────────
@@ -203,6 +204,58 @@ fn at_least_higher_threshold_returns_false() {
     };
     // Error >= Critical: false
     assert!(!a.at_least(Severity::Critical));
+}
+
+// ── verify_page_checksums (Phase 4, stories 5-8) ────────────────────────────
+
+#[test]
+fn verify_page_checksums_empty_for_database_with_unchecked_pages() {
+    // Pages built by PageBuilder have 0 stored checksum → "unchecked", must not be reported.
+    let tmp = fixtures::make_ese_with_db_state(DB_STATE_CLEAN_SHUTDOWN);
+    let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
+    let anomalies = verify_page_checksums(&db);
+    assert!(
+        anomalies.is_empty(),
+        "unchecked pages (zero stored checksum) must produce no anomaly"
+    );
+}
+
+#[test]
+fn verify_page_checksums_reports_mismatch_for_tampered_page() {
+    let tmp = fixtures::make_ese_with_bad_checksum_on_page1();
+    let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
+    let anomalies = verify_page_checksums(&db);
+    let found = anomalies
+        .iter()
+        .any(|a| matches!(a, EseStructuralAnomaly::PageChecksumMismatch { .. }));
+    assert!(found, "tampered page must produce PageChecksumMismatch");
+}
+
+#[test]
+fn verify_page_checksums_mismatch_carries_correct_page_number() {
+    let tmp = fixtures::make_ese_with_bad_checksum_on_page1();
+    let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
+    let anomalies = verify_page_checksums(&db);
+    let found = anomalies.iter().any(|a| {
+        matches!(
+            a,
+            EseStructuralAnomaly::PageChecksumMismatch { page_number, .. }
+                if page_number == 1
+        )
+    });
+    assert!(found, "mismatch on page 1 must report page_number == 1");
+}
+
+#[test]
+fn verify_page_checksums_skips_page_with_zero_stored_checksum() {
+    // A zero stored checksum means "unchecked" — must be silent even if computed ≠ 0.
+    let tmp = fixtures::make_ese_with_page_db_time(0, 0);
+    let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
+    let anomalies = verify_page_checksums(&db);
+    assert!(
+        anomalies.is_empty(),
+        "page with zero stored checksum must not produce PageChecksumMismatch"
+    );
 }
 
 // ── scan_slack_regions ───────────────────────────────────────────────────────

@@ -42,3 +42,16 @@ pub fn make_ese_with_slack_bytes(slack: &[u8]) -> NamedTempFile {
         .add_page(data_page)
         .write()
 }
+
+/// ESE file where page 1 has a non-zero but incorrect XOR checksum.
+///
+/// An all-zero page body gives `computed = XOR_SEED (0x89ABCDEF)`.
+/// We store `0xDEADBEEF` instead, so the check must report a mismatch.
+pub fn make_ese_with_bad_checksum_on_page1() -> NamedTempFile {
+    let mut bad_page = vec![0u8; PAGE_SIZE];
+    bad_page[0..4].copy_from_slice(&0xDEAD_BEEFu32.to_le_bytes());
+    EseFileBuilder::new()
+        .with_db_state(ese_core::DB_STATE_CLEAN_SHUTDOWN)
+        .add_page(bad_page)
+        .write()
+}
