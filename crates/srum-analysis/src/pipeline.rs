@@ -391,4 +391,88 @@ mod tests {
         assert_eq!(all[0]["user_present"], json!(true));
         assert_eq!(all[1]["user_present"], json!(true));
     }
+
+    #[test]
+    fn apply_heuristics_flags_no_focus_with_cpu() {
+        let mut values = vec![json!({
+            "source_table": "apps",
+            "app_id": 1_i64,
+            "timestamp": "2024-01-01T00:00:00Z",
+            "background_cycles": 5_000_000_u64,
+            "foreground_cycles": 0_u64,
+            "focus_time_ms": 0_u64,
+            "user_input_time_ms": 0_u64,
+        })];
+        apply_heuristics(&mut values);
+        assert_eq!(values[0]["no_focus_with_cpu"], json!(true));
+    }
+
+    #[test]
+    fn apply_cross_table_signals_flags_exfil_signal() {
+        let mut all = vec![
+            json!({
+                "source_table": "network",
+                "app_id": 99_i64,
+                "timestamp": "2024-01-01T00:00:00Z",
+                "bytes_sent": 200_000_000_u64,
+                "bytes_recv": 512_u64,
+            }),
+            json!({
+                "source_table": "apps",
+                "app_id": 99_i64,
+                "timestamp": "2024-01-01T00:00:00Z",
+                "background_cycles": 5_000_000_u64,
+                "foreground_cycles": 0_u64,
+                "focus_time_ms": 0_u64,
+            }),
+        ];
+        apply_cross_table_signals(&mut all);
+        assert_eq!(all[1]["exfil_signal"], json!(true));
+    }
+
+    #[test]
+    fn apply_beaconing_signals_flags_regular_network_traffic() {
+        let timestamps = [
+            "2024-01-01T00:00:00Z",
+            "2024-01-01T00:05:00Z",
+            "2024-01-01T00:10:00Z",
+            "2024-01-01T00:15:00Z",
+            "2024-01-01T00:20:00Z",
+            "2024-01-01T00:25:00Z",
+        ];
+        let mut all: Vec<serde_json::Value> = timestamps
+            .iter()
+            .map(|&ts| json!({
+                "source_table": "network",
+                "app_id": 55_i64,
+                "timestamp": ts,
+                "bytes_sent": 1024_u64,
+                "bytes_recv": 512_u64,
+            }))
+            .collect();
+        apply_beaconing_signals(&mut all);
+        assert!(all.iter().all(|v| v["beaconing"] == json!(true)));
+    }
+
+    #[test]
+    fn apply_notification_c2_signal_flags_high_count_with_background_cpu() {
+        let mut all = vec![
+            json!({
+                "source_table": "notifications",
+                "app_id": 7_i64,
+                "timestamp": "2024-01-01T00:00:00Z",
+                "notification_count": 15_u64,
+            }),
+            json!({
+                "source_table": "apps",
+                "app_id": 7_i64,
+                "timestamp": "2024-01-01T00:00:00Z",
+                "background_cycles": 1_000_000_u64,
+                "foreground_cycles": 0_u64,
+                "focus_time_ms": 0_u64,
+            }),
+        ];
+        apply_notification_c2_signal(&mut all);
+        assert_eq!(all[1]["notification_c2"], json!(true));
+    }
 }

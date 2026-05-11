@@ -189,4 +189,14 @@ mod tests {
         assert_eq!(v["user_name"], json!("S-1-5-18"));
         assert_eq!(v["account_type"], json!("system"));
     }
+
+    #[test]
+    fn enrich_injects_masquerade_candidate_flag() {
+        #[derive(Serialize)]
+        struct R { app_id: i32 }
+        let mut id_map = std::collections::HashMap::new();
+        id_map.insert(7, r"C:\Users\User\AppData\Local\svch0st.exe".to_owned());
+        let v = enrich(R { app_id: 7 }, &id_map);
+        assert_eq!(v["masquerade_candidate"], json!(true));
+    }
 }
