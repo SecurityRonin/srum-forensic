@@ -4,8 +4,8 @@ mod fixtures;
 
 use ese_core::{DB_STATE_CLEAN_SHUTDOWN, DB_STATE_DIRTY_SHUTDOWN};
 use ese_integrity::{
-    check_dirty_state, detect_timestamp_skew, find_deleted_records, scan_slack_regions,
-    verify_page_checksums, EseStructuralAnomaly, Severity,
+    check_dirty_state, detect_autoinc_gaps, detect_timestamp_skew, find_deleted_records,
+    scan_slack_regions, verify_page_checksums, EseStructuralAnomaly, Severity,
 };
 
 // ── check_dirty_state ────────────────────────────────────────────────────────
@@ -331,5 +331,44 @@ fn deleted_record_present_severity_is_warning() {
         page_number: 1,
         tag_index: 0,
     };
+    assert_eq!(a.severity(), Severity::Warning);
+}
+
+// ── detect_autoinc_gaps (Phase 4, stories 13-16) ─────────────────────────────
+
+#[test]
+fn detect_autoinc_gaps_empty_for_contiguous_ids() {
+    let ids = vec![1i32, 2, 3, 4, 5];
+    let anomalies = detect_autoinc_gaps(&ids);
+    assert!(
+        anomalies.is_empty(),
+        "contiguous AutoIncIds must produce no anomaly"
+    );
+}
+
+#[test]
+fn detect_autoinc_gaps_detects_single_gap() {
+    // 3 → 5 is a gap (4 is missing)
+    let ids = vec![1i32, 2, 3, 5, 6];
+    let anomalies = detect_autoinc_gaps(&ids);
+    let found = anomalies
+        .iter()
+        .any(|a| matches!(a, EseStructuralAnomaly::AutoIncIdGap { prev: 3, next: 5 }));
+    assert!(found, "gap between 3 and 5 must produce AutoIncIdGap {{ prev:3, next:5 }}");
+}
+
+#[test]
+fn detect_autoinc_gaps_empty_for_single_element() {
+    let ids = vec![42i32];
+    let anomalies = detect_autoinc_gaps(&ids);
+    assert!(
+        anomalies.is_empty(),
+        "single element produces no gaps"
+    );
+}
+
+#[test]
+fn autoinc_id_gap_severity_is_warning() {
+    let a = EseStructuralAnomaly::AutoIncIdGap { prev: 3, next: 5 };
     assert_eq!(a.severity(), Severity::Warning);
 }

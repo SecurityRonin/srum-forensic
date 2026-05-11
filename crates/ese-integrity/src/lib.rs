@@ -82,6 +82,17 @@ pub enum EseStructuralAnomaly {
         declared_pages: u32,
         actual_pages: u32,
     },
+    /// One or more AutoIncId values are missing from a contiguous sequence.
+    ///
+    /// A gap between `prev` and `next` (non-adjacent integers) indicates that
+    /// records were deleted without leaving a deleted-tag marker — either via
+    /// bulk deletion or external manipulation of the ESE store.
+    AutoIncIdGap {
+        /// The AutoIncId immediately before the gap.
+        prev: i32,
+        /// The AutoIncId immediately after the gap.
+        next: i32,
+    },
     /// A record tag has the deleted-record flag set (bit 29 of the tag word).
     ///
     /// Deleted records are not immediately zeroed; the raw bytes often persist
@@ -107,6 +118,7 @@ impl EseStructuralAnomaly {
             Self::MissingSrumTable { .. } => Severity::Warning,
             Self::TruncatedDatabase { .. } => Severity::Critical,
             Self::DeletedRecordPresent { .. } => Severity::Warning,
+            Self::AutoIncIdGap { .. } => Severity::Warning,
         }
     }
 
