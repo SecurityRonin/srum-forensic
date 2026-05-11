@@ -1028,3 +1028,225 @@ New capabilities:
 | srum-parser | `src/filetime.rs` | NEW |
 | srum-parser | `src/(energy\|connectivity\|timeline\|wireless\|push\|generic).rs` | NEW |
 | sr-cli | `src/main.rs` | EXTEND |
+
+---
+
+## 18. ESE Integrity Hardening — Severity Stratification + Expanded Anomaly Coverage
+
+Modelled on `vhdx-forensic`'s `VhdxIntegrityAnomaly::severity()` and `WinevtIntegrity` unified analyser pattern. **Scope: detection and robustness only — no repair.**
+
+ESE databases (including SRUM's `SRUDB.dat`) are frequent targets of anti-forensic manipulation. The existing `ese-integrity` crate has three anomaly variants but lacks severity stratification, a unified entry-point analyser, and coverage of the two highest-value structural checks: per-page checksum validation and B-tree consistency.
+
+---
+
+### Phase 18-A — `Severity` enum + `severity()` on `EseStructuralAnomaly`
+
+**Crate:** `ese-integrity`  
+**File modified:** `crates/ese-integrity/src/lib.rs`
+
+Add `Severity` enum (identical definition to `vhdx-forensic`'s `Severity`; no shared dep — each crate owns its own copy per the no-cross-crate-import rule):
+
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Severity {
+    /// Consistent with legitimate operation; worth noting.
+    Info,
+    /// Suspicious; plausible legitimate explanation but warrants investigation.
+    Warning,
+    /// Strong indicator of tampering or structural corruption.
+    Error,
+    /// Database cannot be reliably decoded; forensic conclusions unsupported.
+    Critical,
+}
+```
+
+Implement `EseStructuralAnomaly::severity()`:
+
+| Anomaly | Severity | Rationale |
+|---|---|---|
+| `DirtyDatabase` | Info | Expected from live captures; normal unclean shutdown; not an attack signal on its own |
+| `TimestampSkew` | Error | Page newer than file header: bypasses normal write path — strong indicator of manual manipulation |
+| `SlackRegionData` | Warning | Residual deleted-record fragments; forensically interesting but not definitively malicious |
+
+Add severity filtering helper:
+
+```rust
+impl EseStructuralAnomaly {
+    pub fn severity(&self) -> Severity { ... }
+    pub fn at_least(&self, min: Severity) -> bool {
+        self.severity() >= min
+    }
+}
+```
+
+**New anomaly variants added in Phase 18-A:**
+
+```rust
+/// The XOR or ECC checksum stored in the page header does not match
+/// the recomputed checksum over page bytes. Bytes changed after write.
+PageChecksumMismatch {
+    page_number: u32,
+    expected: u32,
+    actual: u32,
+},
+
+/// A B-tree node's sibling-page pointer chain is broken: the declared
+/// next/previous page does not reciprocate the link.
+BTreeLinkBroken {
+    page_number: u32,
+    /// Page number that was supposed to link back.
+    broken_sibling: u32,
+},
+
+/// A page is reachable via the B-tree but its `page_flags` are
+/// inconsistent with its position (e.g. leaf flag set on an internal node).
+PageFlagInconsistency {
+    page_number: u32,
+    flags: u16,
+    context: &'static str,
+},
+
+/// A SRUM table identified by GUID in the catalog is referenced by
+/// a record but no corresponding B-tree root page can be found.
+OrphanedSrumTable {
+    table_guid: String,
+},
+
+/// A required SRUM table (known GUID from forensicnomicon) is absent
+/// from the catalog — the table was deleted or never populated.
+MissingSrumTable {
+    table_guid: &'static str,
+    table_name: &'static str,
+},
+
+/// The file ends before the declared page count implies. The database
+/// was truncated — either during acquisition or deliberately.
+TruncatedDatabase {
+    declared_pages: u32,
+    actual_pages: u32,
+},
+```
+
+Severity for new variants:
+
+| New Anomaly | Severity | Rationale |
+|---|---|---|
+| `PageChecksumMismatch` | Error | ESE page checksums are always computed at write; mismatch means bytes changed post-write |
+| `BTreeLinkBroken` | Error | Broken sibling links indicate structural surgery — cannot occur from normal I/O |
+| `PageFlagInconsistency` | Warning | May indicate partial write or deliberate tree restructuring |
+| `OrphanedSrumTable` | Warning | Catalog references a tree that no longer exists — normal table drop or deliberate erasure |
+| `MissingSrumTable` | Warning | Expected SRUM table absent — may indicate selective log clearing |
+| `TruncatedDatabase` | Critical | Cannot decode; declared extent exceeds file; acquisition error or deliberate truncation |
+
+**TDD plan — Phase 18-A:**
+
+RED commit: Add stub `Severity` enum; add stub `severity()` returning `Severity::Info` for all variants; add new variant stubs with empty detection bodies; write tests asserting exact severity for every variant (old and new).
+
+GREEN commit: Implement `severity()` per table above; implement detection logic for new variants.
+
+---
+
+### Phase 18-B — `EseIntegrity` unified analyser
+
+**Crate:** `ese-integrity`  
+**File modified:** `crates/ese-integrity/src/lib.rs`
+
+Add a single entry-point struct analogous to `VhdxIntegrity`:
+
+```rust
+/// Read-only forensic analyser for a raw ESE database byte buffer.
+///
+/// Operates directly on raw bytes so it can detect anomalies that would
+/// prevent normal parsing (bad checksums, missing pages, truncation).
+pub struct EseIntegrity<'a> {
+    data: &'a [u8],
+}
+
+impl<'a> EseIntegrity<'a> {
+    pub fn new(data: &'a [u8]) -> Self { ... }
+
+    /// Run all checks and return every detected anomaly.
+    /// Returns an empty Vec for a structurally sound database.
+    pub fn analyse(&self) -> Vec<EseStructuralAnomaly> { ... }
+
+    // Layer-specific checks (also public for targeted use):
+    pub fn check_header(&self) -> Vec<EseStructuralAnomaly> { ... }
+    pub fn check_pages(&self) -> Vec<EseStructuralAnomaly> { ... }       // checksums, timestamps, flags
+    pub fn check_btree(&self) -> Vec<EseStructuralAnomaly> { ... }       // sibling links
+    pub fn check_catalog(&self) -> Vec<EseStructuralAnomaly> { ... }     // orphaned/missing tables
+    pub fn check_layout(&self) -> Vec<EseStructuralAnomaly> { ... }      // truncation
+}
+```
+
+`analyse()` short-circuits after `Critical` findings (analogous to `VhdxIntegrity::analyse()` halting after `ContainerTruncated`): if `check_layout()` returns `TruncatedDatabase`, the page and B-tree checks are skipped (they would produce false positives on missing pages).
+
+`check_layout()` runs first; if the buffer is smaller than `ESE_HEADER_SIZE` (8192 bytes for the dual-shadow header), `analyse()` returns a single `TruncatedDatabase` immediately.
+
+**Severity-gated filtering helper:**
+
+```rust
+pub fn anomalies_at_least(anomalies: &[EseStructuralAnomaly], min: Severity) -> Vec<&EseStructuralAnomaly> {
+    anomalies.iter().filter(|a| a.at_least(min)).collect()
+}
+```
+
+**TDD plan — Phase 18-B:**
+
+RED commit: Add `EseIntegrity` stub returning empty `Vec`; write tests for unified API (empty buffer returns `TruncatedDatabase`; clean minimal database returns empty vec; page with bad checksum returns `PageChecksumMismatch`).
+
+GREEN commit: Implement `analyse()` by composing layer checks; implement `check_layout()` truncation guard; implement `check_pages()` page-checksum loop using existing `ese-core` checksum functions.
+
+---
+
+### Phase 18-C — Input robustness hardening
+
+**Crate:** `ese-core`  
+**Files modified:** `crates/ese-core/src/page.rs`, `crates/ese-core/src/database.rs`
+
+#### Specific robustness gaps to close
+
+**1. Page count integer overflow**
+
+`EseHeader` stores `last_page_number: u32`. Iteration multiplies by `DB_PAGE_SIZE` (4096 or 8192 for large pages). No overflow check.
+
+Fix: explicit `usize` overflow check on `page_number as usize * page_size`; return `Err` or emit `TruncatedDatabase` anomaly.
+
+**2. Page size trust**
+
+`EseHeader::page_size` is read directly as a slice offset multiplier. A crafted header with `page_size = 0` or `page_size > 32768` panics.
+
+Fix: validate `page_size ∈ {4096, 8192, 16384, 32768}` immediately after header parse; reject all other values.
+
+**3. Record offset trust within page**
+
+Tag array entries in a page contain `offset` + `size` fields. No bounds check against `DB_PAGE_SIZE`.
+
+Fix: check `offset + size <= page_bytes.len()` before slicing; return `Err` on violation.
+
+**4. Checksum algorithm selection**
+
+Two checksum variants (XOR-based legacy, ECC-based Vista+). The selection flag `PAGE_FLAG_NEW_FORMAT` may not be set on all Vista+ images. Add fallback: try both; report mismatch only if neither matches.
+
+**TDD plan — Phase 18-C:**
+
+For each gap: write a test with a crafted malformed buffer that currently panics or gives wrong output; then fix the parsing path. Tests live in `ese-core/tests/robustness_tests.rs` and `ese-integrity/tests/robustness_tests.rs`.
+
+---
+
+### Implementation order
+
+1. Phase 18-A RED → Phase 18-A GREEN (severity + new variants)
+2. Phase 18-B RED → Phase 18-B GREEN (unified analyser) — depends on Phase 18-A severity enum
+3. Phase 18-C (robustness hardening) — independent; can be done in parallel with 18-B
+
+### Files to create / modify (Phase 18)
+
+| Action | Path | Purpose |
+|---|---|---|
+| Modify | `crates/ese-integrity/src/lib.rs` | Add `Severity`, `severity()`, 6 new anomaly variants, `EseIntegrity` struct |
+| Create | `crates/ese-core/tests/robustness_tests.rs` | Malformed input tests for page/header parsing |
+| Create | `crates/ese-integrity/tests/robustness_tests.rs` | Malformed input tests for unified analyser |
+
+### What is deliberately excluded
+
+**No `ese-repair` crate.** ESE databases have a dual-shadow header (shadow copy at page 1), which is the only structurally repairable component. However, rewriting evidence file checksums or page-level bytes without an out-of-band reference is forensically dangerous. Detection and documentation of the anomaly is the correct forensic response. Callers who need working-but-annotated data can use `ese-carver` for page-level recovery.
