@@ -1,14 +1,11 @@
 //! Integration tests for ese-integrity structural anomaly detection.
-//!
-//! Tests [`ese_integrity::check_dirty_state`], [`ese_integrity::detect_timestamp_skew`],
-//! [`ese_integrity::scan_slack_regions`], and [`ese_integrity::verify_page_checksums`].
 
 mod fixtures;
 
 use ese_core::{DB_STATE_CLEAN_SHUTDOWN, DB_STATE_DIRTY_SHUTDOWN};
 use ese_integrity::{
-    check_dirty_state, detect_timestamp_skew, scan_slack_regions, verify_page_checksums,
-    EseStructuralAnomaly, Severity,
+    check_dirty_state, detect_timestamp_skew, find_deleted_records, scan_slack_regions,
+    verify_page_checksums, EseStructuralAnomaly, Severity,
 };
 
 // ── check_dirty_state ────────────────────────────────────────────────────────
@@ -285,4 +282,54 @@ fn slack_detected_for_page_with_residual_bytes() {
         found,
         "page with non-zero slack must produce SlackRegionData"
     );
+}
+
+// ── find_deleted_records (Phase 4, stories 9-12) ─────────────────────────────
+
+#[test]
+fn find_deleted_records_empty_for_database_with_no_deleted_records() {
+    // A freshly built page has no deleted tags — must return empty.
+    let tmp = fixtures::make_ese_with_db_state(DB_STATE_CLEAN_SHUTDOWN);
+    let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
+    let anomalies = find_deleted_records(&db);
+    assert!(
+        anomalies.is_empty(),
+        "database with no deleted records must produce no anomaly"
+    );
+}
+
+#[test]
+fn find_deleted_records_detects_deleted_tag() {
+    // Page with a tag that has bit 29 (the deleted-record flag) set.
+    let tmp = fixtures::make_ese_with_deleted_record();
+    let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
+    let anomalies = find_deleted_records(&db);
+    let found = anomalies
+        .iter()
+        .any(|a| matches!(a, EseStructuralAnomaly::DeletedRecordPresent { .. }));
+    assert!(found, "page with deleted tag must produce DeletedRecordPresent");
+}
+
+#[test]
+fn find_deleted_records_carries_correct_page_number() {
+    let tmp = fixtures::make_ese_with_deleted_record();
+    let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
+    let anomalies = find_deleted_records(&db);
+    let found = anomalies.iter().any(|a| {
+        matches!(
+            a,
+            EseStructuralAnomaly::DeletedRecordPresent { page_number, .. }
+                if page_number == 1
+        )
+    });
+    assert!(found, "deleted record on page 1 must carry page_number == 1");
+}
+
+#[test]
+fn deleted_record_present_severity_is_warning() {
+    let a = EseStructuralAnomaly::DeletedRecordPresent {
+        page_number: 1,
+        tag_index: 0,
+    };
+    assert_eq!(a.severity(), Severity::Warning);
 }

@@ -82,6 +82,15 @@ pub enum EseStructuralAnomaly {
         declared_pages: u32,
         actual_pages: u32,
     },
+    /// A record tag has the deleted-record flag set (bit 29 of the tag word).
+    ///
+    /// Deleted records are not immediately zeroed; the raw bytes often persist
+    /// and can contain recoverable data or evidence of prior state.
+    DeletedRecordPresent {
+        page_number: u32,
+        /// 0-based tag index within the page's tag array.
+        tag_index: usize,
+    },
 }
 
 impl EseStructuralAnomaly {
@@ -97,6 +106,7 @@ impl EseStructuralAnomaly {
             Self::OrphanedSrumTable { .. } => Severity::Warning,
             Self::MissingSrumTable { .. } => Severity::Warning,
             Self::TruncatedDatabase { .. } => Severity::Critical,
+            Self::DeletedRecordPresent { .. } => Severity::Warning,
         }
     }
 

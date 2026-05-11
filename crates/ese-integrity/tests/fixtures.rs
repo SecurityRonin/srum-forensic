@@ -43,6 +43,45 @@ pub fn make_ese_with_slack_bytes(slack: &[u8]) -> NamedTempFile {
         .write()
 }
 
+/// ESE file with a leaf page that has one "live" record and one deleted record.
+///
+/// ESE marks deleted records by setting bit 29 (`0x2000_0000`) of the tag
+/// word. The size field occupies bits 16-30, so bit 13 of the size nibble
+/// carries the deleted flag.  Here we build the tag manually:
+///   offset = 40 (right after page header), size = 4 (bytes), deleted = 1
+///   → tag_raw = (40 & 0x7FFF) | ((4 | 0x2000) << 16) = 0x2004_0028
+pub fn make_ese_with_deleted_record() -> NamedTempFile {
+    let mut data_page = vec![0u8; PAGE_SIZE];
+    // Page flags at 0x20: leaf
+    data_page[0x20..0x24].copy_from_slice(&ese_core::PAGE_FLAG_LEAF.to_le_bytes());
+    // Sibling links: 0xFFFFFFFF = no sibling
+    data_page[0x0C..0x10].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+    data_page[0x10..0x14].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+
+    // Record payload at offset 40 (after 40-byte header)
+    let payload = [0xAA, 0xBB, 0xCC, 0xDD];
+    data_page[40..44].copy_from_slice(&payload);
+
+    // Tag count = 2 (tag0 = header, tag1 = deleted record)
+    data_page[0x1E..0x20].copy_from_slice(&2u16.to_le_bytes());
+
+    // Tag 0 (page header placeholder): offset=0, size=40
+    let tag0_raw: u32 = (40u32 & 0x7FFF) << 16;
+    let t0_pos = PAGE_SIZE - 4;
+    data_page[t0_pos..t0_pos + 4].copy_from_slice(&tag0_raw.to_le_bytes());
+
+    // Tag 1 (deleted record): offset=40, size=4, deleted-bit set in size field
+    // size_with_flag = 4 | 0x2000 = 0x2004
+    let tag1_raw: u32 = (40u32 & 0x7FFF) | ((0x2004u32 & 0x7FFF) << 16);
+    let t1_pos = PAGE_SIZE - 8;
+    data_page[t1_pos..t1_pos + 4].copy_from_slice(&tag1_raw.to_le_bytes());
+
+    EseFileBuilder::new()
+        .with_db_state(ese_core::DB_STATE_CLEAN_SHUTDOWN)
+        .add_page(data_page)
+        .write()
+}
+
 /// ESE file where page 1 has a non-zero but incorrect XOR checksum.
 ///
 /// An all-zero page body gives `computed = XOR_SEED (0x89ABCDEF)`.
