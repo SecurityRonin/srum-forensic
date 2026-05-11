@@ -87,8 +87,17 @@ pub enum EseStructuralAnomaly {
 impl EseStructuralAnomaly {
     /// Return the forensic severity of this anomaly.
     pub fn severity(&self) -> Severity {
-        // RED STUB: returns Info for every variant so severity tests fail.
-        Severity::Info
+        match self {
+            Self::DirtyDatabase { .. } => Severity::Info,
+            Self::TimestampSkew { .. } => Severity::Error,
+            Self::SlackRegionData { .. } => Severity::Warning,
+            Self::PageChecksumMismatch { .. } => Severity::Error,
+            Self::BTreeLinkBroken { .. } => Severity::Error,
+            Self::PageFlagInconsistency { .. } => Severity::Warning,
+            Self::OrphanedSrumTable { .. } => Severity::Warning,
+            Self::MissingSrumTable { .. } => Severity::Warning,
+            Self::TruncatedDatabase { .. } => Severity::Critical,
+        }
     }
 
     /// Return `true` if this anomaly's severity is at least `min`.
