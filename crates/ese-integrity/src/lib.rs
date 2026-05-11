@@ -106,6 +106,32 @@ impl EseStructuralAnomaly {
     }
 }
 
+/// Minimum number of bytes required for a parseable ESE database.
+///
+/// ESE stores a primary header at page 0 and a shadow copy at page 1.
+/// Both must be present for reliable header reconstruction: `2 × 4096 = 8192`.
+const ESE_MIN_BYTES: usize = 8192;
+
+/// ESE header page size used when the `page_size` field cannot be parsed.
+const ESE_DEFAULT_PAGE_SIZE: usize = 4096;
+
+/// XOR checksum seed used by the Vista+ page checksum algorithm.
+const XOR_CHECKSUM_SEED: u32 = 0x89AB_CDEF;
+
+/// Compute the ESE XOR page checksum for `page_data`.
+///
+/// The stored checksum is at offset 0 (4 bytes). The algorithm XORs all
+/// subsequent 4-byte words starting at offset 4, seeded with
+/// [`XOR_CHECKSUM_SEED`]. Data beyond the last full word is ignored.
+fn xor_page_checksum(page_data: &[u8]) -> u32 {
+    let mut csum = XOR_CHECKSUM_SEED;
+    let words = &page_data[4..];
+    for chunk in words.chunks_exact(4) {
+        csum ^= u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+    }
+    csum
+}
+
 /// Read-only forensic analyser for a raw ESE database byte buffer.
 ///
 /// Operates directly on raw bytes so it can detect anomalies that would
@@ -125,35 +151,151 @@ impl<'a> EseIntegrity<'a> {
     /// Run all checks and return every detected anomaly.
     ///
     /// Returns an empty `Vec` for a structurally sound database.
-    /// Short-circuits after any `Critical` finding.
+    /// Short-circuits after any `Critical` finding (e.g. `TruncatedDatabase`).
     pub fn analyse(&self) -> Vec<EseStructuralAnomaly> {
-        // RED STUB: always returns empty Vec so TruncatedDatabase tests fail.
-        Vec::new()
+        let mut anomalies = self.check_layout();
+        // Short-circuit: if any Critical anomaly was found, page/btree/catalog
+        // checks would produce false positives on missing or unreadable pages.
+        let has_critical = anomalies.iter().any(|a| a.severity() == Severity::Critical);
+        if has_critical {
+            return anomalies;
+        }
+        anomalies.extend(self.check_header());
+        anomalies.extend(self.check_pages());
+        anomalies.extend(self.check_btree());
+        anomalies.extend(self.check_catalog());
+        anomalies
     }
 
     /// Check for database layout problems (truncation).
+    ///
+    /// Returns `TruncatedDatabase` if the buffer is smaller than
+    /// [`ESE_MIN_BYTES`] or shorter than the declared page count implies.
     pub fn check_layout(&self) -> Vec<EseStructuralAnomaly> {
+        if self.data.len() < ESE_MIN_BYTES {
+            let actual_pages = u32::try_from(self.data.len() / ESE_DEFAULT_PAGE_SIZE)
+                .unwrap_or(u32::MAX);
+            // Try to read declared page count from header; fall back to 0.
+            let declared_pages = self.try_read_declared_pages().unwrap_or(0);
+            return vec![EseStructuralAnomaly::TruncatedDatabase {
+                declared_pages,
+                actual_pages,
+            }];
+        }
+        // Check that the file is at least as large as the declared page count.
+        let page_size = self.try_read_page_size().unwrap_or(ESE_DEFAULT_PAGE_SIZE);
+        if let Some(declared) = self.try_read_declared_pages() {
+            let expected_bytes = (declared as usize).saturating_mul(page_size);
+            if expected_bytes > self.data.len() {
+                let actual_pages =
+                    u32::try_from(self.data.len() / page_size).unwrap_or(u32::MAX);
+                return vec![EseStructuralAnomaly::TruncatedDatabase {
+                    declared_pages: declared,
+                    actual_pages,
+                }];
+            }
+        }
         Vec::new()
     }
 
-    /// Check page-level integrity (checksums, timestamps, flags).
+    /// Check page-level integrity (XOR checksums).
+    ///
+    /// For each data page, verifies the stored XOR checksum at offset 0
+    /// against the computed value. Pages where the stored checksum is 0 are
+    /// treated as "unchecked" and skipped (common for empty/synthetic pages).
     pub fn check_pages(&self) -> Vec<EseStructuralAnomaly> {
-        Vec::new()
+        let page_size = self.try_read_page_size().unwrap_or(ESE_DEFAULT_PAGE_SIZE);
+        if page_size < 4 {
+            return Vec::new();
+        }
+        let mut anomalies = Vec::new();
+        // Skip page 0 (the file header page itself, which has its own checksum scheme).
+        for page_number in 1.. {
+            let start = (page_number as usize).saturating_mul(page_size);
+            let end = start.saturating_add(page_size);
+            if end > self.data.len() {
+                break;
+            }
+            let page_data = &self.data[start..end];
+            let stored = u32::from_le_bytes([
+                page_data[0],
+                page_data[1],
+                page_data[2],
+                page_data[3],
+            ]);
+            // 0 = checksum field not populated; skip to avoid false positives.
+            if stored == 0 {
+                continue;
+            }
+            if page_data.len() < 8 {
+                continue;
+            }
+            let computed = xor_page_checksum(page_data);
+            if computed != stored {
+                anomalies.push(EseStructuralAnomaly::PageChecksumMismatch {
+                    page_number: page_number as u32,
+                    expected: computed,
+                    actual: stored,
+                });
+            }
+        }
+        anomalies
     }
 
     /// Check B-tree sibling link consistency.
+    ///
+    /// Stub — link verification requires catalog traversal and is deferred
+    /// to a future phase. Returns an empty `Vec`.
     pub fn check_btree(&self) -> Vec<EseStructuralAnomaly> {
         Vec::new()
     }
 
     /// Check catalog consistency (orphaned/missing SRUM tables).
+    ///
+    /// Stub — catalog traversal requires full B-tree walk and is deferred
+    /// to a future phase. Returns an empty `Vec`.
     pub fn check_catalog(&self) -> Vec<EseStructuralAnomaly> {
         Vec::new()
     }
 
-    /// Check header fields (dirty state, page size validity).
+    /// Check header fields (dirty state reported via [`check_dirty_state`]).
+    ///
+    /// Stub — the caller can use [`check_dirty_state`] directly on an
+    /// `EseDatabase`. Returns an empty `Vec`.
     pub fn check_header(&self) -> Vec<EseStructuralAnomaly> {
         Vec::new()
+    }
+
+    // ── private helpers ──────────────────────────────────────────────────────
+
+    fn try_read_page_size(&self) -> Option<usize> {
+        if self.data.len() < 240 {
+            return None;
+        }
+        let raw =
+            u32::from_le_bytes([self.data[236], self.data[237], self.data[238], self.data[239]]);
+        if raw == 0 {
+            Some(ESE_DEFAULT_PAGE_SIZE)
+        } else {
+            Some(raw as usize)
+        }
+    }
+
+    fn try_read_declared_pages(&self) -> Option<u32> {
+        // ESE header `last_page_number` is at offset 0x1C8 (456) in the header page.
+        // It stores the highest page number used, which equals page_count - 1.
+        // We return page_count = last_page_number + 1.
+        const LAST_PAGE_OFFSET: usize = 0x1C8;
+        if self.data.len() < LAST_PAGE_OFFSET + 4 {
+            return None;
+        }
+        let last = u32::from_le_bytes([
+            self.data[LAST_PAGE_OFFSET],
+            self.data[LAST_PAGE_OFFSET + 1],
+            self.data[LAST_PAGE_OFFSET + 2],
+            self.data[LAST_PAGE_OFFSET + 3],
+        ]);
+        Some(last.saturating_add(1))
     }
 }
 

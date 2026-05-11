@@ -8,10 +8,6 @@ mod fixtures;
 
 use ese_integrity::{anomalies_at_least, EseIntegrity, EseStructuralAnomaly, Severity};
 
-/// Minimum dual-shadow-header size required for a parseable ESE database.
-/// Primary header at page 0 (4096 bytes) + shadow header at page 1 (4096 bytes).
-const ESE_MIN_SIZE: usize = 8192;
-
 // ── check_layout / TruncatedDatabase ────────────────────────────────────────
 
 #[test]
@@ -90,11 +86,22 @@ fn page_with_bad_checksum_returns_checksum_mismatch() {
 fn minimal_valid_database_has_no_anomalies() {
     // EseFileBuilder creates pages with all-zero checksums (unchecked).
     // EseIntegrity skips checksum verification when the stored checksum is 0.
+    // We include one data page so the file meets the 8192-byte dual-shadow minimum.
+    use ese_test_fixtures::{EseFileBuilder, PageBuilder, PAGE_SIZE};
     use std::io::Read as _;
-    let tmp = fixtures::make_ese_with_db_state(ese_core::DB_STATE_CLEAN_SHUTDOWN);
+    let data_page = PageBuilder::new(PAGE_SIZE).leaf().build();
+    let tmp = EseFileBuilder::new()
+        .with_db_state(ese_core::DB_STATE_CLEAN_SHUTDOWN)
+        .add_page(data_page)
+        .write();
     let mut file = std::fs::File::open(tmp.path()).expect("open");
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes).expect("read");
+    assert!(
+        bytes.len() >= 8192,
+        "fixture must be at least 8192 bytes (got {})",
+        bytes.len()
+    );
 
     let anomalies = EseIntegrity::new(&bytes).analyse();
     let errors_or_above: Vec<_> = anomalies_at_least(&anomalies, Severity::Error);
