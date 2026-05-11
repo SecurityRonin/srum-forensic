@@ -362,6 +362,30 @@ pub fn verify_page_checksums(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
     anomalies
 }
 
+/// Detect non-adjacent AutoIncId values in a sorted (or unsorted) id slice.
+///
+/// Any pair of adjacent elements where `next > prev + 1` indicates that one or
+/// more records were removed without leaving an in-place deleted-tag marker.
+/// The input does not need to be pre-sorted; this function sorts a copy internally.
+pub fn detect_autoinc_gaps(ids: &[i32]) -> Vec<EseStructuralAnomaly> {
+    if ids.len() < 2 {
+        return Vec::new();
+    }
+    let mut sorted = ids.to_vec();
+    sorted.sort_unstable();
+    sorted
+        .windows(2)
+        .filter_map(|w| {
+            let (prev, next) = (w[0], w[1]);
+            if next > prev + 1 {
+                Some(EseStructuralAnomaly::AutoIncIdGap { prev, next })
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 /// Scan every data page for tags that have the deleted-record flag set.
 ///
 /// ESE marks deleted records in-place: bit 29 (`0x2000_0000`) of the raw
