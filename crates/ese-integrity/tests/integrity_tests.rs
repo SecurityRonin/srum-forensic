@@ -240,7 +240,7 @@ fn verify_page_checksums_mismatch_carries_correct_page_number() {
         matches!(
             a,
             EseStructuralAnomaly::PageChecksumMismatch { page_number, .. }
-                if page_number == 1
+                if *page_number == 1
         )
     });
     assert!(found, "mismatch on page 1 must report page_number == 1");

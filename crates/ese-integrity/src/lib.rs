@@ -299,6 +299,47 @@ impl<'a> EseIntegrity<'a> {
     }
 }
 
+/// Verify the XOR page checksum for every data page in `db`.
+///
+/// Pages where the stored checksum at bytes `[0..4]` is zero are treated as
+/// "unchecked" (common for empty or synthetic pages) and skipped silently.
+/// For all other pages the stored value is compared against the XOR checksum
+/// recomputed over bytes `[4..]`; a mismatch produces [`PageChecksumMismatch`].
+///
+/// Note: this function uses the simple XOR algorithm. ECC-format pages (Vista+
+/// with non-zero bytes at `[4..8]`) are treated the same way — if the stored
+/// XOR word at `[0..4]` is non-zero and wrong, the page is still flagged.
+pub fn verify_page_checksums(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
+    let page_count = db.page_count();
+    let mut anomalies = Vec::new();
+    for page_number in 1..u32::try_from(page_count).unwrap_or(u32::MAX) {
+        let Ok(page) = db.read_page(page_number) else {
+            continue;
+        };
+        if page.data.len() < 8 {
+            continue;
+        }
+        let stored = u32::from_le_bytes([
+            page.data[0],
+            page.data[1],
+            page.data[2],
+            page.data[3],
+        ]);
+        if stored == 0 {
+            continue;
+        }
+        let computed = xor_page_checksum(&page.data);
+        if computed != stored {
+            anomalies.push(EseStructuralAnomaly::PageChecksumMismatch {
+                page_number,
+                expected: computed,
+                actual: stored,
+            });
+        }
+    }
+    anomalies
+}
+
 /// Filter `anomalies` to those at or above `min` severity.
 pub fn anomalies_at_least<'a>(
     anomalies: &'a [EseStructuralAnomaly],
