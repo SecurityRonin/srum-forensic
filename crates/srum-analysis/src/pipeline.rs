@@ -169,7 +169,7 @@ pub fn apply_cross_table_signals(all: &mut Vec<serde_json::Value>) {
                 v.get("app_id").and_then(serde_json::Value::as_i64),
                 v.get("timestamp").and_then(serde_json::Value::as_str).map(str::to_owned),
                 v.get("bytes_sent").and_then(serde_json::Value::as_u64),
-                v.get("bytes_received").and_then(serde_json::Value::as_u64),
+                v.get("bytes_recv").and_then(serde_json::Value::as_u64),
             ) {
                 net_map.insert((app_id, ts), (sent, recv));
             }
