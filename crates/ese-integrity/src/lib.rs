@@ -82,6 +82,19 @@ pub enum EseStructuralAnomaly {
         declared_pages: u32,
         actual_pages: u32,
     },
+    /// A catalog entry references a B-tree root page that falls beyond the
+    /// declared page count (i.e. the page does not exist in the file).
+    ///
+    /// This can indicate a partially written or deliberately truncated database
+    /// where the catalog was updated but the corresponding data pages were not.
+    OrphanedCatalogEntry {
+        /// Name of the catalog entry (table or index name).
+        object_name: String,
+        /// The root page number that the catalog declares.
+        declared_page: u32,
+        /// The highest valid page index in the file.
+        last_valid_page: u32,
+    },
     /// One or more AutoIncId values are missing from a contiguous sequence.
     ///
     /// A gap between `prev` and `next` (non-adjacent integers) indicates that
@@ -119,6 +132,7 @@ impl EseStructuralAnomaly {
             Self::TruncatedDatabase { .. } => Severity::Critical,
             Self::DeletedRecordPresent { .. } => Severity::Warning,
             Self::AutoIncIdGap { .. } => Severity::Warning,
+            Self::OrphanedCatalogEntry { .. } => Severity::Error,
         }
     }
 

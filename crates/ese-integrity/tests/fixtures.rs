@@ -1,6 +1,7 @@
 //! Thin fixture wrappers over [`ese_test_fixtures`] for ese-integrity tests.
 #![allow(dead_code)]
 
+use ese_core::CatalogEntry;
 use ese_test_fixtures::{EseFileBuilder, PageBuilder, PAGE_SIZE};
 use tempfile::NamedTempFile;
 
@@ -79,6 +80,31 @@ pub fn make_ese_with_deleted_record() -> NamedTempFile {
     EseFileBuilder::new()
         .with_db_state(ese_core::DB_STATE_CLEAN_SHUTDOWN)
         .add_page(data_page)
+        .write()
+}
+
+/// ESE file with a catalog entry (at page 4) pointing to a non-existent page.
+///
+/// Layout: page 0 = header, pages 1-3 = blank, page 4 = catalog leaf.
+/// Total = 5 pages; the catalog entry references page 100 → orphaned.
+pub fn make_ese_with_orphaned_catalog_entry() -> NamedTempFile {
+    let entry = CatalogEntry {
+        object_type: 1,
+        object_id: 2,
+        parent_object_id: 1,
+        table_page: 100,
+        object_name: "OrphanedTable".to_owned(),
+    };
+    let catalog_leaf = PageBuilder::new(PAGE_SIZE)
+        .leaf()
+        .add_record(&entry.to_bytes())
+        .build();
+    let blank = vec![0u8; PAGE_SIZE];
+    EseFileBuilder::new()
+        .add_page(blank.clone()) // page 1
+        .add_page(blank.clone()) // page 2
+        .add_page(blank.clone()) // page 3
+        .add_page(catalog_leaf)  // page 4 = catalog leaf
         .write()
 }
 

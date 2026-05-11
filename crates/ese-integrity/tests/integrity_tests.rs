@@ -4,8 +4,9 @@ mod fixtures;
 
 use ese_core::{DB_STATE_CLEAN_SHUTDOWN, DB_STATE_DIRTY_SHUTDOWN};
 use ese_integrity::{
-    check_dirty_state, detect_autoinc_gaps, detect_timestamp_skew, find_deleted_records,
-    scan_slack_regions, verify_page_checksums, EseStructuralAnomaly, Severity,
+    check_dirty_state, detect_autoinc_gaps, detect_orphaned_catalog, detect_timestamp_skew,
+    find_deleted_records, scan_slack_regions, verify_page_checksums, EseStructuralAnomaly,
+    Severity,
 };
 
 // ── check_dirty_state ────────────────────────────────────────────────────────
@@ -371,4 +372,33 @@ fn detect_autoinc_gaps_empty_for_single_element() {
 fn autoinc_id_gap_severity_is_warning() {
     let a = EseStructuralAnomaly::AutoIncIdGap { prev: 3, next: 5 };
     assert_eq!(a.severity(), Severity::Warning);
+}
+
+// ── detect_orphaned_catalog (Phase 4, stories 17-18) ─────────────────────────
+
+#[test]
+fn detect_orphaned_catalog_empty_for_database_with_no_catalog_entries() {
+    // A minimal fixture has no page 4 → catalog_entries() fails → empty result.
+    let tmp = fixtures::make_ese_with_db_state(DB_STATE_CLEAN_SHUTDOWN);
+    let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
+    let anomalies = detect_orphaned_catalog(&db);
+    assert!(
+        anomalies.is_empty(),
+        "database with inaccessible catalog must produce no anomaly"
+    );
+}
+
+#[test]
+fn detect_orphaned_catalog_reports_orphan_when_table_page_is_out_of_bounds() {
+    // Catalog entry references page 100; file only has 5 pages → orphaned.
+    let tmp = fixtures::make_ese_with_orphaned_catalog_entry();
+    let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
+    let anomalies = detect_orphaned_catalog(&db);
+    let found = anomalies
+        .iter()
+        .any(|a| matches!(a, EseStructuralAnomaly::OrphanedCatalogEntry { declared_page: 100, .. }));
+    assert!(
+        found,
+        "catalog entry with table_page=100 beyond file size must produce OrphanedCatalogEntry"
+    );
 }
