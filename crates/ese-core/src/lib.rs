@@ -20,7 +20,7 @@ pub use page::{
     EsePage, EsePageHeader, PAGE_FLAG_EMPTY, PAGE_FLAG_LEAF, PAGE_FLAG_LONG_VALUE,
     PAGE_FLAG_PARENT, PAGE_FLAG_ROOT, PAGE_FLAG_SPACE_TREE, PAGE_SIZE,
 };
-pub use record::{coltyp, decode_record, fixed_col_size, ColumnDef, EseValue};
+pub use record::{coltyp, decode_record, fixed_col_size, verify_page_checksum, ChecksumResult, ColumnDef, EseValue};
 
 /// Open an ESE database file and return the parsed header.
 ///

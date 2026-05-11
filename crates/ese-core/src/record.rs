@@ -2,6 +2,89 @@
 
 use crate::EseError;
 
+/// Result of verifying the checksum stored at the start of an ESE page.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChecksumResult {
+    /// Stored checksum matches the computed value.
+    Valid,
+    /// Legacy XOR checksum: stored value does not match computed value.
+    LegacyXorMismatch { stored: u32, computed: u32 },
+    /// Vista+ ECC checksum: the stored ECC does not match the computed ECC.
+    EccMismatch,
+    /// Stored checksum field is zero — page was never checksummed.
+    Unknown,
+}
+
+/// Verify the checksum stored at offset 0 of `page_data`.
+///
+/// ## Format detection heuristic
+///
+/// * If stored bytes 0–3 are all zero → [`ChecksumResult::Unknown`].
+/// * If stored bytes 4–7 are all zero → legacy XOR format:
+///   seed `0x89AB_CDEF` XOR'd with all 4-byte words from offset 4 onward.
+///   Mismatch → [`ChecksumResult::LegacyXorMismatch`].
+/// * If stored bytes 4–7 are non-zero → Vista+ ECC format:
+///   XOR covers bytes 8+; ECC is a column-parity code over bytes 8+.
+///   Mismatch → [`ChecksumResult::EccMismatch`].
+///
+/// `page_number` is unused in the computation but kept for diagnostic use.
+pub fn verify_page_checksum(page_data: &[u8], _page_number: u32) -> ChecksumResult {
+    if page_data.len() < 8 {
+        return ChecksumResult::Unknown;
+    }
+    let stored_xor = u32::from_le_bytes([
+        page_data[0], page_data[1], page_data[2], page_data[3],
+    ]);
+    if stored_xor == 0 {
+        return ChecksumResult::Unknown;
+    }
+    let stored_ecc = u32::from_le_bytes([
+        page_data[4], page_data[5], page_data[6], page_data[7],
+    ]);
+
+    if stored_ecc == 0 {
+        // Legacy XOR format: covers bytes 4+.
+        let computed = xor_page_checksum(&page_data[4..]);
+        if computed == stored_xor {
+            ChecksumResult::Valid
+        } else {
+            ChecksumResult::LegacyXorMismatch { stored: stored_xor, computed }
+        }
+    } else {
+        // Vista+ ECC format: XOR + column-parity ECC, both covering bytes 8+.
+        if page_data.len() < 9 {
+            return ChecksumResult::Unknown;
+        }
+        let computed_xor = xor_page_checksum(&page_data[8..]);
+        let computed_ecc = column_parity_ecc(&page_data[8..]);
+        if computed_xor == stored_xor && computed_ecc == stored_ecc {
+            ChecksumResult::Valid
+        } else {
+            ChecksumResult::EccMismatch
+        }
+    }
+}
+
+const XOR_CHECKSUM_SEED: u32 = 0x89AB_CDEF;
+
+fn xor_page_checksum(data: &[u8]) -> u32 {
+    let mut csum = XOR_CHECKSUM_SEED;
+    for chunk in data.chunks_exact(4) {
+        csum ^= u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+    }
+    csum
+}
+
+/// Column-parity ECC: XOR each word rotated by its position mod 32.
+fn column_parity_ecc(data: &[u8]) -> u32 {
+    let mut ecc: u32 = 0;
+    for (i, chunk) in data.chunks_exact(4).enumerate() {
+        let word = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        ecc ^= word.rotate_left((i % 32) as u32);
+    }
+    ecc
+}
+
 /// JET column type codes (coltyp field in MSysObjects).
 pub mod coltyp {
     pub const BIT: u8 = 1;

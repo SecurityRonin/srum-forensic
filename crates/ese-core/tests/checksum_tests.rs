@@ -5,12 +5,14 @@ use ese_core::{verify_page_checksum, ChecksumResult, PAGE_SIZE};
 /// Build a page buffer with the legacy XOR checksum correctly stored at offset 0.
 ///
 /// Seed = 0x89AB_CDEF; checksum XORs all 4-byte words from offset 4 onward.
+/// Payload is placed at offset 8+ so bytes 4-7 remain zero — this is required
+/// for the format-detection heuristic (zero bytes 4-7 ⟹ legacy, non-zero ⟹ ECC).
 fn make_page_with_correct_xor(payload: &[u8]) -> Vec<u8> {
     let mut page = vec![0u8; PAGE_SIZE];
-    // Write payload starting at offset 4, up to page size.
-    let len = payload.len().min(PAGE_SIZE - 4);
-    page[4..4 + len].copy_from_slice(&payload[..len]);
-    // Compute XOR checksum.
+    // Write payload starting at offset 8; bytes 4-7 stay zero (legacy indicator).
+    let len = payload.len().min(PAGE_SIZE - 8);
+    page[8..8 + len].copy_from_slice(&payload[..len]);
+    // Compute XOR checksum over bytes 4+ (includes the zero bytes 4-7).
     let seed: u32 = 0x89AB_CDEF;
     let mut csum = seed;
     for chunk in page[4..].chunks_exact(4) {
@@ -21,10 +23,13 @@ fn make_page_with_correct_xor(payload: &[u8]) -> Vec<u8> {
 }
 
 /// Build a page with a deliberately wrong XOR checksum.
+///
+/// Data is placed at offset 8+ (bytes 4-7 remain zero) so the heuristic
+/// correctly identifies this as legacy format before returning the mismatch.
 fn make_page_with_wrong_xor() -> Vec<u8> {
     let mut page = vec![0u8; PAGE_SIZE];
     page[0..4].copy_from_slice(&0xDEAD_BEEFu32.to_le_bytes()); // wrong stored checksum
-    page[4] = 0x01; // non-zero data so computed != stored
+    page[8] = 0x01; // non-zero data at offset 8+; bytes 4-7 stay zero (legacy indicator)
     page
 }
 
