@@ -319,7 +319,7 @@ fn find_deleted_records_carries_correct_page_number() {
         matches!(
             a,
             EseStructuralAnomaly::DeletedRecordPresent { page_number, .. }
-                if page_number == 1
+                if *page_number == 1
         )
     });
     assert!(found, "deleted record on page 1 must carry page_number == 1");

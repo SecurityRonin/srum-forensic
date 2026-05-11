@@ -350,6 +350,46 @@ pub fn verify_page_checksums(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
     anomalies
 }
 
+/// Scan every data page for tags that have the deleted-record flag set.
+///
+/// ESE marks deleted records in-place: bit 29 (`0x2000_0000`) of the raw
+/// 4-byte tag word is set without zeroing the record bytes. This function
+/// reports each such tag as [`DeletedRecordPresent`]; the caller can then
+/// attempt to recover the residual bytes from `page.data[offset..offset+size]`.
+pub fn find_deleted_records(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
+    const DELETED_FLAG: u32 = 0x2000_0000;
+    let page_count = db.page_count();
+    let mut anomalies = Vec::new();
+    for page_number in 1..u32::try_from(page_count).unwrap_or(u32::MAX) {
+        let Ok(page) = db.read_page(page_number) else {
+            continue;
+        };
+        let Ok(hdr) = page.parse_header() else {
+            continue;
+        };
+        let count = hdr.available_page_tag_count as usize;
+        let page_size = page.data.len();
+        for i in 0..count {
+            let Some(tag_offset) = page_size.checked_sub((i + 1) * 4) else {
+                break;
+            };
+            let raw = u32::from_le_bytes([
+                page.data[tag_offset],
+                page.data[tag_offset + 1],
+                page.data[tag_offset + 2],
+                page.data[tag_offset + 3],
+            ]);
+            if raw & DELETED_FLAG != 0 {
+                anomalies.push(EseStructuralAnomaly::DeletedRecordPresent {
+                    page_number,
+                    tag_index: i,
+                });
+            }
+        }
+    }
+    anomalies
+}
+
 /// Filter `anomalies` to those at or above `min` severity.
 pub fn anomalies_at_least<'a>(
     anomalies: &'a [EseStructuralAnomaly],
