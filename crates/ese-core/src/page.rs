@@ -13,8 +13,10 @@ pub const PAGE_FLAG_LEAF: u32 = 0x0002;
 pub const PAGE_FLAG_PARENT: u32 = 0x0004;
 /// Page flag: empty page.
 pub const PAGE_FLAG_EMPTY: u32 = 0x0008;
-/// Page flag: space tree page.
-pub const PAGE_FLAG_SPACE_TREE: u32 = 0x0400;
+/// Page flag: space tree page (OWN_EXT / AVAIL_EXT).
+pub const PAGE_FLAG_SPACE_TREE: u32 = 0x0020;
+/// Page flag: long-value page (stores overflow data for LongBinary/LongText columns).
+pub const PAGE_FLAG_LONG_VALUE: u32 = 0x0400;
 
 /// Parsed ESE page header fields (Vista+ "new" 40-byte format).
 #[derive(Debug, Clone)]
@@ -204,12 +206,13 @@ mod tests {
     }
 
     #[test]
-    fn parse_header_flag_constants_usable() {
+    fn page_flag_constants_match_ese_spec() {
         assert_eq!(PAGE_FLAG_ROOT, 0x0001);
         assert_eq!(PAGE_FLAG_LEAF, 0x0002);
         assert_eq!(PAGE_FLAG_PARENT, 0x0004);
         assert_eq!(PAGE_FLAG_EMPTY, 0x0008);
-        assert_eq!(PAGE_FLAG_SPACE_TREE, 0x0400);
+        assert_eq!(PAGE_FLAG_SPACE_TREE, 0x0020);
+        assert_eq!(PAGE_FLAG_LONG_VALUE, 0x0400);
     }
 
     #[test]
