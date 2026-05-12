@@ -110,3 +110,99 @@ fn minimal_valid_database_has_no_anomalies() {
         "clean minimal database must produce no Error/Critical anomalies; got: {errors_or_above:?}"
     );
 }
+
+// ── ECC checksum fallback (Phase 18-C item 4) ────────────────────────────────
+//
+// Vista+ ESE pages store an 8-byte checksum header:
+//   bytes 0-3: XOR of all 4-byte words from offset 8+, seeded with 0x89ABCDEF
+//   bytes 4-7: column-parity ECC of all 4-byte words from offset 8+
+//
+// The format-detection heuristic: bytes 4-7 zero → legacy XOR; non-zero → Vista+ ECC.
+// check_pages() must handle both formats via ese_core::verify_page_checksum().
+
+const XOR_SEED: u32 = 0x89AB_CDEF;
+
+fn compute_xor_of_slice(data: &[u8]) -> u32 {
+    let mut csum = XOR_SEED;
+    for chunk in data.chunks_exact(4) {
+        csum ^= u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+    }
+    csum
+}
+
+fn compute_column_parity_ecc(data: &[u8]) -> u32 {
+    let mut ecc: u32 = 0;
+    for (i, chunk) in data.chunks_exact(4).enumerate() {
+        let word = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        ecc ^= word.rotate_left((i % 32) as u32);
+    }
+    ecc
+}
+
+/// Build a 3-page ESE buffer where page 1 carries a Vista+ ECC checksum that is
+/// VALID. Bytes 4-7 are non-zero (ECC field), so the legacy XOR-only algorithm
+/// produces a false mismatch. The ECC-aware path must accept the page as clean.
+fn make_buf_with_valid_ecc_page() -> Vec<u8> {
+    let page_size = 4096_usize;
+    let mut buf = vec![0u8; page_size * 3];
+
+    // Header page (page 0): ESE magic + page_size
+    buf[4..8].copy_from_slice(&0x89AB_CDEF_u32.to_le_bytes());
+    buf[236..240].copy_from_slice(&(page_size as u32).to_le_bytes());
+
+    // Page 1: Vista+ ECC format.
+    // Place some non-zero data in the body (offset 8+); bytes 0-7 are the checksum header.
+    let p1 = page_size;
+    buf[p1 + 8] = 0xAB; // non-zero data in the body
+    buf[p1 + 12] = 0xCD;
+
+    let body = &buf[p1 + 8..p1 + page_size].to_vec();
+    let stored_xor = compute_xor_of_slice(body);
+    let stored_ecc = compute_column_parity_ecc(body);
+
+    buf[p1..p1 + 4].copy_from_slice(&stored_xor.to_le_bytes()); // XOR at offset 0
+    buf[p1 + 4..p1 + 8].copy_from_slice(&stored_ecc.to_le_bytes()); // ECC at offset 4
+
+    buf
+}
+
+/// Build a 3-page ESE buffer where page 1 is a Vista+ ECC page with a TAMPERED
+/// data byte — the stored checksum no longer matches the body. check_pages() must
+/// detect this and emit PageChecksumMismatch.
+fn make_buf_with_tampered_ecc_page() -> Vec<u8> {
+    let mut buf = make_buf_with_valid_ecc_page();
+    let page_size = 4096_usize;
+    // Flip one body byte without updating the stored checksum.
+    buf[page_size + 8] ^= 0xFF;
+    buf
+}
+
+#[test]
+fn valid_ecc_page_does_not_produce_false_positive() {
+    // A Vista+ page with a correct ECC checksum must NOT be flagged.
+    // The old XOR-only code in check_pages() would compute XOR over bytes 4+
+    // (including the ECC field), producing a wrong comparison → false positive.
+    let buf = make_buf_with_valid_ecc_page();
+    let anomalies = EseIntegrity::new(&buf).analyse();
+    let false_pos = anomalies.iter().any(|a| {
+        matches!(a, EseStructuralAnomaly::PageChecksumMismatch { page_number: 1, .. })
+    });
+    assert!(
+        !false_pos,
+        "valid ECC page must NOT produce PageChecksumMismatch; got: {anomalies:?}"
+    );
+}
+
+#[test]
+fn tampered_ecc_page_produces_checksum_mismatch() {
+    // A Vista+ page with a corrupted body (checksum no longer matches) MUST be flagged.
+    let buf = make_buf_with_tampered_ecc_page();
+    let anomalies = EseIntegrity::new(&buf).analyse();
+    let detected = anomalies.iter().any(|a| {
+        matches!(a, EseStructuralAnomaly::PageChecksumMismatch { page_number: 1, .. })
+    });
+    assert!(
+        detected,
+        "tampered ECC page must produce PageChecksumMismatch; got: {anomalies:?}"
+    );
+}
