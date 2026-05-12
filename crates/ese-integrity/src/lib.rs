@@ -239,40 +239,43 @@ impl<'a> EseIntegrity<'a> {
     /// For each data page, verifies the stored XOR checksum at offset 0
     /// against the computed value. Pages where the stored checksum is 0 are
     /// treated as "unchecked" and skipped (common for empty/synthetic pages).
+    /// Handles both legacy XOR and Vista+ ECC formats via
+    /// `ese_core::verify_page_checksum()`.
     pub fn check_pages(&self) -> Vec<EseStructuralAnomaly> {
+        use ese_core::{verify_page_checksum, ChecksumResult};
+
         let page_size = self.try_read_page_size().unwrap_or(ESE_DEFAULT_PAGE_SIZE);
-        if page_size < 4 {
+        if page_size < 8 {
             return Vec::new();
         }
         let mut anomalies = Vec::new();
         // Skip page 0 (the file header page itself, which has its own checksum scheme).
-        for page_number in 1.. {
+        for page_number in 1u32.. {
             let start = (page_number as usize).saturating_mul(page_size);
             let end = start.saturating_add(page_size);
             if end > self.data.len() {
                 break;
             }
             let page_data = &self.data[start..end];
-            let stored = u32::from_le_bytes([
-                page_data[0],
-                page_data[1],
-                page_data[2],
-                page_data[3],
-            ]);
-            // 0 = checksum field not populated; skip to avoid false positives.
-            if stored == 0 {
-                continue;
-            }
-            if page_data.len() < 8 {
-                continue;
-            }
-            let computed = xor_page_checksum(page_data);
-            if computed != stored {
-                anomalies.push(EseStructuralAnomaly::PageChecksumMismatch {
-                    page_number: page_number as u32,
-                    expected: computed,
-                    actual: stored,
-                });
+            match verify_page_checksum(page_data, page_number) {
+                ChecksumResult::Valid | ChecksumResult::Unknown => {}
+                ChecksumResult::LegacyXorMismatch { stored, computed } => {
+                    anomalies.push(EseStructuralAnomaly::PageChecksumMismatch {
+                        page_number,
+                        expected: computed,
+                        actual: stored,
+                    });
+                }
+                ChecksumResult::EccMismatch => {
+                    let actual = u32::from_le_bytes([
+                        page_data[0], page_data[1], page_data[2], page_data[3],
+                    ]);
+                    anomalies.push(EseStructuralAnomaly::PageChecksumMismatch {
+                        page_number,
+                        expected: 0,
+                        actual,
+                    });
+                }
             }
         }
         anomalies
