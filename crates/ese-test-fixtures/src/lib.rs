@@ -71,7 +71,7 @@ impl PageBuilder {
         self.tag_count += 1;
         let offset_u32 = u32::try_from(offset).expect("offset within u32");
         let len_u32 = u32::try_from(record.len()).expect("record len within u32");
-        let tag_raw: u32 = (offset_u32 & 0x7FFF) | ((len_u32 & 0x7FFF) << 16);
+        let tag_raw: u32 = (offset_u32 & 0x1FFF) | ((len_u32 & 0x1FFF) << 16);
         let tag_pos = self.page_size - self.tag_count * 4;
         self.data[tag_pos..tag_pos + 4].copy_from_slice(&tag_raw.to_le_bytes());
         let tag_count_u16 = u16::try_from(self.tag_count).unwrap_or(u16::MAX);

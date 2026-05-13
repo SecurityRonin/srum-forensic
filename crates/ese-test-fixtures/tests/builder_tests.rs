@@ -39,8 +39,8 @@ fn page_builder_record_bytes_readable_from_tag() {
     // tag1 is at PAGE_SIZE - 2*4 = PAGE_SIZE - 8
     let tag_pos = PAGE_SIZE - 8;
     let raw = u32::from_le_bytes(page[tag_pos..tag_pos + 4].try_into().unwrap());
-    let offset = (raw & 0x7FFF) as usize;
-    let size = ((raw >> 16) & 0x7FFF) as usize;
+    let offset = (raw & 0x1FFF) as usize;
+    let size = ((raw >> 16) & 0x1FFF) as usize;
     assert_eq!(size, 8);
     assert_eq!(&page[offset..offset + size], &record[..]);
 }

@@ -138,8 +138,11 @@ impl EsePage {
                 self.data[tag_offset + 2],
                 self.data[tag_offset + 3],
             ]);
-            let value_offset = (raw & 0x7FFF) as u16;
-            let value_size = ((raw >> 16) & 0x7FFF) as u16;
+            // Bits 0-12 of the offset word = offset value; bits 13-15 = tag flags.
+            // Bits 0-12 of the size word = size value; bits 13-15 = unknown (can be set).
+            // Both fields are 13-bit; mask 0x1FFF strips the flag/unknown bits.
+            let value_offset = (raw & 0x1FFF) as u16;
+            let value_size = ((raw >> 16) & 0x1FFF) as u16;
             // Guard: reject tags whose data range exceeds the page boundary.
             let end = usize::from(value_offset) + usize::from(value_size);
             if end > self.data.len() {
@@ -324,7 +327,7 @@ mod tests {
     }
 
     fn write_tag(page: &mut [u8], page_size: usize, tag_idx: usize, offset: u16, size: u16) {
-        let raw: u32 = (u32::from(offset) & 0x7FFF) | ((u32::from(size) & 0x7FFF) << 16);
+        let raw: u32 = (u32::from(offset) & 0x1FFF) | ((u32::from(size) & 0x1FFF) << 16);
         let pos = page_size - (tag_idx + 1) * 4;
         page[pos..pos + 4].copy_from_slice(&raw.to_le_bytes());
     }

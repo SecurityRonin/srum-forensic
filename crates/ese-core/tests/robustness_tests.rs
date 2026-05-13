@@ -106,7 +106,7 @@ fn make_page_with_out_of_bounds_tag(page_size: usize) -> EsePage {
     // Tag 1: offset=100, size=4000 → 100+4000=4100 > page_size(4096) — invalid
     let offset: u32 = 100;
     let size: u32 = 4000; // 100 + 4000 = 4100 > 4096
-    let tag1: u32 = (offset & 0x7FFF) | ((size & 0x7FFF) << 16);
+    let tag1: u32 = (offset & 0x1FFF) | ((size & 0x1FFF) << 16);
     let pos1 = page_size - 8;
     data[pos1..pos1 + 4].copy_from_slice(&tag1.to_le_bytes());
 
