@@ -254,6 +254,43 @@ mod tests {
         assert!(result.is_err(), "short buffer must return Err");
     }
 
+    // ── Vista+ offset regression tests (real SRUDB.dat ground-truth) ─────────
+
+    #[test]
+    fn parse_header_tag_count_at_vista_offset_0x22() {
+        // Vista+ page header: available_page_tag_count is at 0x22 (not 0x1E).
+        // Writing 5 at 0x22 must be read back as 5; writing at 0x1E must NOT.
+        let mut data = vec![0u8; 4096];
+        data[0x22..0x24].copy_from_slice(&5u16.to_le_bytes());
+        let page = EsePage { page_number: 1, data };
+        let hdr = page.parse_header().expect("parse header");
+        assert_eq!(hdr.available_page_tag_count, 5,
+            "tag count must be read from offset 0x22 per the Vista+ ESE format");
+    }
+
+    #[test]
+    fn parse_header_flags_at_vista_offset_0x24() {
+        // Vista+ page header: page_flags is at 0x24 (not 0x20).
+        let mut data = vec![0u8; 4096];
+        data[0x24..0x28].copy_from_slice(&PAGE_FLAG_LEAF.to_le_bytes());
+        let page = EsePage { page_number: 1, data };
+        let hdr = page.parse_header().expect("parse header");
+        assert!(hdr.page_flags & PAGE_FLAG_LEAF != 0,
+            "LEAF flag must be read from offset 0x24 per the Vista+ ESE format");
+    }
+
+    #[test]
+    fn parse_header_prev_next_at_vista_offsets_0x10_0x14() {
+        // Vista+ page header: prev_page at 0x10, next_page at 0x14.
+        let mut data = vec![0u8; 4096];
+        data[0x10..0x14].copy_from_slice(&5u32.to_le_bytes());
+        data[0x14..0x18].copy_from_slice(&9u32.to_le_bytes());
+        let page = EsePage { page_number: 1, data };
+        let hdr = page.parse_header().expect("parse header");
+        assert_eq!(hdr.prev_page, Some(5));
+        assert_eq!(hdr.next_page, Some(9));
+    }
+
     // ── ese-page-tags story ──────────────────────────────────────────────────
 
     /// Build a synthetic page with embedded data records.
