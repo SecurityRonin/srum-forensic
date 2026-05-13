@@ -114,10 +114,11 @@ pub fn detect_fragments(pages: &[u8], page_size: usize, expected_size: usize) ->
 }
 
 fn parse_tags_raw(page: &[u8], page_size: usize) -> Option<Vec<(usize, usize)>> {
-    if page.len() < page_size || page_size < 0x20 {
+    if page.len() < page_size || page_size < 0x28 {
         return None;
     }
-    let tag_count = u16::from_le_bytes([page[0x1E], page[0x1F]]) as usize;
+    // Vista+ header: available_page_tag_count at 0x22 (0x1E in pre-Vista format).
+    let tag_count = u16::from_le_bytes([page[0x22], page[0x23]]) as usize;
     if tag_count == 0 {
         return None;
     }
