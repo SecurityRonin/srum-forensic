@@ -125,3 +125,65 @@ fn tags_with_out_of_bounds_offset_returns_err() {
         4096
     );
 }
+
+// ── tag size field uses 13-bit mask (0x1FFF), not 15-bit (0x7FFF) ────────────
+
+/// Build a page with one tag whose size word has bits 13-14 set (simulating
+/// real SRUDB.dat tags like 0x4010_000A where bit 14 of the size word is set).
+/// With 0x7FFF mask the size blows up (e.g. 16400 vs 16); with 0x1FFF it is correct.
+fn make_page_with_high_size_bits(page_size: usize, true_size: usize) -> EsePage {
+    let mut data = vec![0u8; page_size];
+    let tag_count: u16 = 1;
+    data[0x22..0x24].copy_from_slice(&tag_count.to_le_bytes());
+    data[0x24..0x28].copy_from_slice(&ese_core::PAGE_FLAG_LEAF.to_le_bytes());
+
+    // Tag 0: offset=0, true_size, but with bit 14 of size word set (0x4000).
+    // real_size_word = true_size | 0x4000
+    // With 0x7FFF mask: size = true_size | 0x4000 (too large)
+    // With 0x1FFF mask: size = true_size (correct)
+    let size_word = u32::try_from(true_size | 0x4000).expect("size within u32");
+    let tag0: u32 = size_word << 16; // offset=0, size_word with high bits set
+    let pos = page_size - 4;
+    data[pos..pos + 4].copy_from_slice(&tag0.to_le_bytes());
+
+    EsePage { page_number: 1, data }
+}
+
+#[test]
+fn tags_strips_high_bits_from_size_word_returns_13bit_size() {
+    // Real SRUDB.dat tags have bits 13+ set in the size word (format flags/unknown bits).
+    // tags() must mask them to 0x1FFF to return the true record size.
+    // Simulates page 4 tag 1 of chainsaw_SRUDB.dat: raw=0x4010_000A (true size=16).
+    let true_size: usize = 16;
+    let page = make_page_with_high_size_bits(4096, true_size);
+    let tags = page.tags().expect("tags must succeed — no out-of-bounds");
+    assert_eq!(
+        tags[0].1 as usize,
+        true_size,
+        "size must be the 13-bit field value (0x1FFF mask), not the full 15-bit word"
+    );
+}
+
+#[test]
+fn tags_strips_high_bits_from_offset_word_returns_13bit_offset() {
+    // Offset field is also 13 bits (bits 0-12 of the first word); bits 13-15 are flags.
+    // A tag with flag bits set in the offset word must still return the correct offset.
+    let mut data = vec![0u8; 4096];
+    let tag_count: u16 = 1;
+    data[0x22..0x24].copy_from_slice(&tag_count.to_le_bytes());
+    data[0x24..0x28].copy_from_slice(&ese_core::PAGE_FLAG_LEAF.to_le_bytes());
+
+    // offset=10 with the TAG_DEFUNCT flag (bit 13 of offset word = 0x2000) set:
+    // offset_word = 10 | 0x2000 = 0x200A, size_word = 4
+    let tag0: u32 = (10u32 | 0x2000u32) | (4u32 << 16);
+    let pos = 4096 - 4;
+    data[pos..pos + 4].copy_from_slice(&tag0.to_le_bytes());
+
+    let page = EsePage { page_number: 1, data };
+    let tags = page.tags().expect("tags must succeed");
+    assert_eq!(
+        tags[0].0 as usize,
+        10,
+        "offset must be the 13-bit field value (0x1FFF mask), stripping flag bits"
+    );
+}
