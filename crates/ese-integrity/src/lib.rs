@@ -447,12 +447,15 @@ pub fn detect_autoinc_gaps(ids: &[i32]) -> Vec<EseStructuralAnomaly> {
 
 /// Scan every data page for tags that have the deleted-record flag set.
 ///
-/// ESE marks deleted records in-place: bit 29 (`0x2000_0000`) of the raw
-/// 4-byte tag word is set without zeroing the record bytes. This function
-/// reports each such tag as [`DeletedRecordPresent`]; the caller can then
-/// attempt to recover the residual bytes from `page.data[offset..offset+size]`.
+/// Per MS-ESEDB spec: ESE marks deleted records in-place by setting TAG_DEFUNCT=0x2
+/// in bits 13-15 of the offset word of the 4-byte tag. In the 32-bit tag word this
+/// is bit 14 (`0x4000`). The record bytes are left intact, allowing forensic recovery.
+/// Each such tag is reported as [`DeletedRecordPresent`].
 pub fn find_deleted_records(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
-    const DELETED_FLAG: u32 = 0x2000_0000;
+    // TAG_DEFUNCT=0x2 sits at bits 13-15 of the offset word (low 16 bits of the u32).
+    // bit 13 of the u32 = 0x2000, bit 14 = 0x4000; the full 3-bit flag field is 0xE000.
+    // A value of 0x2 in that field means bit 14 (0x4000) is set.
+    const DELETED_FLAG: u32 = 0x4000;
     let page_count = db.page_count();
     let mut anomalies = Vec::new();
     for page_number in 1..u32::try_from(page_count).unwrap_or(u32::MAX) {

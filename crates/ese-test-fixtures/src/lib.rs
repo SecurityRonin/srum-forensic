@@ -27,7 +27,7 @@ pub struct PageBuilder {
 impl PageBuilder {
     pub fn new(page_size: usize) -> Self {
         let mut data = vec![0u8; page_size];
-        // Tag 0 covers the 40-byte page header: offset=0, size=40.
+        // Tag 0: relative offset=0, size=40 — designates the 40-byte page header.
         let tag0_raw: u32 = 40u32 << 16;
         let pos = page_size - 4;
         data[pos..pos + 4].copy_from_slice(&tag0_raw.to_le_bytes());
@@ -36,7 +36,7 @@ impl PageBuilder {
         Self {
             data,
             page_size,
-            record_offset: 40,
+            record_offset: 0, // relative offset (physical = HEADER_SIZE + record_offset)
             tag_count: 1,
         }
     }
@@ -66,10 +66,12 @@ impl PageBuilder {
 
     /// Append a record and its tag entry.
     pub fn add_record(mut self, record: &[u8]) -> Self {
-        let offset = self.record_offset;
-        self.data[offset..offset + record.len()].copy_from_slice(record);
+        const HEADER_SIZE: usize = 40;
+        let relative_offset = self.record_offset;
+        let absolute_offset = HEADER_SIZE + relative_offset;
+        self.data[absolute_offset..absolute_offset + record.len()].copy_from_slice(record);
         self.tag_count += 1;
-        let offset_u32 = u32::try_from(offset).expect("offset within u32");
+        let offset_u32 = u32::try_from(relative_offset).expect("offset within u32");
         let len_u32 = u32::try_from(record.len()).expect("record len within u32");
         let tag_raw: u32 = (offset_u32 & 0x1FFF) | ((len_u32 & 0x1FFF) << 16);
         let tag_pos = self.page_size - self.tag_count * 4;
@@ -88,7 +90,8 @@ impl PageBuilder {
 
     /// Write bytes into the slack region (between last record and tag array).
     pub fn with_slack(mut self, bytes: &[u8]) -> Self {
-        let start = self.record_offset;
+        const HEADER_SIZE: usize = 40;
+        let start = HEADER_SIZE + self.record_offset;
         let tag_array_start = self.page_size - self.tag_count * 4;
         debug_assert!(
             start + bytes.len() <= tag_array_start,

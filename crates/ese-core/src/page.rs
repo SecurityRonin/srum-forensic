@@ -138,13 +138,13 @@ impl EsePage {
                 self.data[tag_offset + 2],
                 self.data[tag_offset + 3],
             ]);
-            // Bits 0-12 of the offset word = offset value; bits 13-15 = tag flags.
-            // Bits 0-12 of the size word = size value; bits 13-15 = unknown (can be set).
+            // Bits 0-12 of the offset word = offset value (RELATIVE to header end); bits 13-15 = tag flags.
+            // Bits 0-12 of the size word = size value; bits 13-15 = unknown (can be set in real files).
             // Both fields are 13-bit; mask 0x1FFF strips the flag/unknown bits.
             let value_offset = (raw & 0x1FFF) as u16;
             let value_size = ((raw >> 16) & 0x1FFF) as u16;
-            // Guard: reject tags whose data range exceeds the page boundary.
-            let end = usize::from(value_offset) + usize::from(value_size);
+            // Guard: absolute position = HEADER_SIZE + relative_offset + size must not exceed page.
+            let end = Self::HEADER_SIZE + usize::from(value_offset) + usize::from(value_size);
             if end > self.data.len() {
                 return Err(EseError::RecordTooShort {
                     page: self.page_number,
@@ -175,7 +175,8 @@ impl EsePage {
             });
         }
         let (offset, size) = tags[index];
-        let start = offset as usize;
+        // Tag offsets are relative to the end of the 40-byte Vista+ page header.
+        let start = Self::HEADER_SIZE + offset as usize;
         let end = start + size as usize;
         if end > self.data.len() {
             return Err(EseError::RecordTooShort {
@@ -300,28 +301,29 @@ mod tests {
     /// Build a synthetic page with embedded data records.
     ///
     /// Layout:
-    /// - Header (40 bytes) at offset 0
-    /// - Records packed starting at offset 40
+    /// - Header (40 bytes) at absolute bytes 0-39
+    /// - Records packed at absolute bytes 40+; tags store RELATIVE offsets (from header end)
     /// - Tag array at page end: tag[0] covers header, tags[1..] cover records
     fn make_page_with_records(page_size: usize, records: &[&[u8]]) -> Vec<u8> {
+        const HEADER_SIZE: usize = 40;
         let mut d = vec![0u8; page_size];
         let tag_count = u16::try_from(1 + records.len()).unwrap_or(u16::MAX);
         // Vista+ header: tag_count at 0x22, PAGE_FLAG_LEAF at 0x24
         d[0x22..0x24].copy_from_slice(&tag_count.to_le_bytes());
         d[0x24..0x28].copy_from_slice(&PAGE_FLAG_LEAF.to_le_bytes());
 
-        // Tag 0: covers the page header (offset=0, size=40)
+        // Tag 0: relative offset=0, size=40 (covers the page header)
         write_tag(&mut d, page_size, 0, 0, 40);
 
-        // Data records starting at offset 40
-        let mut cur_offset: u16 = 40;
+        // Data records; tags store RELATIVE offsets (physical = HEADER_SIZE + relative)
+        let mut cur_relative: u16 = 0;
         for (i, rec) in records.iter().enumerate() {
             let tag_idx = i + 1;
             let rec_size = u16::try_from(rec.len()).unwrap_or(u16::MAX);
-            let start = usize::from(cur_offset);
-            d[start..start + rec.len()].copy_from_slice(rec);
-            write_tag(&mut d, page_size, tag_idx, cur_offset, rec_size);
-            cur_offset += rec_size;
+            let absolute_start = HEADER_SIZE + usize::from(cur_relative);
+            d[absolute_start..absolute_start + rec.len()].copy_from_slice(rec);
+            write_tag(&mut d, page_size, tag_idx, cur_relative, rec_size);
+            cur_relative += rec_size;
         }
         d
     }
@@ -352,8 +354,8 @@ mod tests {
             data,
         };
         let tags = page.tags().expect("tags");
-        // tag 1 is first data record starting at offset 40, size 4
-        assert_eq!(tags[1], (40, 4));
+        // tag 1 is first data record; relative offset=0 (absolute=40), size=4
+        assert_eq!(tags[1], (0, 4));
     }
 
     #[test]
