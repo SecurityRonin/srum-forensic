@@ -55,16 +55,17 @@ impl EsePage {
     /// Parse the Vista+ 40-byte page header from `self.data`.
     ///
     /// Layout (all little-endian):
-    /// - 0x00 (4): checksum
-    /// - 0x04 (8): database time
-    /// - 0x0C (4): previous page number
-    /// - 0x10 (4): next page number
-    /// - 0x14 (4): FDP object ID
-    /// - 0x18 (2): available data size
-    /// - 0x1A (2): available uncommitted data
-    /// - 0x1C (2): available data offset
-    /// - 0x1E (2): available page tag count
-    /// - 0x20 (4): page flags
+    /// - 0x00 (4): XOR checksum
+    /// - 0x04 (4): ECC checksum (Vista+ addition)
+    /// - 0x08 (8): database time (JET_DBTIME)
+    /// - 0x10 (4): previous page number
+    /// - 0x14 (4): next page number
+    /// - 0x18 (4): FDP object ID
+    /// - 0x1C (2): available data size
+    /// - 0x1E (2): available uncommitted data
+    /// - 0x20 (2): available data offset
+    /// - 0x22 (2): available page tag count
+    /// - 0x24 (4): page flags
     ///
     /// # Errors
     ///
@@ -78,14 +79,14 @@ impl EsePage {
             });
         }
 
-        let prev_raw = u32::from_le_bytes([d[0x0C], d[0x0D], d[0x0E], d[0x0F]]);
-        let next_raw = u32::from_le_bytes([d[0x10], d[0x11], d[0x12], d[0x13]]);
-        let fdp_object_id = u32::from_le_bytes([d[0x14], d[0x15], d[0x16], d[0x17]]);
-        let available_data_size = u16::from_le_bytes([d[0x18], d[0x19]]);
-        let available_uncommitted = u16::from_le_bytes([d[0x1A], d[0x1B]]);
-        let available_data_offset = u16::from_le_bytes([d[0x1C], d[0x1D]]);
-        let available_page_tag_count = u16::from_le_bytes([d[0x1E], d[0x1F]]);
-        let page_flags = u32::from_le_bytes([d[0x20], d[0x21], d[0x22], d[0x23]]);
+        let prev_raw = u32::from_le_bytes([d[0x10], d[0x11], d[0x12], d[0x13]]);
+        let next_raw = u32::from_le_bytes([d[0x14], d[0x15], d[0x16], d[0x17]]);
+        let fdp_object_id = u32::from_le_bytes([d[0x18], d[0x19], d[0x1A], d[0x1B]]);
+        let available_data_size = u16::from_le_bytes([d[0x1C], d[0x1D]]);
+        let available_uncommitted = u16::from_le_bytes([d[0x1E], d[0x1F]]);
+        let available_data_offset = u16::from_le_bytes([d[0x20], d[0x21]]);
+        let available_page_tag_count = u16::from_le_bytes([d[0x22], d[0x23]]);
+        let page_flags = u32::from_le_bytes([d[0x24], d[0x25], d[0x26], d[0x27]]);
 
         Ok(EsePageHeader {
             prev_page: if prev_raw == 0xFFFF_FFFF {
@@ -194,8 +195,8 @@ mod tests {
     #[test]
     fn parse_header_page_flags_leaf() {
         let mut data = vec![0u8; 4096];
-        // page_flags at offset 0x20
-        data[0x20..0x24].copy_from_slice(&PAGE_FLAG_LEAF.to_le_bytes());
+        // page_flags at offset 0x24 (Vista+)
+        data[0x24..0x28].copy_from_slice(&PAGE_FLAG_LEAF.to_le_bytes());
         let page = EsePage {
             page_number: 1,
             data,
@@ -218,8 +219,8 @@ mod tests {
     #[test]
     fn parse_header_prev_next_links() {
         let mut data = vec![0u8; 4096];
-        data[0x0C..0x10].copy_from_slice(&5u32.to_le_bytes()); // prev_page = 5
-        data[0x10..0x14].copy_from_slice(&7u32.to_le_bytes()); // next_page = 7
+        data[0x10..0x14].copy_from_slice(&5u32.to_le_bytes()); // prev_page = 5 (Vista+: 0x10)
+        data[0x14..0x18].copy_from_slice(&7u32.to_le_bytes()); // next_page = 7 (Vista+: 0x14)
         let page = EsePage {
             page_number: 3,
             data,
@@ -232,8 +233,8 @@ mod tests {
     #[test]
     fn parse_header_none_when_0xffffffff() {
         let mut data = vec![0u8; 4096];
-        data[0x0C..0x10].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
-        data[0x10..0x14].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        data[0x10..0x14].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes()); // prev (Vista+: 0x10)
+        data[0x14..0x18].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes()); // next (Vista+: 0x14)
         let page = EsePage {
             page_number: 1,
             data,
@@ -302,9 +303,9 @@ mod tests {
     fn make_page_with_records(page_size: usize, records: &[&[u8]]) -> Vec<u8> {
         let mut d = vec![0u8; page_size];
         let tag_count = u16::try_from(1 + records.len()).unwrap_or(u16::MAX);
-        // header: tag_count at 0x1E, PAGE_FLAG_LEAF at 0x20
-        d[0x1E..0x20].copy_from_slice(&tag_count.to_le_bytes());
-        d[0x20..0x24].copy_from_slice(&PAGE_FLAG_LEAF.to_le_bytes());
+        // Vista+ header: tag_count at 0x22, PAGE_FLAG_LEAF at 0x24
+        d[0x22..0x24].copy_from_slice(&tag_count.to_le_bytes());
+        d[0x24..0x28].copy_from_slice(&PAGE_FLAG_LEAF.to_le_bytes());
 
         // Tag 0: covers the page header (offset=0, size=40)
         write_tag(&mut d, page_size, 0, 0, 40);

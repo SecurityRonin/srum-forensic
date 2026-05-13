@@ -94,8 +94,9 @@ fn make_page_with_out_of_bounds_tag(page_size: usize) -> EsePage {
     let mut data = vec![0u8; page_size];
     // 2 tags (tag 0 + tag 1); tag 0 = page header (offset=0, size=40)
     let tag_count: u16 = 2;
-    data[0x1E..0x20].copy_from_slice(&tag_count.to_le_bytes());
-    data[0x20..0x24].copy_from_slice(&ese_core::PAGE_FLAG_LEAF.to_le_bytes());
+    // Vista+ header: tag_count at 0x22, page_flags at 0x24
+    data[0x22..0x24].copy_from_slice(&tag_count.to_le_bytes());
+    data[0x24..0x28].copy_from_slice(&ese_core::PAGE_FLAG_LEAF.to_le_bytes());
 
     // Tag 0: header (offset=0, size=40) — valid
     let tag0: u32 = 40u32 << 16; // offset=0, size=40

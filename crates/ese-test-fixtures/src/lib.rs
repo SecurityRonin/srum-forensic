@@ -31,7 +31,8 @@ impl PageBuilder {
         let tag0_raw: u32 = 40u32 << 16;
         let pos = page_size - 4;
         data[pos..pos + 4].copy_from_slice(&tag0_raw.to_le_bytes());
-        data[0x1E..0x20].copy_from_slice(&1u16.to_le_bytes());
+        // Vista+ header: tag_count at 0x22
+        data[0x22..0x24].copy_from_slice(&1u16.to_le_bytes());
         Self {
             data,
             page_size,
@@ -41,17 +42,19 @@ impl PageBuilder {
     }
 
     pub fn leaf(mut self) -> Self {
-        self.data[0x20..0x24].copy_from_slice(&PAGE_FLAG_LEAF.to_le_bytes());
-        self.data[0x0C..0x10].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        // Vista+ header: page_flags at 0x24, prev/next at 0x10/0x14
+        self.data[0x24..0x28].copy_from_slice(&PAGE_FLAG_LEAF.to_le_bytes());
         self.data[0x10..0x14].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        self.data[0x14..0x18].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
         self
     }
 
     pub fn parent(mut self) -> Self {
         let flags = PAGE_FLAG_PARENT | PAGE_FLAG_ROOT;
-        self.data[0x20..0x24].copy_from_slice(&flags.to_le_bytes());
-        self.data[0x0C..0x10].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        // Vista+ header: page_flags at 0x24, prev/next at 0x10/0x14
+        self.data[0x24..0x28].copy_from_slice(&flags.to_le_bytes());
         self.data[0x10..0x14].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        self.data[0x14..0x18].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
         self
     }
 
@@ -72,7 +75,8 @@ impl PageBuilder {
         let tag_pos = self.page_size - self.tag_count * 4;
         self.data[tag_pos..tag_pos + 4].copy_from_slice(&tag_raw.to_le_bytes());
         let tag_count_u16 = u16::try_from(self.tag_count).unwrap_or(u16::MAX);
-        self.data[0x1E..0x20].copy_from_slice(&tag_count_u16.to_le_bytes());
+        // Vista+ header: tag_count at 0x22
+        self.data[0x22..0x24].copy_from_slice(&tag_count_u16.to_le_bytes());
         self.record_offset += record.len();
         self
     }

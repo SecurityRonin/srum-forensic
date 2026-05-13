@@ -10,7 +10,8 @@ fn page_builder_produces_correct_page_size() {
 #[test]
 fn page_builder_leaf_sets_leaf_flag() {
     let page = PageBuilder::new(PAGE_SIZE).leaf().build();
-    let flags = u32::from_le_bytes(page[0x20..0x24].try_into().unwrap());
+    // Vista+ header: page_flags at 0x24
+    let flags = u32::from_le_bytes(page[0x24..0x28].try_into().unwrap());
     assert!(
         flags & ese_core::PAGE_FLAG_LEAF != 0,
         "leaf flag must be set"
@@ -23,7 +24,8 @@ fn page_builder_add_record_increments_tag_count() {
         .leaf()
         .add_record(&[0xAAu8; 16])
         .build();
-    let tag_count = u16::from_le_bytes(page[0x1E..0x20].try_into().unwrap());
+    // Vista+ header: tag_count at 0x22
+    let tag_count = u16::from_le_bytes(page[0x22..0x24].try_into().unwrap());
     assert_eq!(tag_count, 2, "tag0 (header) + tag1 (data record)");
 }
 

@@ -53,18 +53,18 @@ pub fn make_ese_with_slack_bytes(slack: &[u8]) -> NamedTempFile {
 ///   → tag_raw = (40 & 0x7FFF) | ((4 | 0x2000) << 16) = 0x2004_0028
 pub fn make_ese_with_deleted_record() -> NamedTempFile {
     let mut data_page = vec![0u8; PAGE_SIZE];
-    // Page flags at 0x20: leaf
-    data_page[0x20..0x24].copy_from_slice(&ese_core::PAGE_FLAG_LEAF.to_le_bytes());
-    // Sibling links: 0xFFFFFFFF = no sibling
-    data_page[0x0C..0x10].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+    // Vista+ header: page_flags at 0x24
+    data_page[0x24..0x28].copy_from_slice(&ese_core::PAGE_FLAG_LEAF.to_le_bytes());
+    // Vista+ header: prev/next at 0x10/0x14
     data_page[0x10..0x14].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+    data_page[0x14..0x18].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
 
     // Record payload at offset 40 (after 40-byte header)
     let payload = [0xAA, 0xBB, 0xCC, 0xDD];
     data_page[40..44].copy_from_slice(&payload);
 
-    // Tag count = 2 (tag0 = header, tag1 = deleted record)
-    data_page[0x1E..0x20].copy_from_slice(&2u16.to_le_bytes());
+    // Vista+ header: tag_count at 0x22
+    data_page[0x22..0x24].copy_from_slice(&2u16.to_le_bytes());
 
     // Tag 0 (page header placeholder): offset=0, size=40
     let tag0_raw: u32 = (40u32 & 0x7FFF) << 16;
