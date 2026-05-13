@@ -388,4 +388,45 @@ mod tests {
         let result = page.record_data(5);
         assert!(result.is_err(), "index beyond tag count must return Err");
     }
+
+    // ── tag offset relative-to-header story ──────────────────────────────────
+
+    #[test]
+    fn record_data_treats_tag_offset_as_relative_to_header_end() {
+        // Per MS-ESEDB spec and libesedb/impacket: tag offsets are relative to
+        // the END of the page header (byte 40 for Vista+ pages), not absolute
+        // from page start.
+        //
+        // This test places sentinel bytes at absolute byte 42 (= HEADER_SIZE + 2)
+        // and gives tag 1 a relative offset of 2. Correct behaviour: record_data(1)
+        // returns the sentinel bytes. Wrong (absolute) behaviour: returns zeros
+        // from within the 40-byte header at byte 2.
+        let mut data = vec![0u8; 4096];
+        let sentinel = [0xCA, 0xFE, 0xBA, 0xBEu8];
+        // Place sentinel at absolute byte 42 = HEADER_SIZE(40) + relative_offset(2)
+        data[42..46].copy_from_slice(&sentinel);
+
+        let tag_count: u16 = 2;
+        data[0x22..0x24].copy_from_slice(&tag_count.to_le_bytes());
+        data[0x24..0x28].copy_from_slice(&PAGE_FLAG_LEAF.to_le_bytes());
+        data[0x10..0x14].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        data[0x14..0x18].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+
+        // Tag 0: relative offset=0, size=40 (covers the header)
+        let tag0: u32 = 40u32 << 16;
+        data[4096 - 4..4096].copy_from_slice(&tag0.to_le_bytes());
+
+        // Tag 1: relative offset=2, size=4 → absolute bytes [42..46]
+        let tag1: u32 = 2u32 | (4u32 << 16);
+        data[4096 - 8..4096 - 4].copy_from_slice(&tag1.to_le_bytes());
+
+        let page = EsePage { page_number: 1, data };
+        let rec = page.record_data(1).expect("record_data(1)");
+        assert_eq!(
+            rec,
+            &sentinel,
+            "record_data must add HEADER_SIZE(40) to tag offset; \
+             relative offset 2 must read from absolute byte 42, not byte 2"
+        );
+    }
 }

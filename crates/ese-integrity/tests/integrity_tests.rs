@@ -301,7 +301,9 @@ fn find_deleted_records_empty_for_database_with_no_deleted_records() {
 
 #[test]
 fn find_deleted_records_detects_deleted_tag() {
-    // Page with a tag that has bit 29 (the deleted-record flag) set.
+    // Page with a tag that has the defunct flag set in the offset word (bits 13-15).
+    // Per MS-ESEDB spec: TAG_DEFUNCT = 0x2 is stored in bits 13-15 of the offset word
+    // (bits 13-15 of the 32-bit tag = mask 0x4000 at bit 14 of the u32).
     let tmp = fixtures::make_ese_with_deleted_record();
     let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
     let anomalies = find_deleted_records(&db);
@@ -309,6 +311,47 @@ fn find_deleted_records_detects_deleted_tag() {
         .iter()
         .any(|a| matches!(a, EseStructuralAnomaly::DeletedRecordPresent { .. }));
     assert!(found, "page with deleted tag must produce DeletedRecordPresent");
+}
+
+#[test]
+fn find_deleted_records_detects_defunct_flag_in_offset_word() {
+    // Per MS-ESEDB spec: the defunct (deleted) flag is TAG_DEFUNCT=0x2 in the
+    // 3-bit flag field at bits 13-15 of the OFFSET word, i.e. bit 14 of the
+    // 32-bit tag word (0x4000). This is the correct location; our old code
+    // incorrectly checked bit 29 (0x2000_0000) in the size word.
+    use std::io::Write as _;
+    let page_size = ese_core::PAGE_SIZE;
+    let mut page_data = vec![0u8; page_size];
+    page_data[0x22..0x24].copy_from_slice(&2u16.to_le_bytes()); // tag_count=2
+    page_data[0x24..0x28].copy_from_slice(&ese_core::PAGE_FLAG_LEAF.to_le_bytes());
+    page_data[0x10..0x14].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+    page_data[0x14..0x18].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+
+    // Tag 0: relative offset=0, size=40
+    let tag0: u32 = 40u32 << 16;
+    page_data[page_size - 4..page_size].copy_from_slice(&tag0.to_le_bytes());
+
+    // Tag 1: defunct flag in OFFSET word (bit 14 = TAG_DEFUNCT=0x2 at bits 13-15).
+    // relative offset=0, size=4, defunct bit in offset word.
+    // offset_word = 0 | (0x2 << 13) = 0x4000
+    // tag_raw = 0x4000 | (4 << 16) = 0x0004_4000
+    let tag1: u32 = 0x4000u32 | (4u32 << 16);
+    page_data[page_size - 8..page_size - 4].copy_from_slice(&tag1.to_le_bytes());
+
+    let header = ese_test_fixtures::make_raw_header_page(0, ese_core::DB_STATE_CLEAN_SHUTDOWN);
+    let mut tmp = tempfile::NamedTempFile::new().unwrap();
+    tmp.write_all(&header).unwrap();
+    tmp.write_all(&page_data).unwrap();
+
+    let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
+    let anomalies = find_deleted_records(&db);
+    let found = anomalies
+        .iter()
+        .any(|a| matches!(a, EseStructuralAnomaly::DeletedRecordPresent { .. }));
+    assert!(
+        found,
+        "defunct flag in offset word (bit 14 = 0x4000) must be detected as DeletedRecordPresent"
+    );
 }
 
 #[test]
