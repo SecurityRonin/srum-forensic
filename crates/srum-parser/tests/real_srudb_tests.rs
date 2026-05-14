@@ -29,6 +29,16 @@ const CHAINSAW: &str =
 const PLASO: &str =
     concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/data/srudb/plaso_SRUDB.dat");
 
+const MUSEUM_RATHBUNVM_WIN10: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/museum_rathbunvm_win10_SRUDB.dat"
+);
+
+const MUSEUM_RATHBUNVM_WIN11: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/museum_rathbunvm_win11_SRUDB.dat"
+);
+
 /// Return the path only if the file exists, otherwise print a skip message and
 /// return `None`. Tests call `let Some(p) = fixture(X) else { return; }`.
 fn fixture(path: &'static str) -> Option<&'static Path> {
@@ -221,6 +231,51 @@ fn chainsaw_srudb_timestamps_are_after_windows8_launch() {
             r.timestamp
         );
     }
+}
+
+// ── catalog last-wins deduplication (rathbunvm files) ────────────────────────
+
+/// Real SRUDB.dat files from rathbunvm VMs contain two MSysObjects catalog
+/// entries with the same GUID name `{5C8CF1C7-...}`:
+///   - first  (obj_id=12/15, page 48/64): empty placeholder page (tag_count=1)
+///   - second (obj_id=13/17, page 64/80): actual data B-tree root (tag_count>>1)
+///
+/// `catalog_entries()` must use last-wins deduplication so `find_table_page`
+/// resolves to the correct (second) entry, not the empty placeholder.
+#[test]
+fn rathbunvm_win10_app_usage_catalog_last_wins_deduplication() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let db = EseDatabase::open(p).expect("open");
+    let table_page = db
+        .find_table_page("{5C8CF1C7-7257-4F13-B223-970EF5939312}")
+        .expect("must find apps table");
+    assert_ne!(
+        table_page, 48,
+        "find_table_page must not return the empty placeholder page 48; \
+         catalog_entries() must use last-wins deduplication"
+    );
+}
+
+#[test]
+fn rathbunvm_win10_app_usage_count_matches_dissect() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let records = parse_app_usage(p).expect("parse_app_usage must not error");
+    assert!(
+        records.len() >= 160,
+        "rathbunvm win10 must have >= 160 app usage records (dissect: 163), got {}",
+        records.len()
+    );
+}
+
+#[test]
+fn rathbunvm_win11_app_usage_count_matches_dissect() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let records = parse_app_usage(p).expect("parse_app_usage must not error");
+    assert!(
+        records.len() >= 780,
+        "rathbunvm win11 must have >= 780 app usage records (dissect: 791), got {}",
+        records.len()
+    );
 }
 
 // ── diagnostic: dump catalog to understand structure ─────────────────────────
