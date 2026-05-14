@@ -5,7 +5,7 @@ use crate::output::{OutputFormat, values_to_csv};
 /// Map a SRUM table GUID (or well-known name) to its friendly table name.
 fn guid_to_table_name(guid: &str) -> Option<&'static str> {
     match guid {
-        "{973F5D5C-1D90-4944-BE8E-24B22A728CF2}" => Some("network"),
+        "{973F5D5C-1D90-4944-BE8E-24B94231A174}" => Some("network"),
         "{5C8CF1C7-7257-4F13-B223-970EF5939312}" => Some("apps"),
         "{DD6636C4-8929-4683-974E-22C046A43763}" => Some("connectivity"),
         "{FEE4E14F-02A9-4550-B5CE-5FA2DA202E37}" => Some("energy"),

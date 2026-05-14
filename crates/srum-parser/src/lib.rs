@@ -34,13 +34,20 @@ pub enum SrumError {
 
 /// Iterate a named ESE table and decode each record, silently skipping
 /// records that fail either the ESE read or the domain decode step.
+///
+/// Returns `Ok(vec![])` when the table is absent — correct behaviour for
+/// Windows Server 2022 which omits several SRUM extensions entirely.
 fn collect_table<T>(
     db: &ese_core::EseDatabase,
     table: &str,
     decode: impl Fn(&[u8], u32, usize) -> Result<T, SrumError>,
 ) -> anyhow::Result<Vec<T>> {
-    let records = db
-        .table_records(table)?
+    let cursor = match db.table_records(table) {
+        Ok(c) => c,
+        Err(EseError::TableNotFound { .. }) => return Ok(vec![]),
+        Err(e) => return Err(e.into()),
+    };
+    let records = cursor
         .filter_map(|r| match r {
             Ok((page, tag, data)) => decode(&data, page, tag).ok(),
             Err(_) => None,
