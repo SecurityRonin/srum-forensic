@@ -290,7 +290,8 @@ pub fn annotate_user_presence(all: &mut Vec<serde_json::Value>) {
                 v.get("timestamp").and_then(serde_json::Value::as_str).map(str::to_owned),
                 v.get("user_input_time_ms").and_then(serde_json::Value::as_u64),
             ) {
-                *totals.entry(ts).or_insert(0) += ms;
+                let slot = totals.entry(ts).or_insert(0);
+                *slot = slot.saturating_add(ms);
             }
         }
     }
@@ -378,6 +379,20 @@ mod tests {
         })];
         apply_heuristics(&mut values);
         assert_eq!(values[0]["automated_execution"], json!(true));
+    }
+
+    #[test]
+    fn annotate_user_presence_does_not_panic_on_overflow() {
+        // Real SRUDB.dat files (e.g. belkasoftctf) can contain corrupt or
+        // extremely large user_input_time_ms values. Summing many u64::MAX
+        // values must not panic — saturating_add is required.
+        let mut all = vec![
+            json!({"source_table": "apps", "timestamp": "2024-01-01T00:00:00Z",
+                   "user_input_time_ms": u64::MAX}),
+            json!({"source_table": "apps", "timestamp": "2024-01-01T00:00:00Z",
+                   "user_input_time_ms": u64::MAX}),
+        ];
+        annotate_user_presence(&mut all); // must not panic
     }
 
     #[test]
