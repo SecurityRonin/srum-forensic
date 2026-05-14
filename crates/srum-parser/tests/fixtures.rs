@@ -78,15 +78,15 @@ pub fn encode_id_map_entry(id: i32, name: &str) -> Vec<u8> {
 ///
 /// Layout:
 /// - page 0: ESE file header
-/// - pages 1–3: zero-padded
-/// - page 4: catalog with one entry for `table_name` → page 5
-/// - page 5: leaf page containing `raw_records`
+/// - pages 1–4: zero-padded (ESE reserves pages 1-4 for internal metadata)
+/// - page 5: catalog with one entry for `table_name` → page 6  (matches CATALOG_ROOT=5)
+/// - page 6: leaf page containing `raw_records`
 fn make_srudb(table_name: &str, object_id: u32, raw_records: &[Vec<u8>]) -> NamedTempFile {
     let catalog_entry = CatalogEntry {
         object_type: 1,
         object_id,
         parent_object_id: 1,
-        table_page: 5,
+        table_page: 6,
         object_name: table_name.to_owned(),
     };
     let catalog_bytes = catalog_entry.to_bytes();
@@ -109,14 +109,15 @@ fn make_srudb(table_name: &str, object_id: u32, raw_records: &[Vec<u8>]) -> Name
     tmp.write_all(&padding).expect("write pad 1");
     tmp.write_all(&padding).expect("write pad 2");
     tmp.write_all(&padding).expect("write pad 3");
+    tmp.write_all(&padding).expect("write pad 4");
     tmp.write_all(&catalog_page).expect("write catalog");
     tmp.write_all(&data_page).expect("write data");
     tmp
 }
 
-/// Build a synthetic SRUDB.dat with a `NetworkUsage` leaf page at page 5.
+/// Build a synthetic SRUDB.dat with a `NetworkUsage` leaf page at page 6.
 pub fn make_srudb_with_network_records(raw_records: &[Vec<u8>]) -> NamedTempFile {
-    make_srudb("{973F5D5C-1D90-4944-BE8E-24B22A728CF2}", 10, raw_records)
+    make_srudb("{973F5D5C-1D90-4944-BE8E-24B94231A174}", 10, raw_records)
 }
 
 /// Build a synthetic SRUDB.dat with an `AppUsage` leaf page at page 5.

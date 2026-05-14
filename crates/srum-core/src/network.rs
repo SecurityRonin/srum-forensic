@@ -1,6 +1,6 @@
 //! Network usage record — bytes sent/received per process per ~1-hour interval.
 //!
-//! Source table: `{973F5D5C-1D90-4944-BE8E-24B22A728CF2}` in SRUDB.dat.
+//! Source table: `{973F5D5C-1D90-4944-BE8E-24B94231A174}` in SRUDB.dat.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

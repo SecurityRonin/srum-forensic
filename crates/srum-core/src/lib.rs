@@ -59,6 +59,21 @@ pub fn filetime_to_datetime(filetime: u64) -> DateTime<Utc> {
     DateTime::from_timestamp(secs, nanos).unwrap_or(DateTime::UNIX_EPOCH.with_timezone(&Utc))
 }
 
+/// Convert an OLE Automation Date (f64) to a UTC [`DateTime`].
+///
+/// OLE date counts days since 1899-12-30. The Unix epoch is 25569 days after
+/// the OLE epoch. Infinite or NaN values are clamped to `DateTime::UNIX_EPOCH`.
+pub fn ole_date_to_datetime(v: f64) -> DateTime<Utc> {
+    const OLE_TO_UNIX_DAYS: f64 = 25569.0;
+    if !v.is_finite() {
+        return DateTime::UNIX_EPOCH.with_timezone(&Utc);
+    }
+    let unix_secs_f64 = (v - OLE_TO_UNIX_DAYS) * 86400.0;
+    let unix_secs = unix_secs_f64 as i64;
+    let nanos = ((unix_secs_f64 - unix_secs as f64).abs() * 1_000_000_000.0) as u32;
+    DateTime::from_timestamp(unix_secs, nanos).unwrap_or(DateTime::UNIX_EPOCH.with_timezone(&Utc))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -8,7 +8,7 @@ use srum_schema::{all_srum_tables, srum_column_defs, srum_table_name, SrumColumn
 
 #[test]
 fn srum_table_name_network_usage() {
-    let name = srum_table_name("{973F5D5C-1D90-4944-BE8E-24B22A728CF2}");
+    let name = srum_table_name("{973F5D5C-1D90-4944-BE8E-24B94231A174}");
     assert_eq!(name, Some("Network Data Usage"));
 }
 
@@ -42,7 +42,7 @@ fn srum_table_name_unknown_guid_returns_none() {
 
 #[test]
 fn srum_column_defs_network_usage_has_bytes_sent_at_col_8() {
-    let defs = srum_column_defs("{973F5D5C-1D90-4944-BE8E-24B22A728CF2}")
+    let defs = srum_column_defs("{973F5D5C-1D90-4944-BE8E-24B94231A174}")
         .expect("network usage schema must exist");
     let bytes_sent = defs.iter().find(|c| c.name == "BytesSent");
     assert!(bytes_sent.is_some(), "BytesSent column must be present");
@@ -51,7 +51,7 @@ fn srum_column_defs_network_usage_has_bytes_sent_at_col_8() {
 
 #[test]
 fn srum_column_defs_network_usage_count() {
-    let defs = srum_column_defs("{973F5D5C-1D90-4944-BE8E-24B22A728CF2}")
+    let defs = srum_column_defs("{973F5D5C-1D90-4944-BE8E-24B94231A174}")
         .expect("network usage schema must exist");
     assert_eq!(defs.len(), 9, "network usage has 9 columns (1-9)");
 }
@@ -77,7 +77,7 @@ fn all_srum_tables_contains_network_usage() {
     let tables = all_srum_tables();
     let found = tables
         .iter()
-        .any(|t| t.guid == "{973F5D5C-1D90-4944-BE8E-24B22A728CF2}");
+        .any(|t| t.guid == "{973F5D5C-1D90-4944-BE8E-24B94231A174}");
     assert!(found, "all_srum_tables must include Network Data Usage");
 }
 
@@ -109,7 +109,7 @@ fn srum_column_defs_app_usage_foreground_cycle_time_at_col_5() {
 
 #[test]
 fn srum_column_def_type_fields_accessible() {
-    let defs = srum_column_defs("{973F5D5C-1D90-4944-BE8E-24B22A728CF2}")
+    let defs = srum_column_defs("{973F5D5C-1D90-4944-BE8E-24B94231A174}")
         .expect("network usage schema");
     let col = &defs[0];
     let _: u32 = col.column_id;

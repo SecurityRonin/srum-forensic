@@ -10,16 +10,24 @@ use crate::{catalog::CatalogEntry, record::ColumnDef, EseError, EseHeader, EsePa
 ///
 /// Each item is `(page_number, tag_index, record_bytes)`.
 ///
+/// **Delta semantics**: real ESE leaf pages use cumulative key-prefix compression
+/// where tag N's data region spans from page-header-end through tag N's logical
+/// end — a superset of tags 1..N-1.  This iterator returns the *per-record delta*:
+/// the bytes between the previous tag's end and this tag's end.  For synthetic
+/// fixture pages (where tags are stored sequentially), the delta equals each
+/// tag's individual slice, so behaviour is identical to the old cumulative read.
+///
 /// Error recovery: if a page cannot be read or its tag array is corrupt,
 /// the error is yielded and the iterator advances to the next page. If an
-/// individual tag's record data is corrupt, the error is yielded and the
-/// iterator advances to the next tag on the same page.
+/// individual tag's delta is corrupt, the error is yielded and the iterator
+/// advances to the next tag on the same page.
 #[derive(Debug)]
 pub struct TableCursor<'db> {
     db: &'db EseDatabase,
     leaf_pages: Vec<u32>,
     page_idx: usize,
-    tag_idx: usize, // starts at 1 (tag 0 is the page header tag)
+    tag_idx: usize,    // starts at 1 (tag 0 is the page header tag)
+    prev_tag_end: usize, // absolute byte offset of the previous tag's end within the page
 }
 
 impl Iterator for TableCursor<'_> {
@@ -49,12 +57,42 @@ impl Iterator for TableCursor<'_> {
                 self.tag_idx = 1;
                 continue;
             }
-            let tag = self.tag_idx;
+            // Reset prev_tag_end at the start of each new page.
+            // Tag offsets are relative to header end, so the first record on any
+            // page starts at HEADER_SIZE (tag 0 has size=0 on real ESE pages, so
+            // its end = HEADER_SIZE; synthetic pages use HEADER_SIZE as the base too).
+            if self.tag_idx == 1 {
+                self.prev_tag_end = EsePage::HEADER_SIZE;
+            }
+            let tag_idx = self.tag_idx;
             self.tag_idx += 1;
-            return match page.record_data(tag) {
-                Ok(bytes) => Some(Ok((page_num, tag, bytes.to_vec()))),
-                Err(e) => Some(Err(e)),
-            };
+
+            let (tag_off, tag_sz) = tags[tag_idx];
+            let this_end = EsePage::HEADER_SIZE
+                .saturating_add(usize::from(tag_off))
+                .saturating_add(usize::from(tag_sz));
+            let prev_end = self.prev_tag_end;
+
+            if this_end > page.data.len() || prev_end > this_end {
+                self.prev_tag_end = this_end.min(page.data.len());
+                return Some(Err(EseError::Corrupt {
+                    page: page_num,
+                    detail: format!(
+                        "tag {tag_idx} delta out of bounds \
+                         (prev={prev_end}, end={this_end}, page_len={})",
+                        page.data.len()
+                    ),
+                }));
+            }
+
+            let delta = page.data[prev_end..this_end].to_vec();
+            self.prev_tag_end = this_end;
+
+            if delta.is_empty() {
+                continue; // skip zero-length tags (can appear in corrupt or empty pages)
+            }
+
+            return Some(Ok((page_num, tag_idx, delta)));
         }
     }
 }
@@ -155,28 +193,54 @@ impl EseDatabase {
         u64::try_from(self.mmap.len()).unwrap_or(0) / u64::from(self.header.page_size)
     }
 
-    /// Read and parse all entries from the ESE catalog (page 4).
+    /// Read and parse all entries from the ESE catalog (physical page 5).
     ///
-    /// The catalog maps table names to their root B-tree page numbers.
-    /// Each tag on the catalog leaf page (tags 1+, skipping tag 0) is decoded
-    /// as a [`CatalogEntry`].
+    /// The catalog (MSysObjects) maps table names to their root B-tree page
+    /// numbers. Physical page 5 is the catalog root in real SRUDB.dat files
+    /// (fdp=2, ROOT|PARENT or ROOT|LEAF).
+    ///
+    /// Each tag on the catalog leaf pages (tags 1+, skipping tag 0) is first
+    /// tried against the real ESE tagged-column format via
+    /// [`CatalogEntry::parse_real_catalog_record`], then against the synthetic
+    /// fixture format via [`CatalogEntry::from_bytes`] as a fallback.
     ///
     /// # Errors
     ///
     /// Returns [`EseError`] if the catalog page cannot be read or contains
     /// malformed records.
     pub fn catalog_entries(&self) -> Result<Vec<CatalogEntry>, EseError> {
-        const CATALOG_ROOT: u32 = 4;
+        const CATALOG_ROOT: u32 = 5; // physical page 5 = ESE catalog root (fdp=2)
         let leaf_pages = self.walk_leaf_pages(CATALOG_ROOT)?;
         let mut entries = Vec::new();
+        let mut seen_names = std::collections::HashSet::new();
         for page_num in leaf_pages {
             let page = self.read_page(page_num)?;
-            let tags = page.tags()?;
-            // Tag 0 is the page header tag — data records start at tag 1.
-            for i in 1..tags.len() {
-                let data = page.record_data(i)?;
-                if let Ok(entry) = CatalogEntry::from_bytes(data) {
-                    entries.push(entry);
+            // First attempt: scan the raw page data area for real ESE catalog records.
+            // Real ESE catalog pages use a cumulative key-prefix-compression layout
+            // where early records live before the first tag offset — scanning the full
+            // data area (header end → tag-array start) finds them all.
+            let real_entries = CatalogEntry::scan_catalog_page_data(page.raw_data_area()?);
+            if !real_entries.is_empty() {
+                for entry in real_entries {
+                    if seen_names.insert(entry.object_name.clone()) {
+                        entries.push(entry);
+                    }
+                }
+            } else {
+                // Fallback for synthetic test-fixture pages that use the simple
+                // fixed-layout format (no \xff\x00 tagged-column encoding).
+                let tags = page.tags()?;
+                for i in 1..tags.len() {
+                    let data = page.record_data(i)?;
+                    if let Some(entry) = CatalogEntry::parse_real_catalog_record(data) {
+                        if seen_names.insert(entry.object_name.clone()) {
+                            entries.push(entry);
+                        }
+                    } else if let Ok(entry) = CatalogEntry::from_bytes(data) {
+                        if seen_names.insert(entry.object_name.clone()) {
+                            entries.push(entry);
+                        }
+                    }
                 }
             }
         }
@@ -188,10 +252,11 @@ impl EseDatabase {
     ///
     /// - If the page has [`PAGE_FLAG_LEAF`][crate::PAGE_FLAG_LEAF] set, it is
     ///   returned directly.
-    /// - If the page has [`PAGE_FLAG_PARENT`][crate::PAGE_FLAG_PARENT] set,
-    ///   each tag (skipping tag 0) is decoded as an 8-byte child reference
-    ///   whose first 4 bytes are the child page number (u32 LE); the walk
-    ///   recurses into each child.
+    /// - Otherwise each tag (skipping tag 0) is treated as a parent-node
+    ///   reference: the child page ESE number is stored in the **last 4 bytes**
+    ///   of the tag data (after any B-tree key prefix).  The physical page is
+    ///   `stored_value + 1` (ESE uses 0-based data-page numbering, offset by
+    ///   the file-header page).
     ///
     /// # Errors
     ///
@@ -202,15 +267,19 @@ impl EseDatabase {
         if hdr.page_flags & crate::PAGE_FLAG_LEAF != 0 {
             return Ok(vec![root_page]);
         }
-        // Parent page: collect child page numbers from tags 1+.
+        // Parent (or root) page: child page reference is in the LAST 4 bytes
+        // of each tag's data.  ESE stores a 0-based data-page number; adding 1
+        // converts it to the physical page number used by read_page().
         let tag_count = hdr.available_page_tag_count as usize;
         let mut leaves = Vec::new();
         for i in 1..tag_count {
             let data = page.record_data(i)?;
-            if data.len() < 4 {
+            let n = data.len();
+            if n < 4 {
                 continue;
             }
-            let child_page = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+            let child_ese = u32::from_le_bytes(data[n - 4..n].try_into().unwrap());
+            let child_page = child_ese + 1; // ESE 0-based → physical page
             let mut child_leaves = self.walk_leaf_pages(child_page)?;
             leaves.append(&mut child_leaves);
         }
@@ -249,6 +318,7 @@ impl EseDatabase {
             leaf_pages,
             page_idx: 0,
             tag_idx: 1,
+            prev_tag_end: EsePage::HEADER_SIZE,
         })
     }
 

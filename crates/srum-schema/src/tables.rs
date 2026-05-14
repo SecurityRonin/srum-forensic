@@ -13,7 +13,7 @@ pub struct SrumTableInfo {
 
 pub static ALL_SRUM_TABLES: &[SrumTableInfo] = &[
     SrumTableInfo {
-        guid: "{973F5D5C-1D90-4944-BE8E-24B22A728CF2}",
+        guid: "{973F5D5C-1D90-4944-BE8E-24B94231A174}",
         name: "Network Data Usage",
     },
     SrumTableInfo {

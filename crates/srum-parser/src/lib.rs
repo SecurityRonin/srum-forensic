@@ -52,7 +52,7 @@ fn collect_table<T>(
 /// Parse network usage records from a SRUDB.dat file.
 ///
 /// Returns all records from the
-/// `{973F5D5C-1D90-4944-BE8E-24B22A728CF2}` table.
+/// `{973F5D5C-1D90-4944-BE8E-24B94231A174}` table.
 ///
 /// # Errors
 ///
