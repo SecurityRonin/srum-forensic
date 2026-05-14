@@ -158,6 +158,26 @@ impl EsePage {
         Ok(tags)
     }
 
+    /// Return the raw data area of the page: bytes from the end of the 40-byte
+    /// page header to the start of the tag array at the page end.
+    ///
+    /// This span contains ALL record bytes laid out sequentially, including bytes
+    /// that may fall before the smallest tag offset (common in ESE's cumulative
+    /// key-prefix-compression format).  Scanning this area directly (rather than
+    /// individual tags) is the correct way to read real ESE catalog pages.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EseError::Corrupt`] if the header cannot be parsed.
+    pub fn raw_data_area(&self) -> Result<&[u8], EseError> {
+        let hdr = self.parse_header()?;
+        let tag_count = hdr.available_page_tag_count as usize;
+        let tag_array_bytes = tag_count.saturating_mul(4);
+        let tag_array_start = self.data.len().saturating_sub(tag_array_bytes);
+        let start = Self::HEADER_SIZE.min(tag_array_start);
+        Ok(&self.data[start..tag_array_start])
+    }
+
     /// Return the raw record data slice for tag at `index`.
     ///
     /// Tag 0 is the page header tag. Data records start at tag 1.
@@ -389,6 +409,74 @@ mod tests {
         };
         let result = page.record_data(5);
         assert!(result.is_err(), "index beyond tag count must return Err");
+    }
+
+    // ── real ESE tag field order (RED — cb_ in LOW bits, ib_ in HIGH bits) ──
+
+    /// ESE TAG struct: low 13 bits = cb_ (SIZE), high 13 bits = ib_ (OFFSET).
+    /// These two tests pin that contract against a page built with REAL ESE encoding.
+    /// They will FAIL until `tags()` is fixed to read size from LOW and offset from HIGH.
+    #[test]
+    fn tags_real_ese_format_size_in_low_bits_offset_in_high_bits() {
+        // raw = 4u32 means size=4 in LOW, offset=0 in HIGH (real ESE format).
+        // Buggy code reads: offset=4 (LOW), size=0 (HIGH) → returns empty.
+        // Fixed code reads: offset=0 (HIGH), size=4 (LOW) → returns sentinel.
+        let mut data = vec![0u8; 4096];
+        let sentinel = [0xDE, 0xAD, 0xBE, 0xEFu8];
+        data[40..44].copy_from_slice(&sentinel); // HEADER_SIZE=40, offset=0
+
+        data[0x22..0x24].copy_from_slice(&2u16.to_le_bytes()); // tag_count=2
+        data[0x24..0x28].copy_from_slice(&PAGE_FLAG_LEAF.to_le_bytes());
+        data[0x10..0x14].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        data[0x14..0x18].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        // Tag 0: real ESE — size=40 in LOW, offset=0 in HIGH → 40u32
+        data[4096 - 4..4096].copy_from_slice(&40u32.to_le_bytes());
+        // Tag 1: real ESE — size=4 in LOW, offset=0 in HIGH → 4u32
+        data[4096 - 8..4096 - 4].copy_from_slice(&4u32.to_le_bytes());
+
+        let page = EsePage { page_number: 1, data };
+        let (tag_offset, tag_size) = page.tags().expect("tags")[1];
+        assert_eq!(tag_size, 4, "cb_ (size) must be read from LOW 13 bits");
+        assert_eq!(tag_offset, 0, "ib_ (offset) must be read from HIGH 13 bits");
+        assert_eq!(
+            page.record_data(1).expect("record_data"),
+            &sentinel,
+            "real ESE tag: size in LOW bits, offset in HIGH bits"
+        );
+    }
+
+    #[test]
+    fn record_data_real_ese_nonsequential_offset() {
+        // Record 1 at offset=0, record 2 at offset=8 (non-sequential — 4-byte gap).
+        // Direct access (offset+size per tag) must return correct bytes for both.
+        let mut data = vec![0u8; 4096];
+        let rec1 = [0xAAu8; 4];
+        let rec2 = [0xBBu8; 4];
+        data[40..44].copy_from_slice(&rec1); // HEADER_SIZE + offset=0
+        data[48..52].copy_from_slice(&rec2); // HEADER_SIZE + offset=8
+
+        data[0x22..0x24].copy_from_slice(&3u16.to_le_bytes()); // tag_count=3
+        data[0x24..0x28].copy_from_slice(&PAGE_FLAG_LEAF.to_le_bytes());
+        data[0x10..0x14].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        data[0x14..0x18].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        // Tag 0: size=40, offset=0 → 40u32
+        data[4096 - 4..4096].copy_from_slice(&40u32.to_le_bytes());
+        // Tag 1: size=4, offset=0 → 4u32
+        data[4096 - 8..4096 - 4].copy_from_slice(&4u32.to_le_bytes());
+        // Tag 2: size=4, offset=8 → (8u32 << 16) | 4u32
+        data[4096 - 12..4096 - 8].copy_from_slice(&((8u32 << 16) | 4u32).to_le_bytes());
+
+        let page = EsePage { page_number: 1, data };
+        assert_eq!(
+            page.record_data(1).expect("rec1"),
+            &rec1,
+            "record 1 at offset=0"
+        );
+        assert_eq!(
+            page.record_data(2).expect("rec2"),
+            &rec2,
+            "record 2 at non-sequential offset=8"
+        );
     }
 
     // ── tag offset relative-to-header story ──────────────────────────────────
