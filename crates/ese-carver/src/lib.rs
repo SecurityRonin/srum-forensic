@@ -126,7 +126,8 @@ fn parse_tags_raw(page: &[u8], page_size: usize) -> Option<Vec<(usize, usize)>> 
     for i in 0..tag_count {
         let pos = page_size - (i + 1) * 4;
         let raw = u32::from_le_bytes([page[pos], page[pos + 1], page[pos + 2], page[pos + 3]]);
-        tags.push(((raw & 0x1FFF) as usize, ((raw >> 16) & 0x1FFF) as usize));
+        // Real ESE: cb_ (size) in LOW 13 bits, ib_ (offset) in HIGH 13 bits.
+        tags.push((((raw >> 16) & 0x1FFF) as usize, (raw & 0x1FFF) as usize));
     }
     Some(tags)
 }

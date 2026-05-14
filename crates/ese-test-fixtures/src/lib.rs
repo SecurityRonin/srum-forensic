@@ -27,8 +27,8 @@ pub struct PageBuilder {
 impl PageBuilder {
     pub fn new(page_size: usize) -> Self {
         let mut data = vec![0u8; page_size];
-        // Tag 0: relative offset=0, size=40 — designates the 40-byte page header.
-        let tag0_raw: u32 = 40u32 << 16;
+        // Tag 0: size=40, offset=0 — real ESE format: cb_ (size) in LOW, ib_ (offset) in HIGH.
+        let tag0_raw: u32 = 40u32; // size=40 in LOW bits, offset=0 in HIGH bits
         let pos = page_size - 4;
         data[pos..pos + 4].copy_from_slice(&tag0_raw.to_le_bytes());
         // Vista+ header: tag_count at 0x22
@@ -73,7 +73,8 @@ impl PageBuilder {
         self.tag_count += 1;
         let offset_u32 = u32::try_from(relative_offset).expect("offset within u32");
         let len_u32 = u32::try_from(record.len()).expect("record len within u32");
-        let tag_raw: u32 = (offset_u32 & 0x1FFF) | ((len_u32 & 0x1FFF) << 16);
+        // Real ESE format: cb_ (size) in LOW 13 bits, ib_ (offset) in HIGH 13 bits.
+        let tag_raw: u32 = (len_u32 & 0x1FFF) | ((offset_u32 & 0x1FFF) << 16);
         let tag_pos = self.page_size - self.tag_count * 4;
         self.data[tag_pos..tag_pos + 4].copy_from_slice(&tag_raw.to_le_bytes());
         let tag_count_u16 = u16::try_from(self.tag_count).unwrap_or(u16::MAX);

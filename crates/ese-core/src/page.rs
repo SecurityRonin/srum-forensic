@@ -138,11 +138,12 @@ impl EsePage {
                 self.data[tag_offset + 2],
                 self.data[tag_offset + 3],
             ]);
-            // Bits 0-12 of the offset word = offset value (RELATIVE to header end); bits 13-15 = tag flags.
-            // Bits 0-12 of the size word = size value; bits 13-15 = unknown (can be set in real files).
-            // Both fields are 13-bit; mask 0x1FFF strips the flag/unknown bits.
-            let value_offset = (raw & 0x1FFF) as u16;
-            let value_size = ((raw >> 16) & 0x1FFF) as u16;
+            // ESE TAG struct layout (MS-ESEDB §2.2.7.1):
+            //   cb_ (SIZE)   = low  16 bits (bits  0-12 are value, bits 13-15 are flags)
+            //   ib_ (OFFSET) = high 16 bits (bits 16-28 are value, bits 29-31 are flags)
+            // Mask 0x1FFF strips the flag bits from each 13-bit field.
+            let value_size = (raw & 0x1FFF) as u16;           // cb_ = SIZE
+            let value_offset = ((raw >> 16) & 0x1FFF) as u16; // ib_ = OFFSET
             // Guard: absolute position = HEADER_SIZE + relative_offset + size must not exceed page.
             let end = Self::HEADER_SIZE + usize::from(value_offset) + usize::from(value_size);
             if end > self.data.len() {
@@ -349,7 +350,8 @@ mod tests {
     }
 
     fn write_tag(page: &mut [u8], page_size: usize, tag_idx: usize, offset: u16, size: u16) {
-        let raw: u32 = (u32::from(offset) & 0x1FFF) | ((u32::from(size) & 0x1FFF) << 16);
+        // Real ESE format: cb_ (size) in LOW 13 bits, ib_ (offset) in HIGH 13 bits.
+        let raw: u32 = (u32::from(size) & 0x1FFF) | ((u32::from(offset) & 0x1FFF) << 16);
         let pos = page_size - (tag_idx + 1) * 4;
         page[pos..pos + 4].copy_from_slice(&raw.to_le_bytes());
     }
@@ -502,12 +504,13 @@ mod tests {
         data[0x10..0x14].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
         data[0x14..0x18].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
 
-        // Tag 0: relative offset=0, size=40 (covers the header)
-        let tag0: u32 = 40u32 << 16;
+        // Real ESE format: cb_ (size) in LOW bits, ib_ (offset) in HIGH bits.
+        // Tag 0: size=40, offset=0 → raw = 40u32
+        let tag0: u32 = 40u32;
         data[4096 - 4..4096].copy_from_slice(&tag0.to_le_bytes());
 
-        // Tag 1: relative offset=2, size=4 → absolute bytes [42..46]
-        let tag1: u32 = 2u32 | (4u32 << 16);
+        // Tag 1: size=4, offset=2 → absolute bytes [42..46]
+        let tag1: u32 = 4u32 | (2u32 << 16);
         data[4096 - 8..4096 - 4].copy_from_slice(&tag1.to_le_bytes());
 
         let page = EsePage { page_number: 1, data };

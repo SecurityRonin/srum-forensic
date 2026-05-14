@@ -10,24 +10,19 @@ use crate::{catalog::CatalogEntry, record::ColumnDef, EseError, EseHeader, EsePa
 ///
 /// Each item is `(page_number, tag_index, record_bytes)`.
 ///
-/// **Delta semantics**: real ESE leaf pages use cumulative key-prefix compression
-/// where tag N's data region spans from page-header-end through tag N's logical
-/// end — a superset of tags 1..N-1.  This iterator returns the *per-record delta*:
-/// the bytes between the previous tag's end and this tag's end.  For synthetic
-/// fixture pages (where tags are stored sequentially), the delta equals each
-/// tag's individual slice, so behaviour is identical to the old cumulative read.
+/// Record bytes are read directly from each tag's `(offset, size)` pair:
+/// `page.data[HEADER_SIZE + offset .. HEADER_SIZE + offset + size]`.
+/// This is correct for SRUM data tables, which store independently-addressed
+/// records rather than key-prefix-compressed B-tree index keys.
 ///
 /// Error recovery: if a page cannot be read or its tag array is corrupt,
-/// the error is yielded and the iterator advances to the next page. If an
-/// individual tag's delta is corrupt, the error is yielded and the iterator
-/// advances to the next tag on the same page.
+/// the error is yielded and the iterator advances to the next page.
 #[derive(Debug)]
 pub struct TableCursor<'db> {
     db: &'db EseDatabase,
     leaf_pages: Vec<u32>,
     page_idx: usize,
-    tag_idx: usize,    // starts at 1 (tag 0 is the page header tag)
-    prev_tag_end: usize, // absolute byte offset of the previous tag's end within the page
+    tag_idx: usize, // starts at 1 (tag 0 is the page header tag)
 }
 
 impl Iterator for TableCursor<'_> {
@@ -57,42 +52,26 @@ impl Iterator for TableCursor<'_> {
                 self.tag_idx = 1;
                 continue;
             }
-            // Reset prev_tag_end at the start of each new page.
-            // Tag offsets are relative to header end, so the first record on any
-            // page starts at HEADER_SIZE (tag 0 has size=0 on real ESE pages, so
-            // its end = HEADER_SIZE; synthetic pages use HEADER_SIZE as the base too).
-            if self.tag_idx == 1 {
-                self.prev_tag_end = EsePage::HEADER_SIZE;
-            }
             let tag_idx = self.tag_idx;
             self.tag_idx += 1;
 
             let (tag_off, tag_sz) = tags[tag_idx];
-            let this_end = EsePage::HEADER_SIZE
-                .saturating_add(usize::from(tag_off))
-                .saturating_add(usize::from(tag_sz));
-            let prev_end = self.prev_tag_end;
-
-            if this_end > page.data.len() || prev_end > this_end {
-                self.prev_tag_end = this_end.min(page.data.len());
+            if tag_sz == 0 {
+                continue; // skip zero-length tags
+            }
+            let start = EsePage::HEADER_SIZE.saturating_add(usize::from(tag_off));
+            let end = start.saturating_add(usize::from(tag_sz));
+            if end > page.data.len() {
                 return Some(Err(EseError::Corrupt {
                     page: page_num,
                     detail: format!(
-                        "tag {tag_idx} delta out of bounds \
-                         (prev={prev_end}, end={this_end}, page_len={})",
+                        "tag {tag_idx} out of bounds (offset={tag_off}, size={tag_sz}, \
+                         page_len={})",
                         page.data.len()
                     ),
                 }));
             }
-
-            let delta = page.data[prev_end..this_end].to_vec();
-            self.prev_tag_end = this_end;
-
-            if delta.is_empty() {
-                continue; // skip zero-length tags (can appear in corrupt or empty pages)
-            }
-
-            return Some(Ok((page_num, tag_idx, delta)));
+            return Some(Ok((page_num, tag_idx, page.data[start..end].to_vec())));
         }
     }
 }
@@ -318,7 +297,6 @@ impl EseDatabase {
             leaf_pages,
             page_idx: 0,
             tag_idx: 1,
-            prev_tag_end: EsePage::HEADER_SIZE,
         })
     }
 
