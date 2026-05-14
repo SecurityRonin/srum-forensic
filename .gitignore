@@ -1,2 +1,4 @@
 /target
 .worktrees/
+# Real SRUDB.dat test fixtures — downloaded locally, not committed (see tests/data/srudb/SOURCES.md)
+tests/data/srudb/*.dat

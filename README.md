@@ -473,6 +473,12 @@ srum-analysis = "0.1"
 
 ---
 
+## Validation
+
+See [Parser Validation Report](docs/validation-report.md) for accuracy results across 7 real-world SRUDB.dat files from Windows 10, Windows 11, and Windows Server 2022 — including record counts, timestamp ranges, plausibility checks, and known gaps.
+
+---
+
 ## Performance
 
 `ese-core` memory-maps the database file once at open time (`memmap2`). All subsequent page reads — integrity checks, record iteration, carving — slice directly into the OS-managed mapping with no additional syscalls or heap allocation per page. The OS page cache handles read-ahead and eviction; the tool itself never touches the file descriptor again after `open()`.
