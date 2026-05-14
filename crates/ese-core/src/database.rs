@@ -190,8 +190,12 @@ impl EseDatabase {
     pub fn catalog_entries(&self) -> Result<Vec<CatalogEntry>, EseError> {
         const CATALOG_ROOT: u32 = 5; // physical page 5 = ESE catalog root (fdp=2)
         let leaf_pages = self.walk_leaf_pages(CATALOG_ROOT)?;
-        let mut entries = Vec::new();
-        let mut seen_names = std::collections::HashSet::new();
+        // Last-wins: real SRUDB.dat files contain two catalog entries with the same
+        // GUID name — a placeholder (empty page) registered first and the live data
+        // entry registered second. Walking the B-tree in key order, the second entry
+        // resides on a later leaf page and must overwrite the first so that
+        // find_table_page() returns the correct (non-empty) root page.
+        let mut by_name: std::collections::HashMap<String, CatalogEntry> = Default::default();
         for page_num in leaf_pages {
             let page = self.read_page(page_num)?;
             // First attempt: scan the raw page data area for real ESE catalog records.
@@ -201,9 +205,7 @@ impl EseDatabase {
             let real_entries = CatalogEntry::scan_catalog_page_data(page.raw_data_area()?);
             if !real_entries.is_empty() {
                 for entry in real_entries {
-                    if seen_names.insert(entry.object_name.clone()) {
-                        entries.push(entry);
-                    }
+                    by_name.insert(entry.object_name.clone(), entry);
                 }
             } else {
                 // Fallback for synthetic test-fixture pages that use the simple
@@ -212,18 +214,14 @@ impl EseDatabase {
                 for i in 1..tags.len() {
                     let data = page.record_data(i)?;
                     if let Some(entry) = CatalogEntry::parse_real_catalog_record(data) {
-                        if seen_names.insert(entry.object_name.clone()) {
-                            entries.push(entry);
-                        }
+                        by_name.insert(entry.object_name.clone(), entry);
                     } else if let Ok(entry) = CatalogEntry::from_bytes(data) {
-                        if seen_names.insert(entry.object_name.clone()) {
-                            entries.push(entry);
-                        }
+                        by_name.insert(entry.object_name.clone(), entry);
                     }
                 }
             }
         }
-        Ok(entries)
+        Ok(by_name.into_values().collect())
     }
 
     /// Walk the B-tree rooted at `root_page` and return the page numbers of
