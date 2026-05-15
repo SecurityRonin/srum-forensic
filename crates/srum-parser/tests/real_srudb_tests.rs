@@ -19,7 +19,7 @@ use forensicnomicon::srum::{
     TABLE_APP_RESOURCE_USAGE, TABLE_ENERGY_USAGE, TABLE_ID_MAP, TABLE_NETWORK_CONNECTIVITY,
     TABLE_NETWORK_USAGE, TABLE_PUSH_NOTIFICATIONS,
 };
-use srum_parser::{parse_app_usage, parse_id_map, parse_network_usage};
+use srum_parser::{parse_app_timeline, parse_app_usage, parse_id_map, parse_network_usage};
 
 // ── fixture paths ─────────────────────────────────────────────────────────────
 
@@ -275,6 +275,69 @@ fn rathbunvm_win11_app_usage_count_matches_dissect() {
         records.len() >= 780,
         "rathbunvm win11 must have >= 780 app usage records (dissect: 791), got {}",
         records.len()
+    );
+}
+
+// ── idmap decoder field accuracy ──────────────────────────────────────────────
+
+#[test]
+fn rathbunvm_win10_idmap_count_matches_dissect() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let entries = parse_id_map(p).expect("parse_id_map must not error");
+    assert!(
+        entries.len() >= 280,
+        "rathbunvm win10 must have >= 280 idmap entries (dissect: 288), got {}",
+        entries.len()
+    );
+}
+
+#[test]
+fn rathbunvm_win10_idmap_string_entry_has_correct_id_and_name() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let entries = parse_id_map(p).expect("parse ok");
+    let entry3 = entries.iter().find(|e| e.id == 3);
+    assert!(entry3.is_some(), "must have entry with id=3");
+    assert!(
+        entry3.unwrap().name.starts_with("!!"),
+        "IdType=0 entry name must start with '!!' (SRUM blob format), got {:?}",
+        entry3.unwrap().name
+    );
+}
+
+// ── app timeline decoder field accuracy ──────────────────────────────────────
+
+#[test]
+fn rathbunvm_win10_app_timeline_count_matches_dissect() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let records = parse_app_timeline(p).expect("parse ok");
+    assert!(
+        records.len() >= 4,
+        "rathbunvm win10 must have >= 4 app timeline records (dissect: 4), got {}",
+        records.len()
+    );
+}
+
+#[test]
+fn rathbunvm_win10_app_timeline_records_have_correct_app_id() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let records = parse_app_timeline(p).expect("parse ok");
+    assert!(!records.is_empty(), "must have at least one record");
+    assert_eq!(
+        records[0].app_id, 154,
+        "first app_timeline record must have AppId=154, got {}",
+        records[0].app_id
+    );
+}
+
+#[test]
+fn rathbunvm_win10_app_timeline_records_have_correct_user_id() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let records = parse_app_timeline(p).expect("parse ok");
+    assert!(!records.is_empty(), "must have at least one record");
+    assert_eq!(
+        records[0].user_id, 52,
+        "first app_timeline record must have UserId=52, got {}",
+        records[0].user_id
     );
 }
 
