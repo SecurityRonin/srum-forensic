@@ -33,13 +33,16 @@ pub fn make_leaf_page_with_records(flags_extra: u32, records: &[Vec<u8>]) -> Vec
     builder.build()
 }
 
-/// Build a parent (internal B-tree node) page whose child pointers point to
-/// the given page numbers.
+/// Build a parent (internal B-tree node) page whose child pointers use the
+/// given **ESE page numbers** (0-based data-page numbering, i.e. physical − 1).
+///
+/// `walk_leaf_pages` adds 1 to each stored value to convert it to a physical
+/// page number, so callers must pass `physical_page - 1`.
 #[allow(dead_code)]
-pub fn make_parent_page_with_children(children: &[u32]) -> Vec<u8> {
+pub fn make_parent_page_with_children(ese_children: &[u32]) -> Vec<u8> {
     let mut builder = PageBuilder::new(PAGE_SIZE).parent();
-    for &child in children {
-        builder = builder.add_child_page(child);
+    for &ese_page in ese_children {
+        builder = builder.add_child_page(ese_page);
     }
     builder.build()
 }
@@ -55,9 +58,10 @@ pub fn write_ese_file(pages: &[Vec<u8>]) -> NamedTempFile {
     tmp
 }
 
-/// Build a single-page ESE database with a catalog leaf page at page 4.
+/// Build a single-page ESE database with a catalog leaf page at physical page 5.
 ///
-/// Returns a `NamedTempFile` with pages: `[header, 1, 2, 3, catalog_leaf]`.
+/// Returns a `NamedTempFile` with pages: `[header(0), 1, 2, 3, 4, catalog_leaf(5)]`.
+/// Page 5 matches the `CATALOG_ROOT` constant used by `EseDatabase::catalog_entries`.
 #[allow(dead_code)]
 pub fn make_ese_with_catalog(entries: &[CatalogEntry]) -> NamedTempFile {
     let mut catalog_builder = PageBuilder::new(PAGE_SIZE).leaf();
@@ -67,9 +71,10 @@ pub fn make_ese_with_catalog(entries: &[CatalogEntry]) -> NamedTempFile {
     let catalog_page = catalog_builder.build();
     let padding = vec![0u8; PAGE_SIZE];
     EseFileBuilder::new()
-        .add_page(padding.clone())
-        .add_page(padding.clone())
-        .add_page(padding)
-        .add_page(catalog_page)
+        .add_page(padding.clone()) // page 1
+        .add_page(padding.clone()) // page 2
+        .add_page(padding.clone()) // page 3
+        .add_page(padding)         // page 4
+        .add_page(catalog_page)    // page 5 = catalog (matches CATALOG_ROOT=5)
         .write()
 }

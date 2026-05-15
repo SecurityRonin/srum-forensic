@@ -433,7 +433,7 @@ fn detect_orphaned_catalog_empty_for_database_with_no_catalog_entries() {
 
 #[test]
 fn detect_orphaned_catalog_reports_orphan_when_table_page_is_out_of_bounds() {
-    // Catalog entry references page 100; file only has 5 pages → orphaned.
+    // Catalog entry references page 100; file only has 6 pages → orphaned.
     let tmp = fixtures::make_ese_with_orphaned_catalog_entry();
     let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
     let anomalies = detect_orphaned_catalog(&db);

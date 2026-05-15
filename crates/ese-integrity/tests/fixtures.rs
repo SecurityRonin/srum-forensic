@@ -84,10 +84,11 @@ pub fn make_ese_with_deleted_record() -> NamedTempFile {
         .write()
 }
 
-/// ESE file with a catalog entry (at page 4) pointing to a non-existent page.
+/// ESE file with a catalog entry (at page 5) pointing to a non-existent page.
 ///
-/// Layout: page 0 = header, pages 1-3 = blank, page 4 = catalog leaf.
-/// Total = 5 pages; the catalog entry references page 100 → orphaned.
+/// Layout: page 0 = header, pages 1-4 = blank, page 5 = catalog leaf.
+/// Total = 6 pages; the catalog entry references page 100 → orphaned.
+/// Page 5 matches the `CATALOG_ROOT` constant in `EseDatabase::catalog_entries`.
 pub fn make_ese_with_orphaned_catalog_entry() -> NamedTempFile {
     let entry = CatalogEntry {
         object_type: 1,
@@ -105,7 +106,8 @@ pub fn make_ese_with_orphaned_catalog_entry() -> NamedTempFile {
         .add_page(blank.clone()) // page 1
         .add_page(blank.clone()) // page 2
         .add_page(blank.clone()) // page 3
-        .add_page(catalog_leaf)  // page 4 = catalog leaf
+        .add_page(blank.clone()) // page 4
+        .add_page(catalog_leaf)  // page 5 = catalog leaf (matches CATALOG_ROOT)
         .write()
 }
 

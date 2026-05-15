@@ -20,11 +20,11 @@ fn walk_leaf_root_returns_root_page() {
 #[test]
 fn walk_two_level_btree_returns_leaf_pages_not_root() {
     // page 0 = header
-    // page 1 = parent (root), pointing to children at pages 2 and 3
-    // page 2 = leaf A
-    // page 3 = leaf B
+    // page 1 = parent (root), ESE child refs [1, 2] → physical pages 2 and 3
+    // page 2 = leaf A  (ESE page 1, physical 2)
+    // page 3 = leaf B  (ESE page 2, physical 3)
     let header = fixtures::make_ese_header_page();
-    let parent = fixtures::make_parent_page_with_children(&[2, 3]);
+    let parent = fixtures::make_parent_page_with_children(&[1, 2]); // ESE page numbers
     let leaf_a = fixtures::make_leaf_page_with_records(0, &[]);
     let leaf_b = fixtures::make_leaf_page_with_records(0, &[]);
     let tmp = fixtures::write_ese_file(&[header, parent, leaf_a, leaf_b]);
