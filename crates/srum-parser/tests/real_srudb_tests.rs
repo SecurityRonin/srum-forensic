@@ -19,7 +19,10 @@ use forensicnomicon::srum::{
     TABLE_APP_RESOURCE_USAGE, TABLE_ENERGY_USAGE, TABLE_ID_MAP, TABLE_NETWORK_CONNECTIVITY,
     TABLE_NETWORK_USAGE, TABLE_PUSH_NOTIFICATIONS,
 };
-use srum_parser::{parse_app_timeline, parse_app_usage, parse_id_map, parse_network_usage};
+use srum_parser::{
+    parse_app_timeline, parse_app_usage, parse_energy_lt, parse_energy_usage, parse_id_map,
+    parse_network_connectivity, parse_network_usage, parse_push_notifications,
+};
 
 // ── fixture paths ─────────────────────────────────────────────────────────────
 
@@ -37,6 +40,21 @@ const MUSEUM_RATHBUNVM_WIN10: &str = concat!(
 const MUSEUM_RATHBUNVM_WIN11: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/data/srudb/museum_rathbunvm_win11_SRUDB.dat"
+);
+
+const MUSEUM_BELKASOFTCTF_WIN10: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/museum_belkasoftctf_win10_SRUDB.dat"
+);
+
+const MUSEUM_APTVM_SERVER2022_CLEAN: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/museum_aptvm_server2022_clean_SRUDB.dat"
+);
+
+const MUSEUM_APTVM_SERVER2022_1DAYLATER: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/museum_aptvm_server2022_1daylater_SRUDB.dat"
 );
 
 /// Return the path only if the file exists, otherwise print a skip message and
@@ -338,6 +356,362 @@ fn rathbunvm_win10_app_timeline_records_have_correct_user_id() {
         records[0].user_id, 52,
         "first app_timeline record must have UserId=52, got {}",
         records[0].user_id
+    );
+}
+
+// ── full-coverage smoke tests: all parsers × all fixtures ─────────────────────
+//
+// Ground truth from dissect.esedb 3.18 (ABSENT = table not in catalog):
+//
+// fixture              net  app  conn  energy  elt  push  timeline  idmap
+// chainsaw             96   1660 6     0       0    562   26        714
+// plaso                1840 2851 260   0       2    16183 ABSENT    5895
+// rathbunvm_win10      23   163  1     ABSENT  ABST 118   4         288
+// rathbunvm_win11      143  791  9     13      2    662   33        1044
+// belkasoftctf_win10   465  4107 50    0       1    2087  101       476
+// aptvm_server22_clean ABST ABST ABST  ABSENT  ABST ABST  ABSENT    2
+// aptvm_server22_1day  ABST ABST 4     ABSENT  ABST 153   ABSENT    96
+//
+// All tests assert no-panic (Ok result). Tables marked ABSENT return Ok([]).
+// Tables with 0 records in dissect may return Ok([]) from our parser too.
+
+// ── chainsaw ──────────────────────────────────────────────────────────────────
+
+#[test]
+fn chainsaw_network_connectivity_parses_without_panic() {
+    let Some(p) = fixture(CHAINSAW) else { return };
+    let r = parse_network_connectivity(p);
+    assert!(r.is_ok(), "chainsaw: parse_network_connectivity failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "chainsaw: network_connectivity must be non-empty (dissect: 6)");
+}
+
+#[test]
+fn chainsaw_energy_usage_parses_without_panic() {
+    let Some(p) = fixture(CHAINSAW) else { return };
+    let r = parse_energy_usage(p);
+    assert!(r.is_ok(), "chainsaw: parse_energy_usage failed: {:?}", r);
+}
+
+#[test]
+fn chainsaw_energy_lt_parses_without_panic() {
+    let Some(p) = fixture(CHAINSAW) else { return };
+    let r = parse_energy_lt(p);
+    assert!(r.is_ok(), "chainsaw: parse_energy_lt failed: {:?}", r);
+}
+
+#[test]
+fn chainsaw_push_notifications_parses_without_panic() {
+    let Some(p) = fixture(CHAINSAW) else { return };
+    let r = parse_push_notifications(p);
+    assert!(r.is_ok(), "chainsaw: parse_push_notifications failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "chainsaw: push_notifications must be non-empty (dissect: 562)");
+}
+
+#[test]
+fn chainsaw_app_timeline_parses_without_panic() {
+    let Some(p) = fixture(CHAINSAW) else { return };
+    let r = parse_app_timeline(p);
+    assert!(r.is_ok(), "chainsaw: parse_app_timeline failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "chainsaw: app_timeline must be non-empty (dissect: 26)");
+}
+
+#[test]
+fn chainsaw_id_map_parses_non_empty() {
+    let Some(p) = fixture(CHAINSAW) else { return };
+    let entries = parse_id_map(p).expect("chainsaw: parse_id_map must not error");
+    assert!(
+        entries.len() >= 700,
+        "chainsaw: idmap must have >= 700 entries (dissect: 714), got {}",
+        entries.len()
+    );
+}
+
+// ── plaso ─────────────────────────────────────────────────────────────────────
+
+#[test]
+fn plaso_network_connectivity_parses_without_panic() {
+    let Some(p) = fixture(PLASO) else { return };
+    let r = parse_network_connectivity(p);
+    assert!(r.is_ok(), "plaso: parse_network_connectivity failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "plaso: network_connectivity must be non-empty (dissect: 260)");
+}
+
+#[test]
+fn plaso_energy_lt_parses_without_panic() {
+    let Some(p) = fixture(PLASO) else { return };
+    let r = parse_energy_lt(p);
+    assert!(r.is_ok(), "plaso: parse_energy_lt failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "plaso: energy_lt must be non-empty (dissect: 2)");
+}
+
+#[test]
+fn plaso_push_notifications_parses_without_panic() {
+    let Some(p) = fixture(PLASO) else { return };
+    let r = parse_push_notifications(p);
+    assert!(r.is_ok(), "plaso: parse_push_notifications failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "plaso: push_notifications must be non-empty (dissect: 16183)");
+}
+
+#[test]
+fn plaso_id_map_parses_non_empty() {
+    let Some(p) = fixture(PLASO) else { return };
+    let entries = parse_id_map(p).expect("plaso: parse_id_map must not error");
+    assert!(
+        entries.len() >= 5800,
+        "plaso: idmap must have >= 5800 entries (dissect: 5895), got {}",
+        entries.len()
+    );
+}
+
+// ── rathbunvm_win11 ───────────────────────────────────────────────────────────
+
+#[test]
+fn rathbunvm_win11_network_usage_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let r = parse_network_usage(p);
+    assert!(r.is_ok(), "rathbunvm_win11: parse_network_usage failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "rathbunvm_win11: network_usage must be non-empty (dissect: 143)");
+}
+
+#[test]
+fn rathbunvm_win11_network_connectivity_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let r = parse_network_connectivity(p);
+    assert!(r.is_ok(), "rathbunvm_win11: parse_network_connectivity failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "rathbunvm_win11: network_connectivity must be non-empty (dissect: 9)");
+}
+
+#[test]
+fn rathbunvm_win11_energy_usage_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let r = parse_energy_usage(p);
+    assert!(r.is_ok(), "rathbunvm_win11: parse_energy_usage failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "rathbunvm_win11: energy_usage must be non-empty (dissect: 13)");
+}
+
+#[test]
+fn rathbunvm_win11_energy_lt_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let r = parse_energy_lt(p);
+    assert!(r.is_ok(), "rathbunvm_win11: parse_energy_lt failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "rathbunvm_win11: energy_lt must be non-empty (dissect: 2)");
+}
+
+#[test]
+fn rathbunvm_win11_push_notifications_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let r = parse_push_notifications(p);
+    assert!(r.is_ok(), "rathbunvm_win11: parse_push_notifications failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "rathbunvm_win11: push_notifications must be non-empty (dissect: 662)");
+}
+
+#[test]
+fn rathbunvm_win11_app_timeline_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let r = parse_app_timeline(p);
+    assert!(r.is_ok(), "rathbunvm_win11: parse_app_timeline failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "rathbunvm_win11: app_timeline must be non-empty (dissect: 33)");
+}
+
+#[test]
+fn rathbunvm_win11_id_map_parses_non_empty() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let entries = parse_id_map(p).expect("rathbunvm_win11: parse_id_map must not error");
+    assert!(
+        entries.len() >= 1000,
+        "rathbunvm_win11: idmap must have >= 1000 entries (dissect: 1044), got {}",
+        entries.len()
+    );
+}
+
+// ── rathbunvm_win10 (additional parsers not yet covered) ─────────────────────
+
+#[test]
+fn rathbunvm_win10_network_usage_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let r = parse_network_usage(p);
+    assert!(r.is_ok(), "rathbunvm_win10: parse_network_usage failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "rathbunvm_win10: network_usage must be non-empty (dissect: 23)");
+}
+
+#[test]
+fn rathbunvm_win10_network_connectivity_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let r = parse_network_connectivity(p);
+    assert!(r.is_ok(), "rathbunvm_win10: parse_network_connectivity failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "rathbunvm_win10: network_connectivity must be non-empty (dissect: 1)");
+}
+
+#[test]
+fn rathbunvm_win10_push_notifications_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let r = parse_push_notifications(p);
+    assert!(r.is_ok(), "rathbunvm_win10: parse_push_notifications failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "rathbunvm_win10: push_notifications must be non-empty (dissect: 118)");
+}
+
+// ── belkasoftctf_win10 ────────────────────────────────────────────────────────
+
+#[test]
+fn belkasoftctf_win10_opens_without_error() {
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    EseDatabase::open(p).expect("belkasoftctf_win10: EseDatabase::open must succeed");
+}
+
+#[test]
+fn belkasoftctf_win10_catalog_has_core_srum_tables() {
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let db = EseDatabase::open(p).expect("open");
+    assert_catalog_has_core_srum_tables(&db, "belkasoftctf_win10");
+}
+
+#[test]
+fn belkasoftctf_win10_network_usage_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let r = parse_network_usage(p);
+    assert!(r.is_ok(), "belkasoftctf_win10: parse_network_usage failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "belkasoftctf_win10: network_usage must be non-empty (dissect: 465)");
+}
+
+#[test]
+fn belkasoftctf_win10_app_usage_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let r = parse_app_usage(p);
+    assert!(r.is_ok(), "belkasoftctf_win10: parse_app_usage failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "belkasoftctf_win10: app_usage must be non-empty (dissect: 4107)");
+}
+
+#[test]
+fn belkasoftctf_win10_network_connectivity_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let r = parse_network_connectivity(p);
+    assert!(r.is_ok(), "belkasoftctf_win10: parse_network_connectivity failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "belkasoftctf_win10: network_connectivity must be non-empty (dissect: 50)");
+}
+
+#[test]
+fn belkasoftctf_win10_energy_usage_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let r = parse_energy_usage(p);
+    assert!(r.is_ok(), "belkasoftctf_win10: parse_energy_usage failed: {:?}", r);
+}
+
+#[test]
+fn belkasoftctf_win10_energy_lt_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let r = parse_energy_lt(p);
+    assert!(r.is_ok(), "belkasoftctf_win10: parse_energy_lt failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "belkasoftctf_win10: energy_lt must be non-empty (dissect: 1)");
+}
+
+#[test]
+fn belkasoftctf_win10_push_notifications_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let r = parse_push_notifications(p);
+    assert!(r.is_ok(), "belkasoftctf_win10: parse_push_notifications failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "belkasoftctf_win10: push_notifications must be non-empty (dissect: 2087)");
+}
+
+#[test]
+fn belkasoftctf_win10_app_timeline_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let r = parse_app_timeline(p);
+    assert!(r.is_ok(), "belkasoftctf_win10: parse_app_timeline failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "belkasoftctf_win10: app_timeline must be non-empty (dissect: 101)");
+}
+
+#[test]
+fn belkasoftctf_win10_id_map_parses_non_empty() {
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let entries = parse_id_map(p).expect("belkasoftctf_win10: parse_id_map must not error");
+    assert!(
+        entries.len() >= 470,
+        "belkasoftctf_win10: idmap must have >= 470 entries (dissect: 476), got {}",
+        entries.len()
+    );
+}
+
+// ── aptvm_server2022_clean ────────────────────────────────────────────────────
+// Server 2022 clean install: only SruDbIdMapTable exists (2 entries).
+// All other SRUM extension tables are absent — must return Ok([]).
+
+#[test]
+fn aptvm_server2022_clean_opens_without_error() {
+    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_CLEAN) else { return };
+    EseDatabase::open(p).expect("aptvm_clean: EseDatabase::open must succeed");
+}
+
+#[test]
+fn aptvm_server2022_clean_all_parsers_return_ok() {
+    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_CLEAN) else { return };
+    assert!(parse_network_usage(p).is_ok(),          "aptvm_clean: parse_network_usage failed");
+    assert!(parse_app_usage(p).is_ok(),               "aptvm_clean: parse_app_usage failed");
+    assert!(parse_network_connectivity(p).is_ok(),    "aptvm_clean: parse_network_connectivity failed");
+    assert!(parse_energy_usage(p).is_ok(),            "aptvm_clean: parse_energy_usage failed");
+    assert!(parse_energy_lt(p).is_ok(),               "aptvm_clean: parse_energy_lt failed");
+    assert!(parse_push_notifications(p).is_ok(),      "aptvm_clean: parse_push_notifications failed");
+    assert!(parse_app_timeline(p).is_ok(),            "aptvm_clean: parse_app_timeline failed");
+    assert!(parse_id_map(p).is_ok(),                  "aptvm_clean: parse_id_map failed");
+}
+
+#[test]
+fn aptvm_server2022_clean_absent_tables_return_empty() {
+    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_CLEAN) else { return };
+    assert!(parse_network_usage(p).unwrap().is_empty(),       "aptvm_clean: network_usage should be empty (ABSENT)");
+    assert!(parse_app_usage(p).unwrap().is_empty(),            "aptvm_clean: app_usage should be empty (ABSENT)");
+    assert!(parse_network_connectivity(p).unwrap().is_empty(), "aptvm_clean: network_connectivity should be empty (ABSENT)");
+    assert!(parse_energy_usage(p).unwrap().is_empty(),         "aptvm_clean: energy_usage should be empty (ABSENT)");
+    assert!(parse_energy_lt(p).unwrap().is_empty(),            "aptvm_clean: energy_lt should be empty (ABSENT)");
+    assert!(parse_push_notifications(p).unwrap().is_empty(),   "aptvm_clean: push_notifications should be empty (ABSENT)");
+    assert!(parse_app_timeline(p).unwrap().is_empty(),         "aptvm_clean: app_timeline should be empty (ABSENT)");
+}
+
+// ── aptvm_server2022_1daylater ────────────────────────────────────────────────
+// After one day of use: connectivity(4), push_notifications(153), idmap(96).
+
+#[test]
+fn aptvm_server2022_1daylater_opens_without_error() {
+    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else { return };
+    EseDatabase::open(p).expect("aptvm_1daylater: EseDatabase::open must succeed");
+}
+
+#[test]
+fn aptvm_server2022_1daylater_all_parsers_return_ok() {
+    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else { return };
+    assert!(parse_network_usage(p).is_ok(),          "aptvm_1daylater: parse_network_usage failed");
+    assert!(parse_app_usage(p).is_ok(),               "aptvm_1daylater: parse_app_usage failed");
+    assert!(parse_network_connectivity(p).is_ok(),    "aptvm_1daylater: parse_network_connectivity failed");
+    assert!(parse_energy_usage(p).is_ok(),            "aptvm_1daylater: parse_energy_usage failed");
+    assert!(parse_energy_lt(p).is_ok(),               "aptvm_1daylater: parse_energy_lt failed");
+    assert!(parse_push_notifications(p).is_ok(),      "aptvm_1daylater: parse_push_notifications failed");
+    assert!(parse_app_timeline(p).is_ok(),            "aptvm_1daylater: parse_app_timeline failed");
+    assert!(parse_id_map(p).is_ok(),                  "aptvm_1daylater: parse_id_map failed");
+}
+
+#[test]
+fn aptvm_server2022_1daylater_network_connectivity_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else { return };
+    let r = parse_network_connectivity(p);
+    assert!(r.is_ok(), "aptvm_1daylater: parse_network_connectivity failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "aptvm_1daylater: network_connectivity must be non-empty (dissect: 4)");
+}
+
+#[test]
+fn aptvm_server2022_1daylater_push_notifications_parses_without_panic() {
+    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else { return };
+    let r = parse_push_notifications(p);
+    assert!(r.is_ok(), "aptvm_1daylater: parse_push_notifications failed: {:?}", r);
+    assert!(!r.unwrap().is_empty(), "aptvm_1daylater: push_notifications must be non-empty (dissect: 153)");
+}
+
+#[test]
+fn aptvm_server2022_1daylater_id_map_parses_non_empty() {
+    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else { return };
+    let entries = parse_id_map(p).expect("aptvm_1daylater: parse_id_map must not error");
+    assert!(
+        entries.len() >= 90,
+        "aptvm_1daylater: idmap must have >= 90 entries (dissect: 96), got {}",
+        entries.len()
     );
 }
 
