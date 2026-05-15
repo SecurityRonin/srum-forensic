@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"static":["ALL_SRUM_TABLES"],"struct":["SrumTableInfo"]};

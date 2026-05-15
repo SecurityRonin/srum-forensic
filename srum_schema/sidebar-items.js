@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["all_srum_tables","srum_column_defs","srum_table_name"],"mod":["columns","tables"],"struct":["SrumColumnDef","SrumTableInfo"]};

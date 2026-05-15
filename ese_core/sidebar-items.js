@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["open"],"mod":["catalog","database","error","header","page","record"]};

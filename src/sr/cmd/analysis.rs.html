@@ -1,0 +1,119 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `crates/sr-cli/src/cmd/analysis.rs`."><title>analysis.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-17e0aaed.css"><script id="default-settings" 
+data-use_system_theme="false"
+data-theme="ayu"></script><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="sr" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (7c3c88f42 2026-05-14)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">sr/cmd/</div>analysis.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>std::path::Path;
+<a href=#2 id=2 data-nosnippet>2</a>
+<a href=#3 id=3 data-nosnippet>3</a><span class="kw">use </span><span class="kw">crate</span>::output::{OutputFormat, print_values};
+<a href=#4 id=4 data-nosnippet>4</a>
+<a href=#5 id=5 data-nosnippet>5</a><span class="doccomment">/// Named forensic hunt signature for `sr hunt`.
+<a href=#6 id=6 data-nosnippet>6</a></span><span class="attr">#[derive(clap::ValueEnum, Clone, Debug)]
+<a href=#7 id=7 data-nosnippet>7</a></span><span class="kw">pub enum </span>HuntSignature {
+<a href=#8 id=8 data-nosnippet>8</a>    <span class="doccomment">/// Records with exfil_signal: true (cross-table exfiltration fingerprint)
+<a href=#9 id=9 data-nosnippet>9</a>    </span>Exfil,
+<a href=#10 id=10 data-nosnippet>10</a>    <span class="doccomment">/// Records with background_cpu_dominant: true (miner/persistent background process)
+<a href=#11 id=11 data-nosnippet>11</a>    </span>Miner,
+<a href=#12 id=12 data-nosnippet>12</a>    <span class="doccomment">/// Records with masquerade_candidate: true (lookalike process name)
+<a href=#13 id=13 data-nosnippet>13</a>    </span>Masquerade,
+<a href=#14 id=14 data-nosnippet>14</a>    <span class="doccomment">/// Records with suspicious_path: true (execution from temp/downloads/UNC)
+<a href=#15 id=15 data-nosnippet>15</a>    </span><span class="attr">#[value(name = <span class="string">"suspicious-path"</span>)]
+<a href=#16 id=16 data-nosnippet>16</a>    </span>SuspiciousPath,
+<a href=#17 id=17 data-nosnippet>17</a>    <span class="doccomment">/// Records with no_focus_with_cpu: true (CPU without keyboard focus)
+<a href=#18 id=18 data-nosnippet>18</a>    </span><span class="attr">#[value(name = <span class="string">"no-focus"</span>)]
+<a href=#19 id=19 data-nosnippet>19</a>    </span>NoFocus,
+<a href=#20 id=20 data-nosnippet>20</a>    <span class="doccomment">/// Records with phantom_foreground: true (foreground cycles but zero focus time)
+<a href=#21 id=21 data-nosnippet>21</a>    </span>Phantom,
+<a href=#22 id=22 data-nosnippet>22</a>    <span class="doccomment">/// Records with automated_execution: true (focus without user input)
+<a href=#23 id=23 data-nosnippet>23</a>    </span>Automated,
+<a href=#24 id=24 data-nosnippet>24</a>    <span class="doccomment">/// Records with beaconing: true (regular-interval network activity)
+<a href=#25 id=25 data-nosnippet>25</a>    </span>Beaconing,
+<a href=#26 id=26 data-nosnippet>26</a>    <span class="doccomment">/// Records with notification_c2: true (notification-as-C2 pattern)
+<a href=#27 id=27 data-nosnippet>27</a>    </span><span class="attr">#[value(name = <span class="string">"notification-c2"</span>)]
+<a href=#28 id=28 data-nosnippet>28</a>    </span>NotificationC2,
+<a href=#29 id=29 data-nosnippet>29</a>    <span class="doccomment">/// Any record with at least one heuristic flag set
+<a href=#30 id=30 data-nosnippet>30</a>    </span>All,
+<a href=#31 id=31 data-nosnippet>31</a>}
+<a href=#32 id=32 data-nosnippet>32</a>
+<a href=#33 id=33 data-nosnippet>33</a><span class="doccomment">/// Map the CLI `HuntSignature` (with Clap attrs) to `srum_analysis::analysis::HuntSignature`.
+<a href=#34 id=34 data-nosnippet>34</a></span><span class="kw">pub fn </span>to_analysis_sig(s: <span class="kw-2">&amp;</span>HuntSignature) -&gt; srum_analysis::analysis::HuntSignature {
+<a href=#35 id=35 data-nosnippet>35</a>    <span class="kw">use </span>HuntSignature <span class="kw">as </span>C;
+<a href=#36 id=36 data-nosnippet>36</a>    <span class="kw">use </span>srum_analysis::analysis::HuntSignature <span class="kw">as </span>A;
+<a href=#37 id=37 data-nosnippet>37</a>    <span class="kw">match </span>s {
+<a href=#38 id=38 data-nosnippet>38</a>        C::Exfil          =&gt; A::Exfil,
+<a href=#39 id=39 data-nosnippet>39</a>        C::Miner          =&gt; A::Miner,
+<a href=#40 id=40 data-nosnippet>40</a>        C::Masquerade     =&gt; A::Masquerade,
+<a href=#41 id=41 data-nosnippet>41</a>        C::SuspiciousPath =&gt; A::SuspiciousPath,
+<a href=#42 id=42 data-nosnippet>42</a>        C::NoFocus        =&gt; A::NoFocus,
+<a href=#43 id=43 data-nosnippet>43</a>        C::Phantom        =&gt; A::Phantom,
+<a href=#44 id=44 data-nosnippet>44</a>        C::Automated      =&gt; A::Automated,
+<a href=#45 id=45 data-nosnippet>45</a>        C::Beaconing      =&gt; A::Beaconing,
+<a href=#46 id=46 data-nosnippet>46</a>        C::NotificationC2 =&gt; A::NotificationC2,
+<a href=#47 id=47 data-nosnippet>47</a>        C::All            =&gt; A::All,
+<a href=#48 id=48 data-nosnippet>48</a>    }
+<a href=#49 id=49 data-nosnippet>49</a>}
+<a href=#50 id=50 data-nosnippet>50</a>
+<a href=#51 id=51 data-nosnippet>51</a><span class="kw">pub fn </span>run_timeline(path: <span class="kw-2">&amp;</span>Path, resolve: bool, format: <span class="kw-2">&amp;</span>OutputFormat) -&gt; anyhow::Result&lt;()&gt; {
+<a href=#52 id=52 data-nosnippet>52</a>    <span class="kw">let </span>id_map = resolve.then(|| srum_analysis::load_id_map(path));
+<a href=#53 id=53 data-nosnippet>53</a>    <span class="kw">let </span>all = srum_analysis::build_timeline(path, id_map.as_ref());
+<a href=#54 id=54 data-nosnippet>54</a>    print_values(<span class="kw-2">&amp;</span>all, format)
+<a href=#55 id=55 data-nosnippet>55</a>}
+<a href=#56 id=56 data-nosnippet>56</a>
+<a href=#57 id=57 data-nosnippet>57</a><span class="kw">pub fn </span>run_process(
+<a href=#58 id=58 data-nosnippet>58</a>    app: <span class="kw-2">&amp;</span>str,
+<a href=#59 id=59 data-nosnippet>59</a>    path: <span class="kw-2">&amp;</span>Path,
+<a href=#60 id=60 data-nosnippet>60</a>    resolve: bool,
+<a href=#61 id=61 data-nosnippet>61</a>    format: <span class="kw-2">&amp;</span>OutputFormat,
+<a href=#62 id=62 data-nosnippet>62</a>) -&gt; anyhow::Result&lt;()&gt; {
+<a href=#63 id=63 data-nosnippet>63</a>    <span class="kw">let </span>id_map = resolve.then(|| srum_analysis::load_id_map(path));
+<a href=#64 id=64 data-nosnippet>64</a>    <span class="kw">let </span>all = srum_analysis::build_timeline(path, id_map.as_ref());
+<a href=#65 id=65 data-nosnippet>65</a>    <span class="kw">let </span>filtered = srum_analysis::analysis::filter_by_app(all, app);
+<a href=#66 id=66 data-nosnippet>66</a>    print_values(<span class="kw-2">&amp;</span>filtered, format)
+<a href=#67 id=67 data-nosnippet>67</a>}
+<a href=#68 id=68 data-nosnippet>68</a>
+<a href=#69 id=69 data-nosnippet>69</a><span class="kw">pub fn </span>run_stats(path: <span class="kw-2">&amp;</span>Path, resolve: bool, format: <span class="kw-2">&amp;</span>OutputFormat) -&gt; anyhow::Result&lt;()&gt; {
+<a href=#70 id=70 data-nosnippet>70</a>    <span class="kw">let </span>id_map = resolve.then(|| srum_analysis::load_id_map(path));
+<a href=#71 id=71 data-nosnippet>71</a>    <span class="kw">let </span>all = srum_analysis::build_timeline(path, id_map.as_ref());
+<a href=#72 id=72 data-nosnippet>72</a>    <span class="kw">let </span>stats = srum_analysis::analysis::build_stats(all);
+<a href=#73 id=73 data-nosnippet>73</a>    print_values(<span class="kw-2">&amp;</span>stats, format)
+<a href=#74 id=74 data-nosnippet>74</a>}
+<a href=#75 id=75 data-nosnippet>75</a>
+<a href=#76 id=76 data-nosnippet>76</a><span class="kw">pub fn </span>run_sessions(path: <span class="kw-2">&amp;</span>Path, format: <span class="kw-2">&amp;</span>OutputFormat) -&gt; anyhow::Result&lt;()&gt; {
+<a href=#77 id=77 data-nosnippet>77</a>    <span class="kw">let </span>all = srum_analysis::build_timeline(path, <span class="prelude-val">None</span>);
+<a href=#78 id=78 data-nosnippet>78</a>    <span class="kw">let </span>sessions = srum_analysis::analysis::build_sessions(<span class="kw-2">&amp;</span>all);
+<a href=#79 id=79 data-nosnippet>79</a>    print_values(<span class="kw-2">&amp;</span>sessions, format)
+<a href=#80 id=80 data-nosnippet>80</a>}
+<a href=#81 id=81 data-nosnippet>81</a>
+<a href=#82 id=82 data-nosnippet>82</a><span class="kw">pub fn </span>run_gaps(
+<a href=#83 id=83 data-nosnippet>83</a>    path: <span class="kw-2">&amp;</span>Path,
+<a href=#84 id=84 data-nosnippet>84</a>    threshold_hours: u64,
+<a href=#85 id=85 data-nosnippet>85</a>    format: <span class="kw-2">&amp;</span>OutputFormat,
+<a href=#86 id=86 data-nosnippet>86</a>) -&gt; anyhow::Result&lt;()&gt; {
+<a href=#87 id=87 data-nosnippet>87</a>    <span class="kw">let </span>all = srum_analysis::build_timeline(path, <span class="prelude-val">None</span>);
+<a href=#88 id=88 data-nosnippet>88</a>    <span class="kw">let </span><span class="kw-2">mut </span>gaps = srum_analysis::analysis::detect_gaps(<span class="kw-2">&amp;</span>all, threshold_hours);
+<a href=#89 id=89 data-nosnippet>89</a>
+<a href=#90 id=90 data-nosnippet>90</a>    <span class="comment">// AutoIncId gap detection (best-effort, appended after timestamp gaps).
+<a href=#91 id=91 data-nosnippet>91</a>    </span><span class="macro">macro_rules!</span> add_autoinc_gaps {
+<a href=#92 id=92 data-nosnippet>92</a>        (<span class="macro-nonterminal">$table</span>:expr, <span class="macro-nonterminal">$parser</span>:expr) =&gt; {
+<a href=#93 id=93 data-nosnippet>93</a>            <span class="kw">if let </span><span class="prelude-val">Ok</span>(records) = <span class="macro-nonterminal">$parser</span>(path) {
+<a href=#94 id=94 data-nosnippet>94</a>                <span class="kw">let </span>ids: Vec&lt;u32&gt; = records.iter().map(|r| r.auto_inc_id).collect();
+<a href=#95 id=95 data-nosnippet>95</a>                gaps.extend(srum_analysis::analysis::detect_autoinc_gaps_from_ids(<span class="macro-nonterminal">$table</span>, <span class="kw-2">&amp;</span>ids));
+<a href=#96 id=96 data-nosnippet>96</a>            }
+<a href=#97 id=97 data-nosnippet>97</a>        };
+<a href=#98 id=98 data-nosnippet>98</a>    }
+<a href=#99 id=99 data-nosnippet>99</a>    <span class="macro">add_autoinc_gaps!</span>(<span class="string">"network"</span>, srum_parser::parse_network_usage);
+<a href=#100 id=100 data-nosnippet>100</a>    <span class="macro">add_autoinc_gaps!</span>(<span class="string">"apps"</span>, srum_parser::parse_app_usage);
+<a href=#101 id=101 data-nosnippet>101</a>    <span class="macro">add_autoinc_gaps!</span>(<span class="string">"energy"</span>, srum_parser::parse_energy_usage);
+<a href=#102 id=102 data-nosnippet>102</a>
+<a href=#103 id=103 data-nosnippet>103</a>    print_values(<span class="kw-2">&amp;</span>gaps, format)
+<a href=#104 id=104 data-nosnippet>104</a>}
+<a href=#105 id=105 data-nosnippet>105</a>
+<a href=#106 id=106 data-nosnippet>106</a><span class="kw">pub fn </span>run_hunt(
+<a href=#107 id=107 data-nosnippet>107</a>    signature: <span class="kw-2">&amp;</span>HuntSignature,
+<a href=#108 id=108 data-nosnippet>108</a>    path: <span class="kw-2">&amp;</span>Path,
+<a href=#109 id=109 data-nosnippet>109</a>    resolve: bool,
+<a href=#110 id=110 data-nosnippet>110</a>    format: <span class="kw-2">&amp;</span>OutputFormat,
+<a href=#111 id=111 data-nosnippet>111</a>) -&gt; anyhow::Result&lt;()&gt; {
+<a href=#112 id=112 data-nosnippet>112</a>    <span class="kw">let </span>id_map = resolve.then(|| srum_analysis::load_id_map(path));
+<a href=#113 id=113 data-nosnippet>113</a>    <span class="kw">let </span>all = srum_analysis::build_timeline(path, id_map.as_ref());
+<a href=#114 id=114 data-nosnippet>114</a>    <span class="kw">let </span>filtered = srum_analysis::analysis::hunt_filter(all, <span class="kw-2">&amp;</span>to_analysis_sig(signature));
+<a href=#115 id=115 data-nosnippet>115</a>    print_values(<span class="kw-2">&amp;</span>filtered, format)
+<a href=#116 id=116 data-nosnippet>116</a>}
+</code></pre></div></section></main></body></html>

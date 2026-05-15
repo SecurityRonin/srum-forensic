@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["HEURISTIC_KEYS","NOTIFICATION_C2_MIN_COUNT","TABLE_KEY","USER_PRESENCE_THRESHOLD_MS"],"fn":["annotate_user_presence","apply_beaconing_signals","apply_cross_table_signals","apply_heuristics","apply_notification_c2_signal","build_timeline","merge_focus_into_apps","mitre_techniques_for"]};
