@@ -475,7 +475,9 @@ srum-analysis = "0.1"
 
 ## Validation
 
-See [Parser Validation Report](docs/validation-report.md) for accuracy results across 7 real-world SRUDB.dat files from Windows 10, Windows 11, and Windows Server 2022 — including record counts, timestamp ranges, plausibility checks, and known gaps.
+See [Parser Validation Report](docs/validation-report.md) for accuracy results across 7 real-world SRUDB.dat files from Windows 10, Windows 11, and Windows Server 2022.
+
+**56/56 record counts match dissect.esedb 3.18 exactly** across all 8 parse functions and all 7 fixtures. 68 integration tests enforce this — all with exact `== N` count assertions derived from dissect ground truth.
 
 ---
 

@@ -279,8 +279,8 @@ fn rathbunvm_win10_app_usage_count_matches_dissect() {
     let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
     let records = parse_app_usage(p).expect("parse_app_usage must not error");
     assert!(
-        records.len() >= 160,
-        "rathbunvm win10 must have >= 160 app usage records (dissect: 163), got {}",
+        records.len() == 163,
+        "rathbunvm win10 app usage count must match dissect exactly: expected 163, got {}",
         records.len()
     );
 }
@@ -290,8 +290,8 @@ fn rathbunvm_win11_app_usage_count_matches_dissect() {
     let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
     let records = parse_app_usage(p).expect("parse_app_usage must not error");
     assert!(
-        records.len() >= 780,
-        "rathbunvm win11 must have >= 780 app usage records (dissect: 791), got {}",
+        records.len() == 791,
+        "rathbunvm win11 app usage count must match dissect exactly: expected 791, got {}",
         records.len()
     );
 }
@@ -303,8 +303,8 @@ fn rathbunvm_win10_idmap_count_matches_dissect() {
     let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
     let entries = parse_id_map(p).expect("parse_id_map must not error");
     assert!(
-        entries.len() >= 280,
-        "rathbunvm win10 must have >= 280 idmap entries (dissect: 288), got {}",
+        entries.len() == 288,
+        "rathbunvm win10 idmap count must match dissect exactly: expected 288, got {}",
         entries.len()
     );
 }
@@ -329,8 +329,8 @@ fn rathbunvm_win10_app_timeline_count_matches_dissect() {
     let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
     let records = parse_app_timeline(p).expect("parse ok");
     assert!(
-        records.len() >= 4,
-        "rathbunvm win10 must have >= 4 app timeline records (dissect: 4), got {}",
+        records.len() == 4,
+        "rathbunvm win10 app timeline count must match dissect exactly: expected 4, got {}",
         records.len()
     );
 }
@@ -381,8 +381,9 @@ fn rathbunvm_win10_app_timeline_records_have_correct_user_id() {
 fn chainsaw_network_connectivity_parses_without_panic() {
     let Some(p) = fixture(CHAINSAW) else { return };
     let r = parse_network_connectivity(p);
-    assert!(r.is_ok(), "chainsaw: parse_network_connectivity failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "chainsaw: network_connectivity must be non-empty (dissect: 6)");
+    let records = r.expect("chainsaw: parse_network_connectivity must not error");
+    assert_eq!(records.len(), 6,
+        "chainsaw network_connectivity count must match dissect exactly: expected 6, got {}", records.len());
 }
 
 #[test]
@@ -403,16 +404,18 @@ fn chainsaw_energy_lt_parses_without_panic() {
 fn chainsaw_push_notifications_parses_without_panic() {
     let Some(p) = fixture(CHAINSAW) else { return };
     let r = parse_push_notifications(p);
-    assert!(r.is_ok(), "chainsaw: parse_push_notifications failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "chainsaw: push_notifications must be non-empty (dissect: 562)");
+    let records = r.expect("chainsaw: parse_push_notifications must not error");
+    assert_eq!(records.len(), 562,
+        "chainsaw push_notifications count must match dissect exactly: expected 562, got {}", records.len());
 }
 
 #[test]
 fn chainsaw_app_timeline_parses_without_panic() {
     let Some(p) = fixture(CHAINSAW) else { return };
     let r = parse_app_timeline(p);
-    assert!(r.is_ok(), "chainsaw: parse_app_timeline failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "chainsaw: app_timeline must be non-empty (dissect: 26)");
+    let records = r.expect("chainsaw: parse_app_timeline must not error");
+    assert_eq!(records.len(), 26,
+        "chainsaw app_timeline count must match dissect exactly: expected 26, got {}", records.len());
 }
 
 #[test]
@@ -420,10 +423,26 @@ fn chainsaw_id_map_parses_non_empty() {
     let Some(p) = fixture(CHAINSAW) else { return };
     let entries = parse_id_map(p).expect("chainsaw: parse_id_map must not error");
     assert!(
-        entries.len() >= 700,
-        "chainsaw: idmap must have >= 700 entries (dissect: 714), got {}",
+        entries.len() == 714,
+        "chainsaw idmap count must match dissect exactly: expected 714, got {}",
         entries.len()
     );
+}
+
+
+// chainsaw: energy tables exist in catalog but contain 0 records (no battery hardware in VM)
+#[test]
+fn chainsaw_energy_usage_returns_empty() {
+    let Some(p) = fixture(CHAINSAW) else { return };
+    let r = parse_energy_usage(p).expect("chainsaw: parse_energy_usage must not error");
+    assert_eq!(r.len(), 0, "chainsaw energy_usage must be empty (dissect: 0), got {}", r.len());
+}
+
+#[test]
+fn chainsaw_energy_lt_returns_empty() {
+    let Some(p) = fixture(CHAINSAW) else { return };
+    let r = parse_energy_lt(p).expect("chainsaw: parse_energy_lt must not error");
+    assert_eq!(r.len(), 0, "chainsaw energy_lt must be empty (dissect: 0), got {}", r.len());
 }
 
 // ── plaso ─────────────────────────────────────────────────────────────────────
@@ -432,24 +451,27 @@ fn chainsaw_id_map_parses_non_empty() {
 fn plaso_network_connectivity_parses_without_panic() {
     let Some(p) = fixture(PLASO) else { return };
     let r = parse_network_connectivity(p);
-    assert!(r.is_ok(), "plaso: parse_network_connectivity failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "plaso: network_connectivity must be non-empty (dissect: 260)");
+    let records = r.expect("plaso: parse_network_connectivity must not error");
+    assert_eq!(records.len(), 260,
+        "plaso network_connectivity count must match dissect exactly: expected 260, got {}", records.len());
 }
 
 #[test]
 fn plaso_energy_lt_parses_without_panic() {
     let Some(p) = fixture(PLASO) else { return };
     let r = parse_energy_lt(p);
-    assert!(r.is_ok(), "plaso: parse_energy_lt failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "plaso: energy_lt must be non-empty (dissect: 2)");
+    let records = r.expect("plaso: parse_energy_lt must not error");
+    assert_eq!(records.len(), 2,
+        "plaso energy_lt count must match dissect exactly: expected 2, got {}", records.len());
 }
 
 #[test]
 fn plaso_push_notifications_parses_without_panic() {
     let Some(p) = fixture(PLASO) else { return };
     let r = parse_push_notifications(p);
-    assert!(r.is_ok(), "plaso: parse_push_notifications failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "plaso: push_notifications must be non-empty (dissect: 16183)");
+    let records = r.expect("plaso: parse_push_notifications must not error");
+    assert_eq!(records.len(), 16183,
+        "plaso push_notifications count must match dissect exactly: expected 16183, got {}", records.len());
 }
 
 #[test]
@@ -457,10 +479,26 @@ fn plaso_id_map_parses_non_empty() {
     let Some(p) = fixture(PLASO) else { return };
     let entries = parse_id_map(p).expect("plaso: parse_id_map must not error");
     assert!(
-        entries.len() >= 5800,
-        "plaso: idmap must have >= 5800 entries (dissect: 5895), got {}",
+        entries.len() == 5895,
+        "plaso idmap count must match dissect exactly: expected 5895, got {}",
         entries.len()
     );
+}
+
+
+#[test]
+fn plaso_energy_usage_returns_empty() {
+    let Some(p) = fixture(PLASO) else { return };
+    let r = parse_energy_usage(p).expect("plaso: parse_energy_usage must not error");
+    assert_eq!(r.len(), 0, "plaso energy_usage must be empty (dissect: 0), got {}", r.len());
+}
+
+#[test]
+fn plaso_app_timeline_returns_empty() {
+    // AppTimeline table is absent from plaso SRUDB.dat; parser must return Ok([]).
+    let Some(p) = fixture(PLASO) else { return };
+    let r = parse_app_timeline(p).expect("plaso: parse_app_timeline must not error");
+    assert_eq!(r.len(), 0, "plaso app_timeline must be empty (ABSENT in catalog), got {}", r.len());
 }
 
 // ── rathbunvm_win11 ───────────────────────────────────────────────────────────
@@ -469,48 +507,54 @@ fn plaso_id_map_parses_non_empty() {
 fn rathbunvm_win11_network_usage_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
     let r = parse_network_usage(p);
-    assert!(r.is_ok(), "rathbunvm_win11: parse_network_usage failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "rathbunvm_win11: network_usage must be non-empty (dissect: 143)");
+    let records = r.expect("rathbunvm_win11: parse_network_usage must not error");
+    assert_eq!(records.len(), 143,
+        "rathbunvm_win11 network_usage count must match dissect exactly: expected 143, got {}", records.len());
 }
 
 #[test]
 fn rathbunvm_win11_network_connectivity_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
     let r = parse_network_connectivity(p);
-    assert!(r.is_ok(), "rathbunvm_win11: parse_network_connectivity failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "rathbunvm_win11: network_connectivity must be non-empty (dissect: 9)");
+    let records = r.expect("rathbunvm_win11: parse_network_connectivity must not error");
+    assert_eq!(records.len(), 9,
+        "rathbunvm_win11 network_connectivity count must match dissect exactly: expected 9, got {}", records.len());
 }
 
 #[test]
 fn rathbunvm_win11_energy_usage_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
     let r = parse_energy_usage(p);
-    assert!(r.is_ok(), "rathbunvm_win11: parse_energy_usage failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "rathbunvm_win11: energy_usage must be non-empty (dissect: 13)");
+    let records = r.expect("rathbunvm_win11: parse_energy_usage must not error");
+    assert_eq!(records.len(), 13,
+        "rathbunvm_win11 energy_usage count must match dissect exactly: expected 13, got {}", records.len());
 }
 
 #[test]
 fn rathbunvm_win11_energy_lt_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
     let r = parse_energy_lt(p);
-    assert!(r.is_ok(), "rathbunvm_win11: parse_energy_lt failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "rathbunvm_win11: energy_lt must be non-empty (dissect: 2)");
+    let records = r.expect("rathbunvm_win11: parse_energy_lt must not error");
+    assert_eq!(records.len(), 2,
+        "rathbunvm_win11 energy_lt count must match dissect exactly: expected 2, got {}", records.len());
 }
 
 #[test]
 fn rathbunvm_win11_push_notifications_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
     let r = parse_push_notifications(p);
-    assert!(r.is_ok(), "rathbunvm_win11: parse_push_notifications failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "rathbunvm_win11: push_notifications must be non-empty (dissect: 662)");
+    let records = r.expect("rathbunvm_win11: parse_push_notifications must not error");
+    assert_eq!(records.len(), 662,
+        "rathbunvm_win11 push_notifications count must match dissect exactly: expected 662, got {}", records.len());
 }
 
 #[test]
 fn rathbunvm_win11_app_timeline_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
     let r = parse_app_timeline(p);
-    assert!(r.is_ok(), "rathbunvm_win11: parse_app_timeline failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "rathbunvm_win11: app_timeline must be non-empty (dissect: 33)");
+    let records = r.expect("rathbunvm_win11: parse_app_timeline must not error");
+    assert_eq!(records.len(), 33,
+        "rathbunvm_win11 app_timeline count must match dissect exactly: expected 33, got {}", records.len());
 }
 
 #[test]
@@ -518,8 +562,8 @@ fn rathbunvm_win11_id_map_parses_non_empty() {
     let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
     let entries = parse_id_map(p).expect("rathbunvm_win11: parse_id_map must not error");
     assert!(
-        entries.len() >= 1000,
-        "rathbunvm_win11: idmap must have >= 1000 entries (dissect: 1044), got {}",
+        entries.len() == 1044,
+        "rathbunvm_win11 idmap count must match dissect exactly: expected 1044, got {}",
         entries.len()
     );
 }
@@ -530,24 +574,44 @@ fn rathbunvm_win11_id_map_parses_non_empty() {
 fn rathbunvm_win10_network_usage_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
     let r = parse_network_usage(p);
-    assert!(r.is_ok(), "rathbunvm_win10: parse_network_usage failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "rathbunvm_win10: network_usage must be non-empty (dissect: 23)");
+    let records = r.expect("rathbunvm_win10: parse_network_usage must not error");
+    assert_eq!(records.len(), 23,
+        "rathbunvm_win10 network_usage count must match dissect exactly: expected 23, got {}", records.len());
 }
 
 #[test]
 fn rathbunvm_win10_network_connectivity_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
     let r = parse_network_connectivity(p);
-    assert!(r.is_ok(), "rathbunvm_win10: parse_network_connectivity failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "rathbunvm_win10: network_connectivity must be non-empty (dissect: 1)");
+    let records = r.expect("rathbunvm_win10: parse_network_connectivity must not error");
+    assert_eq!(records.len(), 1,
+        "rathbunvm_win10 network_connectivity count must match dissect exactly: expected 1, got {}", records.len());
 }
 
 #[test]
 fn rathbunvm_win10_push_notifications_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
     let r = parse_push_notifications(p);
-    assert!(r.is_ok(), "rathbunvm_win10: parse_push_notifications failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "rathbunvm_win10: push_notifications must be non-empty (dissect: 118)");
+    let records = r.expect("rathbunvm_win10: parse_push_notifications must not error");
+    assert_eq!(records.len(), 118,
+        "rathbunvm_win10 push_notifications count must match dissect exactly: expected 118, got {}", records.len());
+}
+
+
+#[test]
+fn rathbunvm_win10_energy_usage_returns_empty() {
+    // Energy table is absent from rathbunvm Win10 SRUDB.dat; parser must return Ok([]).
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let r = parse_energy_usage(p).expect("rathbunvm_win10: parse_energy_usage must not error");
+    assert_eq!(r.len(), 0, "rathbunvm_win10 energy_usage must be empty (ABSENT in catalog), got {}", r.len());
+}
+
+#[test]
+fn rathbunvm_win10_energy_lt_returns_empty() {
+    // EnergyLT table is absent from rathbunvm Win10 SRUDB.dat; parser must return Ok([]).
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let r = parse_energy_lt(p).expect("rathbunvm_win10: parse_energy_lt must not error");
+    assert_eq!(r.len(), 0, "rathbunvm_win10 energy_lt must be empty (ABSENT in catalog), got {}", r.len());
 }
 
 // ── belkasoftctf_win10 ────────────────────────────────────────────────────────
@@ -569,24 +633,27 @@ fn belkasoftctf_win10_catalog_has_core_srum_tables() {
 fn belkasoftctf_win10_network_usage_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
     let r = parse_network_usage(p);
-    assert!(r.is_ok(), "belkasoftctf_win10: parse_network_usage failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "belkasoftctf_win10: network_usage must be non-empty (dissect: 465)");
+    let records = r.expect("belkasoftctf_win10: parse_network_usage must not error");
+    assert_eq!(records.len(), 465,
+        "belkasoftctf_win10 network_usage count must match dissect exactly: expected 465, got {}", records.len());
 }
 
 #[test]
 fn belkasoftctf_win10_app_usage_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
     let r = parse_app_usage(p);
-    assert!(r.is_ok(), "belkasoftctf_win10: parse_app_usage failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "belkasoftctf_win10: app_usage must be non-empty (dissect: 4107)");
+    let records = r.expect("belkasoftctf_win10: parse_app_usage must not error");
+    assert_eq!(records.len(), 4107,
+        "belkasoftctf_win10 app_usage count must match dissect exactly: expected 4107, got {}", records.len());
 }
 
 #[test]
 fn belkasoftctf_win10_network_connectivity_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
     let r = parse_network_connectivity(p);
-    assert!(r.is_ok(), "belkasoftctf_win10: parse_network_connectivity failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "belkasoftctf_win10: network_connectivity must be non-empty (dissect: 50)");
+    let records = r.expect("belkasoftctf_win10: parse_network_connectivity must not error");
+    assert_eq!(records.len(), 50,
+        "belkasoftctf_win10 network_connectivity count must match dissect exactly: expected 50, got {}", records.len());
 }
 
 #[test]
@@ -600,24 +667,27 @@ fn belkasoftctf_win10_energy_usage_parses_without_panic() {
 fn belkasoftctf_win10_energy_lt_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
     let r = parse_energy_lt(p);
-    assert!(r.is_ok(), "belkasoftctf_win10: parse_energy_lt failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "belkasoftctf_win10: energy_lt must be non-empty (dissect: 1)");
+    let records = r.expect("belkasoftctf_win10: parse_energy_lt must not error");
+    assert_eq!(records.len(), 1,
+        "belkasoftctf_win10 energy_lt count must match dissect exactly: expected 1, got {}", records.len());
 }
 
 #[test]
 fn belkasoftctf_win10_push_notifications_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
     let r = parse_push_notifications(p);
-    assert!(r.is_ok(), "belkasoftctf_win10: parse_push_notifications failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "belkasoftctf_win10: push_notifications must be non-empty (dissect: 2087)");
+    let records = r.expect("belkasoftctf_win10: parse_push_notifications must not error");
+    assert_eq!(records.len(), 2087,
+        "belkasoftctf_win10 push_notifications count must match dissect exactly: expected 2087, got {}", records.len());
 }
 
 #[test]
 fn belkasoftctf_win10_app_timeline_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
     let r = parse_app_timeline(p);
-    assert!(r.is_ok(), "belkasoftctf_win10: parse_app_timeline failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "belkasoftctf_win10: app_timeline must be non-empty (dissect: 101)");
+    let records = r.expect("belkasoftctf_win10: parse_app_timeline must not error");
+    assert_eq!(records.len(), 101,
+        "belkasoftctf_win10 app_timeline count must match dissect exactly: expected 101, got {}", records.len());
 }
 
 #[test]
@@ -625,8 +695,8 @@ fn belkasoftctf_win10_id_map_parses_non_empty() {
     let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
     let entries = parse_id_map(p).expect("belkasoftctf_win10: parse_id_map must not error");
     assert!(
-        entries.len() >= 470,
-        "belkasoftctf_win10: idmap must have >= 470 entries (dissect: 476), got {}",
+        entries.len() == 476,
+        "belkasoftctf_win10 idmap count must match dissect exactly: expected 476, got {}",
         entries.len()
     );
 }
@@ -692,16 +762,18 @@ fn aptvm_server2022_1daylater_all_parsers_return_ok() {
 fn aptvm_server2022_1daylater_network_connectivity_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else { return };
     let r = parse_network_connectivity(p);
-    assert!(r.is_ok(), "aptvm_1daylater: parse_network_connectivity failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "aptvm_1daylater: network_connectivity must be non-empty (dissect: 4)");
+    let records = r.expect("aptvm_1daylater: parse_network_connectivity must not error");
+    assert_eq!(records.len(), 4,
+        "aptvm_1daylater network_connectivity count must match dissect exactly: expected 4, got {}", records.len());
 }
 
 #[test]
 fn aptvm_server2022_1daylater_push_notifications_parses_without_panic() {
     let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else { return };
     let r = parse_push_notifications(p);
-    assert!(r.is_ok(), "aptvm_1daylater: parse_push_notifications failed: {:?}", r);
-    assert!(!r.unwrap().is_empty(), "aptvm_1daylater: push_notifications must be non-empty (dissect: 153)");
+    let records = r.expect("aptvm_1daylater: parse_push_notifications must not error");
+    assert_eq!(records.len(), 153,
+        "aptvm_1daylater push_notifications count must match dissect exactly: expected 153, got {}", records.len());
 }
 
 #[test]
@@ -709,8 +781,8 @@ fn aptvm_server2022_1daylater_id_map_parses_non_empty() {
     let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else { return };
     let entries = parse_id_map(p).expect("aptvm_1daylater: parse_id_map must not error");
     assert!(
-        entries.len() >= 90,
-        "aptvm_1daylater: idmap must have >= 90 entries (dissect: 96), got {}",
+        entries.len() == 96,
+        "aptvm_1daylater idmap count must match dissect exactly: expected 96, got {}",
         entries.len()
     );
 }
