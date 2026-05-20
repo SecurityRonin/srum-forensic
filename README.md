@@ -475,9 +475,11 @@ srum-analysis = "0.1"
 
 ## Validation
 
-See [Parser Validation Report](docs/validation-report.md) for accuracy results across 7 real-world SRUDB.dat files from Windows 10, Windows 11, and Windows Server 2022.
+See [Parser Validation Report](docs/validation-report.md) for full accuracy results across 7 real-world SRUDB.dat files from Windows 10, Windows 11, and Windows Server 2022.
 
-**56/56 record counts match dissect.esedb 3.18 exactly** across all 8 parse functions and all 7 fixtures. 68 integration tests enforce this — all with exact `== N` count assertions derived from dissect ground truth.
+**56/56 record counts match dissect.esedb 3.18 exactly** across all 8 parse functions and all 7 fixtures. **0/0 page checksum anomalies** on known-good files using the correct Vista+ XOR-32 algorithm. **0 AutoIncId gaps** in chainsaw app_usage (IDs 1..1660 contiguous).
+
+76 real-fixture integration tests enforce record count correctness with exact `== N` assertions derived from dissect ground truth. 47 structural integrity tests cover page checksums, B-tree layout, dirty state, and deleted record detection. All decoders accept real ESE raw-tag format only — no synthetic fallback paths exist in production code.
 
 ---
 
