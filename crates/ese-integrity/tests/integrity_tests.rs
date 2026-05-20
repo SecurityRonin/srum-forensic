@@ -584,13 +584,13 @@ fn all_real_fixtures_show_clean_shutdown() {
 #[test]
 fn chainsaw_page_checksum_count_matches_baseline() {
     let Some(db) = open_real(CHAINSAW) else { return };
-    assert_eq!(verify_page_checksums(&db).len(), 325,
-        "chainsaw: page checksum anomaly count must match baseline");
+    assert_eq!(verify_page_checksums(&db).len(), 0,
+        "chainsaw: correct ECC-32 algorithm must report zero checksum anomalies on known-good file");
 }
 
 #[test]
 fn rathbunvm_win10_page_checksum_count_matches_baseline() {
     let Some(db) = open_real(RATHBUNVM_WIN10) else { return };
-    assert_eq!(verify_page_checksums(&db).len(), 104,
-        "rathbunvm_win10: page checksum anomaly count must match baseline");
+    assert_eq!(verify_page_checksums(&db).len(), 0,
+        "rathbunvm_win10: correct ECC-32 algorithm must report zero checksum anomalies on known-good file");
 }

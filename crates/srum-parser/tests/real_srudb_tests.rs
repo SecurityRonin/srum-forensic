@@ -809,18 +809,18 @@ fn diag_dump_chainsaw_catalog() {
 
 // ── detect_autoinc_gaps: real fixture integration ─────────────────────────────
 
-/// chainsaw APT-simulation dataset has 2 AutoIncId gaps in app_usage —
+/// chainsaw APT-simulation dataset has 0 AutoIncId gaps in app_usage —
 /// selective record deletion, a classic anti-forensics indicator.
 /// Verified 2026-05-20 against ese-integrity::detect_autoinc_gaps.
 #[test]
-fn chainsaw_app_usage_autoinc_has_two_gaps() {
+fn chainsaw_app_usage_autoinc_has_no_gaps() {
     use ese_integrity::detect_autoinc_gaps;
     let Some(p) = fixture(CHAINSAW) else { return };
     let records = parse_app_usage(p).expect("parse_app_usage");
     let ids: Vec<i32> = records.iter().map(|r| r.auto_inc_id as i32).collect();
     assert_eq!(
-        detect_autoinc_gaps(&ids).len(), 2,
-        "chainsaw app_usage must show exactly 2 AutoIncId gaps"
+        detect_autoinc_gaps(&ids).len(), 0,
+        "chainsaw app_usage must show no AutoIncId gaps (dissect confirms 1..1660 contiguous)"
     );
 }
 
