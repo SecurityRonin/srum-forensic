@@ -71,6 +71,53 @@ fn detect_fragments_db_finds_split_via_ese_database() {
     assert_eq!(pairs[0].suffix_len, 8);
 }
 
+// ── detect_fragments_db: real fixture smoke tests ────────────────────────────
+
+fn real_fixture(path: &str) -> Option<ese_core::EseDatabase> {
+    let p = std::path::Path::new(path);
+    if !p.exists() { return None; }
+    Some(ese_core::EseDatabase::open(p).expect("open real SRUDB"))
+}
+
+const CHAINSAW: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/chainsaw_SRUDB.dat"
+);
+const RATHBUNVM_WIN10: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/museum_rathbunvm_win10_SRUDB.dat"
+);
+const APTVM_CLEAN: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/museum_aptvm_server2022_clean_SRUDB.dat"
+);
+
+/// Real ESE records are larger than 32 bytes; detect_fragments_db(32) must
+/// return 0 — confirming no false positives at the synthetic fixture size.
+#[test]
+fn chainsaw_has_no_fragments_at_size_32() {
+    let Some(db) = real_fixture(CHAINSAW) else { return };
+    let pairs = ese_carver::detect_fragments_db(&db, 32);
+    assert_eq!(pairs.len(), 0,
+        "chainsaw: real ESE records do not split at exactly 32 bytes");
+}
+
+#[test]
+fn rathbunvm_win10_has_no_fragments_at_size_32() {
+    let Some(db) = real_fixture(RATHBUNVM_WIN10) else { return };
+    let pairs = ese_carver::detect_fragments_db(&db, 32);
+    assert_eq!(pairs.len(), 0,
+        "rathbunvm_win10: real ESE records do not split at exactly 32 bytes");
+}
+
+#[test]
+fn aptvm_clean_has_no_fragments_at_size_32() {
+    let Some(db) = real_fixture(APTVM_CLEAN) else { return };
+    let pairs = ese_carver::detect_fragments_db(&db, 32);
+    assert_eq!(pairs.len(), 0,
+        "aptvm_clean: fresh Server 2022 must not produce carver false positives");
+}
+
 // ── reconstruct_fragment ─────────────────────────────────────────────────────
 
 #[test]
