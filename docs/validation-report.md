@@ -1,6 +1,6 @@
 # Parser Validation Report
 
-**Tool:** `sr` (srum-forensic) · **Date:** 2026-05-18 · **Validated against:** dissect.esedb 3.18
+**Tool:** `sr` (srum-forensic) · **Date:** 2026-05-20 · **Validated against:** dissect.esedb 3.18
 
 ---
 
@@ -8,6 +8,10 @@
 
 **56/56 record counts match dissect.esedb exactly** across 7 real SRUDB.dat files and all 8 parse functions.
 All parsers return `Ok([])` for tables absent from the catalog (correct behaviour — no crash, no error).
+
+**0/0 page checksum anomalies** on two known-good real SRUDB.dat files using the correct Vista+ XOR-32 algorithm.
+
+**0 AutoIncId gaps** in `chainsaw_SRUDB.dat` app_usage records (IDs 1..1660 confirmed contiguous).
 
 | Fixture | Size | Windows | Tables present | Verdict |
 |---------|------|---------|----------------|---------|
@@ -42,6 +46,39 @@ All values verified identical between dissect and our parser. Zero mismatches.
 
 ---
 
+## Page Checksum Validation
+
+The Vista+ ESE XOR-32 checksum algorithm:
+
+- Seed: `logical_page_number = physical_page_number - 1`
+- XOR all 4-byte words across the **entire** page (including bytes[0..8])
+- Compare computed XOR to `page.data[4..8]` (the stored checksum field)
+- Skip pages where both `data[0..4]` and `data[4..8]` are zero (never checksummed)
+
+| Fixture | Pages | Anomalies | Verdict |
+|---------|-------|-----------|---------|
+| `chainsaw_SRUDB.dat` | 326 | 0 | PASS |
+| `museum_rathbunvm_win10_SRUDB.dat` | ~100 | 0 | PASS |
+
+Validated by `ese-integrity::verify_page_checksums`. Algorithm was confirmed independently
+via a Python probe across all 326 chainsaw pages before implementation.
+
+---
+
+## AutoIncId Continuity Validation
+
+App Resource Usage records carry an `AutoIncId` column that Windows increments for each new
+record. Gaps indicate deleted records or data loss. The diagnostic binary at
+`crates/srum-parser/src/bin/gap_diag.rs` iterates raw B-tree tags and computes
+`col_start = data.len() - COL_DATA_LEN` (290 bytes, invariant across all three tested fixtures)
+to extract `AutoIncId` without assuming KEY_LEN.
+
+| Fixture | Records | AutoIncId range | Gaps |
+|---------|---------|-----------------|------|
+| `chainsaw_SRUDB.dat` | 1660 | 1..1660 | 0 |
+
+---
+
 ## Methodology
 
 Record counts were compared using dissect.esedb 3.18 (independent ground truth) and
@@ -64,6 +101,15 @@ Field-level accuracy was verified on `museum_rathbunvm_win10_SRUDB.dat`:
 
 ## Decoder Notes
 
+### App Resource Usage (`{5C8CF1C7-7257-4F13-B223-970EF5939312}`)
+
+Real ESE raw-tag layout: `cbCommonKeyPrefix (2 B) | key_suffix | col_data (290 B)`.  
+KEY_LEN is **not fixed**: observed 16-byte and 28-byte keys within the same file.  
+`col_start = data.len() - 290` — anchoring from the tail bypasses the KEY_LEN ambiguity.  
+`AutoIncId` (u32 LE) at `col_start+4`. `TimeStamp` (OLE date f64 LE) at `col_start+8`.  
+`AppId` (i32 LE) at `col_start+16`. `UserId` (i32 LE) at `col_start+20`.  
+`foreground_cycles` and `background_cycles` are 0 pending column location.
+
 ### ID Map (`SruDbIdMapTable`)
 
 Real ESE raw-tag layout: `cbCommonKeyPrefix (2 B) | key_suffix (KEY_LEN−pfx B) | col_data`.  
@@ -74,9 +120,24 @@ Detection: `cb_pfx ≤ 7` AND `data[col_start] == 0x02` AND `data[col_start+1] =
 ### App Timeline (`{7ACBBAA3-D029-4BE4-9A7A-0885927F1D8F}`)
 
 KEY_LEN = 28. `col_start = 2 + (28 − cb_pfx)`.  
-Detection: `data.len() > 32` (all real ESE records are ≥ 40 bytes; synthetic fixtures are exactly 32).  
 `TimeStamp` as OLE Automation Date (f64 LE) at `col_start+8`. `AppId` (i32 LE) at `col_start+16`. `UserId` (i32 LE) at `col_start+20`.  
 `focus_time_ms` and `user_input_time_ms` have no equivalent real column — returned as 0.
+
+### Network Connectivity (`{DD6636C4-8929-4683-974E-22C046A43763}`)
+
+KEY_LEN = 28. `col_start = 2 + (28 − cb_pfx)`.  
+`L2ProfileId` (i32 LE) at `col_start+32`. `ConnectedTime` (u32 LE, stored as u64) at `col_start+36`.
+
+### Push Notifications (`{D10CA2FE-6FCF-4F6D-848E-B2E99266FA89}`)
+
+KEY_LEN = 16. `col_start = 2 + (16 − cb_pfx)`.  
+`ForegroundCycleTime` (u64 LE) at `col_start+24`. `BackgroundCycleTime` (u64 LE) at `col_start+32`.  
+`notification_type` and `count` returned as 0 (no corresponding column at these offsets).
+
+### Energy Usage / Energy LT (`{FEE4E14F-…}`)
+
+KEY_LEN = 28. `col_start = 2 + (28 − cb_pfx)`.  
+`charge_level` and `energy_consumed` returned as 0 (all-zero in available VM fixtures, pending column location).
 
 ### Catalog Deduplication
 
@@ -91,14 +152,33 @@ Fresh Server 2022 installations contain only `SruDbIdMapTable` in the SRUM catal
 All other extension tables are absent. Our `collect_table()` returns `Ok([])` for absent
 tables rather than `Err`, matching the expected forensic behaviour.
 
+### No Synthetic Decoders
+
+All decoders accept **real ESE raw-tag format only**. Synthetic fallback paths (FILETIME-based
+32-byte test fixtures) were removed after being identified as a doer-checker violation: both
+the format and the parser were written by us, so those tests proved nothing about actual
+Windows SRUDB.dat files.
+
 ---
 
 ## Test Coverage
 
-Integration tests live in `crates/srum-parser/tests/real_srudb_tests.rs`.  
-68 tests covering all 7 fixtures × all 8 parse functions, with exact record count assertions
-derived from dissect ground truth. Run with:
+Integration tests against real SRUDB.dat fixtures:
+
+| Suite | File | Tests | Coverage |
+|-------|------|-------|---------|
+| `real_srudb_tests` | `crates/srum-parser/tests/real_srudb_tests.rs` | 76 | Record counts, field values, gap detection, ID resolution, all 7 fixtures |
+| `integrity_tests` | `crates/ese-integrity/tests/integrity_tests.rs` | 47 | Page checksums, B-tree structure, catalog integrity, deleted records |
+
+Run all integration tests:
 
 ```
-cargo test -p srum-parser --test real_srudb_tests
+cargo test --workspace
+```
+
+Run only the fixture-backed tests:
+
+```
+cargo test --test real_srudb_tests -p srum-parser
+cargo test -p ese-integrity
 ```
