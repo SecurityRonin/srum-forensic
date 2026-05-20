@@ -479,7 +479,7 @@ See [Parser Validation Report](docs/validation-report.md) for full accuracy resu
 
 **56/56 record counts match dissect.esedb 3.18 exactly** across all 8 parse functions and all 7 fixtures.
 
-76 real-fixture integration tests enforce record count correctness with exact `== N` assertions derived from dissect ground truth. 47 structural integrity tests cover page checksums, B-tree layout, dirty state, and deleted record detection.
+76 real-fixture integration tests enforce record count correctness with exact `== N` assertions derived from dissect ground truth. 47 structural integrity tests cover page checksums, B-tree layout, dirty state, and deleted record detection. 20 forensic-analysis tests validate the analysis layer — timeline building, delta comparison, and suspicious-path heuristics — against real fixtures using externally-confirmed ground truth: APTSimulator's published bat scripts for the chainsaw fixture, and the Belkasoft CTF scenario for the clean-machine negative assertions.
 
 ---
 

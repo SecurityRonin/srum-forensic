@@ -169,6 +169,7 @@ Integration tests against real SRUDB.dat fixtures:
 |-------|------|-------|---------|
 | `real_srudb_tests` | `crates/srum-parser/tests/real_srudb_tests.rs` | 76 | Record counts, field values, gap detection, ID resolution, all 7 fixtures |
 | `integrity_tests` | `crates/ese-integrity/tests/integrity_tests.rs` | 47 | Page checksums, B-tree structure, catalog integrity, deleted records |
+| `real_analysis_tests` | `crates/srum-analysis/tests/real_analysis_tests.rs` | 20 | Timeline building, delta comparison, suspicious-path heuristics, APTSimulator tool detection, clean-machine negative assertions — all against real fixtures with externally-confirmed ground truth |
 
 Run all integration tests:
 
@@ -181,4 +182,5 @@ Run only the fixture-backed tests:
 ```
 cargo test --test real_srudb_tests -p srum-parser
 cargo test -p ese-integrity
+cargo test --test real_analysis_tests -p srum-analysis
 ```
