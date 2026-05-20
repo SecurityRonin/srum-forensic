@@ -807,7 +807,62 @@ fn diag_dump_chainsaw_catalog() {
     // Always pass — this is purely diagnostic
 }
 
+// ── detect_autoinc_gaps: real fixture integration ─────────────────────────────
+
+/// chainsaw APT-simulation dataset has 2 AutoIncId gaps in app_usage —
+/// selective record deletion, a classic anti-forensics indicator.
+/// Verified 2026-05-20 against ese-integrity::detect_autoinc_gaps.
+#[test]
+fn chainsaw_app_usage_autoinc_has_two_gaps() {
+    use ese_integrity::detect_autoinc_gaps;
+    let Some(p) = fixture(CHAINSAW) else { return };
+    let records = parse_app_usage(p).expect("parse_app_usage");
+    let ids: Vec<i32> = records.iter().map(|r| r.auto_inc_id as i32).collect();
+    assert_eq!(
+        detect_autoinc_gaps(&ids).len(), 2,
+        "chainsaw app_usage must show exactly 2 AutoIncId gaps"
+    );
+}
+
+/// rathbunvm_win10 is a clean VM with no selective deletions.
+#[test]
+fn rathbunvm_win10_app_usage_autoinc_has_no_gaps() {
+    use ese_integrity::detect_autoinc_gaps;
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let records = parse_app_usage(p).expect("parse_app_usage");
+    let ids: Vec<i32> = records.iter().map(|r| r.auto_inc_id as i32).collect();
+    assert_eq!(
+        detect_autoinc_gaps(&ids).len(), 0,
+        "rathbunvm_win10 app_usage must have no AutoIncId gaps"
+    );
+}
+
 // ── field-level accuracy: real ESE decoders ───────────────────────────────────
+
+// ── ID resolution accuracy ────────────────────────────────────────────────────
+
+/// app_id=154 in rathbunvm_win10 (seen in AppTimeline rec[0]) resolves to "C127"
+/// via IdMap. Verified 2026-05-20 against dissect.esedb 3.18 (IdType=0, blob_len=10).
+#[test]
+fn rathbunvm_win10_app_id_154_resolves_to_c127() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let id_map = parse_id_map(p).expect("parse_id_map");
+    let entry = id_map.iter().find(|e| e.id == 154)
+        .expect("app_id=154 must exist in rathbunvm_win10 IdMap");
+    assert_eq!(entry.name, "C127",
+        "app_id=154 must resolve to 'C127' (dissect-verified)");
+}
+
+/// id=1 in rathbunvm_win10 IdMap is a system entry with no name blob (IdType=0, blob_len=0).
+#[test]
+fn rathbunvm_win10_system_id_1_has_empty_name() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let id_map = parse_id_map(p).expect("parse_id_map");
+    let entry = id_map.iter().find(|e| e.id == 1)
+        .expect("id=1 must exist in rathbunvm_win10 IdMap");
+    assert!(entry.name.is_empty(),
+        "id=1 system entry must have empty name blob (dissect-verified)");
+}
 
 /// Dissect ground truth (chainsaw, rec[0]): auto_inc_id=94, app_id=88, user_id=6.
 /// The current synthetic decoder reads data[8..12] as app_id — wrong for real ESE.
