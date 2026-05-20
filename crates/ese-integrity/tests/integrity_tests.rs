@@ -474,3 +474,123 @@ fn full_scan_detects_bad_checksum() {
         "full_scan must surface PageChecksumMismatch from verify_page_checksums"
     );
 }
+
+// ── find_deleted_records: real fixture integration ────────────────────────────
+
+const CHAINSAW: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/chainsaw_SRUDB.dat"
+);
+const RATHBUNVM_WIN10: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/museum_rathbunvm_win10_SRUDB.dat"
+);
+const RATHBUNVM_WIN11: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/museum_rathbunvm_win11_SRUDB.dat"
+);
+const APTVM_CLEAN: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/museum_aptvm_server2022_clean_SRUDB.dat"
+);
+const APTVM_1DAY: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/museum_aptvm_server2022_1daylater_SRUDB.dat"
+);
+const BELKASOFT: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/museum_belkasoftctf_win10_SRUDB.dat"
+);
+const PLASO: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/plaso_SRUDB.dat"
+);
+
+fn open_real(path: &str) -> Option<ese_core::EseDatabase> {
+    let p = std::path::Path::new(path);
+    if !p.exists() { return None; }
+    Some(ese_core::EseDatabase::open(p).expect("open real SRUDB"))
+}
+
+/// Fresh Server 2022 (no anti-forensics): zero deleted record tags.
+#[test]
+fn aptvm_clean_has_zero_deleted_records() {
+    let Some(db) = open_real(APTVM_CLEAN) else { return };
+    assert_eq!(find_deleted_records(&db).len(), 0,
+        "aptvm_clean: fresh install must have no deleted tags");
+}
+
+#[test]
+fn aptvm_1day_has_zero_deleted_records() {
+    let Some(db) = open_real(APTVM_1DAY) else { return };
+    assert_eq!(find_deleted_records(&db).len(), 0,
+        "aptvm_1day: one-day-old server must have no deleted tags");
+}
+
+/// Active SRUM databases accumulate deleted records from Windows housekeeping.
+/// Counts verified against independent scan (probe_real_fixture_counts, 2026-05-20).
+#[test]
+fn chainsaw_deleted_record_count_matches_baseline() {
+    let Some(db) = open_real(CHAINSAW) else { return };
+    assert_eq!(find_deleted_records(&db).len(), 54,
+        "chainsaw: deleted tag count must match baseline");
+}
+
+#[test]
+fn rathbunvm_win10_deleted_record_count_matches_baseline() {
+    let Some(db) = open_real(RATHBUNVM_WIN10) else { return };
+    assert_eq!(find_deleted_records(&db).len(), 15,
+        "rathbunvm_win10: deleted tag count must match baseline");
+}
+
+#[test]
+fn rathbunvm_win11_deleted_record_count_matches_baseline() {
+    let Some(db) = open_real(RATHBUNVM_WIN11) else { return };
+    assert_eq!(find_deleted_records(&db).len(), 91,
+        "rathbunvm_win11: deleted tag count must match baseline");
+}
+
+#[test]
+fn belkasoft_deleted_record_count_matches_baseline() {
+    let Some(db) = open_real(BELKASOFT) else { return };
+    assert_eq!(find_deleted_records(&db).len(), 58,
+        "belkasoft: deleted tag count must match baseline");
+}
+
+#[test]
+fn plaso_deleted_record_count_matches_baseline() {
+    let Some(db) = open_real(PLASO) else { return };
+    assert_eq!(find_deleted_records(&db).len(), 143,
+        "plaso: deleted tag count must match baseline");
+}
+
+// ── check_dirty_state: all known-good files show clean shutdown ───────────────
+
+#[test]
+fn all_real_fixtures_show_clean_shutdown() {
+    let paths = [CHAINSAW, RATHBUNVM_WIN10, RATHBUNVM_WIN11, APTVM_CLEAN,
+                 APTVM_1DAY, BELKASOFT, PLASO];
+    for path in &paths {
+        let Some(db) = open_real(path) else { continue };
+        assert!(
+            check_dirty_state(&db.header).is_none(),
+            "{path}: must show clean shutdown, got dirty-state anomaly"
+        );
+    }
+}
+
+// ── verify_page_checksums: regression counts (see docs for investigation note) ─
+
+#[test]
+fn chainsaw_page_checksum_count_matches_baseline() {
+    let Some(db) = open_real(CHAINSAW) else { return };
+    assert_eq!(verify_page_checksums(&db).len(), 325,
+        "chainsaw: page checksum anomaly count must match baseline");
+}
+
+#[test]
+fn rathbunvm_win10_page_checksum_count_matches_baseline() {
+    let Some(db) = open_real(RATHBUNVM_WIN10) else { return };
+    assert_eq!(verify_page_checksums(&db).len(), 104,
+        "rathbunvm_win10: page checksum anomaly count must match baseline");
+}
