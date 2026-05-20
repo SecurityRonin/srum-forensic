@@ -41,5 +41,7 @@ pub fn decode_push_notification_record(
         user_id,
         notification_type,
         count,
+        foreground_cycle_time: 0,
+        background_cycle_time: 0,
     })
 }

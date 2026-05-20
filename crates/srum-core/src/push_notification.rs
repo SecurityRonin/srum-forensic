@@ -22,4 +22,10 @@ pub struct PushNotificationRecord {
     pub notification_type: u32,
     /// Number of notifications delivered in this interval.
     pub count: u32,
+    /// Foreground CPU cycle time from real ESE `ForegroundCycleTime` column.
+    /// Zero when decoded from the synthetic fixture format.
+    pub foreground_cycle_time: u64,
+    /// Background CPU cycle time from real ESE `BackgroundCycleTime` column.
+    /// Zero when decoded from the synthetic fixture format.
+    pub background_cycle_time: u64,
 }

@@ -806,3 +806,56 @@ fn diag_dump_chainsaw_catalog() {
     }
     // Always pass — this is purely diagnostic
 }
+
+// ── field-level accuracy: real ESE decoders ───────────────────────────────────
+
+/// Dissect ground truth (chainsaw, rec[0]): auto_inc_id=94, app_id=88, user_id=6.
+/// The current synthetic decoder reads data[8..12] as app_id — wrong for real ESE.
+#[test]
+fn chainsaw_app_usage_first_record_fields_match_dissect() {
+    let Some(p) = fixture(CHAINSAW) else { return };
+    let records = parse_app_usage(p).expect("parse_app_usage");
+    assert!(!records.is_empty(), "chainsaw must have app_usage records");
+    let r = &records[0];
+    assert_eq!(r.auto_inc_id, 94, "app_usage rec[0] auto_inc_id (dissect=94)");
+    assert_eq!(r.app_id, 88, "app_usage rec[0] app_id (dissect=88)");
+    assert_eq!(r.user_id, 6, "app_usage rec[0] user_id (dissect=6)");
+}
+
+/// Dissect ground truth (chainsaw, rec[0]): app_id=1, user_id=2, connected_time=66, profile_id=0.
+#[test]
+fn chainsaw_connectivity_first_record_fields_match_dissect() {
+    let Some(p) = fixture(CHAINSAW) else { return };
+    let records = parse_network_connectivity(p).expect("parse_network_connectivity");
+    assert!(!records.is_empty(), "chainsaw must have connectivity records");
+    let r = &records[0];
+    assert_eq!(r.app_id, 1, "connectivity rec[0] app_id (dissect=1)");
+    assert_eq!(r.user_id, 2, "connectivity rec[0] user_id (dissect=2)");
+    assert_eq!(r.connected_time, 66, "connectivity rec[0] connected_time (dissect=66)");
+    assert_eq!(r.profile_id, 0, "connectivity rec[0] profile_id (dissect=0)");
+}
+
+/// Dissect ground truth (chainsaw, rec[0]): app_id=96, user_id=306, fg_cycles=8046669904, bg_cycles=0.
+#[test]
+fn chainsaw_push_first_record_fields_match_dissect() {
+    let Some(p) = fixture(CHAINSAW) else { return };
+    let records = parse_push_notifications(p).expect("parse_push_notifications");
+    assert!(!records.is_empty(), "chainsaw must have push records");
+    let r = &records[0];
+    assert_eq!(r.app_id, 96, "push rec[0] app_id (dissect=96)");
+    assert_eq!(r.user_id, 306, "push rec[0] user_id (dissect=306)");
+    assert_eq!(r.foreground_cycle_time, 8_046_669_904, "push rec[0] foreground_cycle_time (dissect=8046669904)");
+    assert_eq!(r.background_cycle_time, 0, "push rec[0] background_cycle_time (dissect=0)");
+}
+
+/// Dissect ground truth (rathbunvm_win11, rec[0]): auto_inc_id=3, app_id=1, user_id=2.
+#[test]
+fn rathbunvm_win11_energy_first_record_fields_match_dissect() {
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let records = parse_energy_usage(p).expect("parse_energy_usage");
+    assert!(!records.is_empty(), "rathbunvm_win11 must have energy records");
+    let r = &records[0];
+    assert_eq!(r.auto_inc_id, 3, "energy rec[0] auto_inc_id (dissect=3)");
+    assert_eq!(r.app_id, 1, "energy rec[0] app_id (dissect=1)");
+    assert_eq!(r.user_id, 2, "energy rec[0] user_id (dissect=2)");
+}
