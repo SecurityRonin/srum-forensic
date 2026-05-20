@@ -1,9 +1,4 @@
-//! [`IdMapEntry`] binary decoder — supports both real ESE and synthetic fixture formats.
-//!
-//! **Synthetic fixture layout** (6 + N bytes):
-//! - `[0..4]`:  `id` (i32 LE)
-//! - `[4..6]`:  `name_utf16le_byte_len` (u16 LE)
-//! - `[6..]`:   name encoded as UTF-16LE
+//! [`IdMapEntry`] binary decoder — real ESE raw-tag format only.
 //!
 //! **Real ESE raw-tag layout** (`cbCommonKeyPrefix | key_suffix | col_data`):
 //! - `[0..2]`:          `cbCommonKeyPrefix` (u16 LE) — bytes of full key shared with page prefix
@@ -16,7 +11,7 @@
 //!   - tagged section at `col_start+10`: `00 01 04 40 01` descriptor + blob bytes
 //!   - IdBlob UTF-16LE starts at `col_start+15` (only when IdType==0)
 
-use srum_core::{IdMapEntry, ID_MAP_MIN_SIZE};
+use srum_core::IdMapEntry;
 
 use crate::SrumError;
 
@@ -32,16 +27,6 @@ const COL_TAGGED_OFF: usize = 10;
 /// Bytes consumed by the 5-byte tagged column descriptor before the blob payload.
 const TAGGED_DESCRIPTOR_LEN: usize = 5;
 
-/// Decode one `IdMapEntry` record from raw bytes.
-///
-/// Detects real ESE records by `cb_pfx ≤ KEY_LEN` AND the ESE record-header
-/// marker `0x02 0x7F` at `col_start`. Falls back to the synthetic 6+N-byte
-/// fixture format otherwise.
-///
-/// # Errors
-///
-/// Returns [`SrumError::DecodeError`] if the slice is too short or the
-/// UTF-16LE name bytes contain an invalid surrogate pair.
 pub fn decode_id_map_entry(data: &[u8], page: u32, tag: usize) -> Result<IdMapEntry, SrumError> {
     if data.len() < 2 {
         return Err(SrumError::DecodeError {
@@ -52,29 +37,26 @@ pub fn decode_id_map_entry(data: &[u8], page: u32, tag: usize) -> Result<IdMapEn
     }
 
     let cb_pfx = u16::from_le_bytes([data[0], data[1]]) as usize;
-
-    // Real ESE: cb_pfx fits within the known key length and the ESE record
-    // header marker appears at col_start.
-    if cb_pfx <= ESE_KEY_LEN {
-        let col_start = 2 + (ESE_KEY_LEN - cb_pfx);
-        if data.len() > col_start + 1
-            && data[col_start] == 0x02
-            && data[col_start + 1] == 0x7f
-        {
-            return decode_real_ese(data, page, tag, col_start);
-        }
+    if cb_pfx > ESE_KEY_LEN {
+        return Err(SrumError::DecodeError {
+            page,
+            tag,
+            detail: format!("id-map cb_pfx={cb_pfx} exceeds KEY_LEN={ESE_KEY_LEN}"),
+        });
     }
 
-    // Fallback: synthetic fixture format.
-    decode_synthetic(data, page, tag)
-}
+    let col_start = 2 + (ESE_KEY_LEN - cb_pfx);
+    if data.len() < col_start + 2 || data[col_start] != 0x02 || data[col_start + 1] != 0x7f {
+        return Err(SrumError::DecodeError {
+            page,
+            tag,
+            detail: format!(
+                "id-map record missing ESE header marker at col_start={col_start}: len={}",
+                data.len()
+            ),
+        });
+    }
 
-fn decode_real_ese(
-    data: &[u8],
-    page: u32,
-    tag: usize,
-    col_start: usize,
-) -> Result<IdMapEntry, SrumError> {
     let id_off = col_start + COL_ID_INDEX_OFF;
     if data.len() < id_off + 4 {
         return Err(SrumError::DecodeError {
@@ -89,11 +71,9 @@ fn decode_real_ese(
     }
     let id = i32::from_le_bytes([data[id_off], data[id_off + 1], data[id_off + 2], data[id_off + 3]]);
 
-    // Tagged IdBlob section: present only when record extends past the fixed columns.
     let blob_start = col_start + COL_TAGGED_OFF + TAGGED_DESCRIPTOR_LEN;
     let name = if data.len() > blob_start {
         let blob = &data[blob_start..];
-        // Strip trailing null pair if present.
         let blob = if blob.len() >= 2 && blob[blob.len() - 2] == 0 && blob[blob.len() - 1] == 0 {
             &blob[..blob.len() - 2]
         } else {
@@ -110,40 +90,5 @@ fn decode_real_ese(
         String::new()
     };
 
-    Ok(IdMapEntry { id, name })
-}
-
-fn decode_synthetic(data: &[u8], page: u32, tag: usize) -> Result<IdMapEntry, SrumError> {
-    if data.len() < ID_MAP_MIN_SIZE {
-        return Err(SrumError::DecodeError {
-            page,
-            tag,
-            detail: format!(
-                "id-map record too short: {} < {ID_MAP_MIN_SIZE}",
-                data.len()
-            ),
-        });
-    }
-    let id = i32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-    let name_byte_len = u16::from_le_bytes([data[4], data[5]]) as usize;
-    let total = ID_MAP_MIN_SIZE + name_byte_len;
-    if data.len() < total {
-        return Err(SrumError::DecodeError {
-            page,
-            tag,
-            detail: format!(
-                "id-map record name truncated: need {total}, got {}",
-                data.len()
-            ),
-        });
-    }
-    let name_bytes = &data[6..6 + name_byte_len];
-    let utf16_units: Vec<u16> = name_bytes
-        .chunks_exact(2)
-        .map(|b| u16::from_le_bytes([b[0], b[1]]))
-        .collect();
-    let name = char::decode_utf16(utf16_units)
-        .map(|r| r.unwrap_or(char::REPLACEMENT_CHARACTER))
-        .collect::<String>();
     Ok(IdMapEntry { id, name })
 }

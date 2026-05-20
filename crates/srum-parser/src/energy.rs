@@ -1,11 +1,4 @@
-//! [`EnergyUsageRecord`] binary decoder — supports both real ESE and synthetic fixture formats.
-//!
-//! **Synthetic fixture layout** (32 bytes, all LE):
-//! - `[0..8]`:   `filetime` (u64)
-//! - `[8..12]`:  `app_id` (i32)
-//! - `[12..16]`: `user_id` (i32)
-//! - `[16..24]`: `charge_level` (u64)
-//! - `[24..32]`: `energy_consumed` (u64)
+//! [`EnergyUsageRecord`] binary decoder — real ESE raw-tag format only.
 //!
 //! **Real ESE raw-tag layout** (`cbCommonKeyPrefix | key_suffix | col_data`):
 //! - `[0..2]`:           `cbCommonKeyPrefix` (u16 LE)
@@ -17,9 +10,7 @@
 //!   - `[col_start+20..+24]`: `UserId` (i32 LE) → `user_id`
 //!   - `charge_level` and `energy_consumed` returned as 0 (all 0 in available VM fixtures)
 
-use srum_core::{
-    ole_date_to_datetime, filetime_to_datetime, EnergyUsageRecord, ENERGY_RECORD_SIZE,
-};
+use srum_core::{ole_date_to_datetime, EnergyUsageRecord};
 
 use crate::SrumError;
 
@@ -34,25 +25,11 @@ pub fn decode_energy_record(
     page: u32,
     tag: usize,
 ) -> Result<EnergyUsageRecord, SrumError> {
-    if data.len() == ENERGY_RECORD_SIZE {
-        return decode_synthetic(data, page, tag);
-    }
-    if data.len() > ENERGY_RECORD_SIZE {
-        return decode_real_ese(data, page, tag);
-    }
-    Err(SrumError::DecodeError {
-        page,
-        tag,
-        detail: format!("energy record too short: {} < {ENERGY_RECORD_SIZE}", data.len()),
-    })
-}
-
-fn decode_real_ese(data: &[u8], page: u32, tag: usize) -> Result<EnergyUsageRecord, SrumError> {
     if data.len() < 2 {
         return Err(SrumError::DecodeError {
             page,
             tag,
-            detail: "energy real ESE record too short for cbCommonKeyPrefix".to_string(),
+            detail: format!("energy record too short: {}", data.len()),
         });
     }
     let cb_pfx = u16::from_le_bytes([data[0], data[1]]) as usize;
@@ -107,34 +84,5 @@ fn decode_real_ese(data: &[u8], page: u32, tag: usize) -> Result<EnergyUsageReco
         charge_level: 0,
         energy_consumed: 0,
         auto_inc_id,
-    })
-}
-
-fn decode_synthetic(data: &[u8], page: u32, tag: usize) -> Result<EnergyUsageRecord, SrumError> {
-    if data.len() < ENERGY_RECORD_SIZE {
-        return Err(SrumError::DecodeError {
-            page,
-            tag,
-            detail: format!("energy record too short: {} < {ENERGY_RECORD_SIZE}", data.len()),
-        });
-    }
-    let filetime = u64::from_le_bytes([
-        data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7],
-    ]);
-    let app_id = i32::from_le_bytes([data[8], data[9], data[10], data[11]]);
-    let user_id = i32::from_le_bytes([data[12], data[13], data[14], data[15]]);
-    let charge_level = u64::from_le_bytes([
-        data[16], data[17], data[18], data[19], data[20], data[21], data[22], data[23],
-    ]);
-    let energy_consumed = u64::from_le_bytes([
-        data[24], data[25], data[26], data[27], data[28], data[29], data[30], data[31],
-    ]);
-    Ok(EnergyUsageRecord {
-        timestamp: filetime_to_datetime(filetime),
-        app_id,
-        user_id,
-        charge_level,
-        energy_consumed,
-        auto_inc_id: page,
     })
 }

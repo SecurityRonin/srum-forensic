@@ -1,11 +1,4 @@
-//! [`NetworkConnectivityRecord`] binary decoder — supports both real ESE and synthetic formats.
-//!
-//! **Synthetic fixture layout** (28 bytes, all LE):
-//! - `[0..8]`:   `filetime` (u64)
-//! - `[8..12]`:  `app_id` (i32)
-//! - `[12..16]`: `user_id` (i32)
-//! - `[16..20]`: `profile_id` (i32)
-//! - `[20..28]`: `connected_time` (u64)
+//! [`NetworkConnectivityRecord`] binary decoder — real ESE raw-tag format only.
 //!
 //! **Real ESE raw-tag layout** (`cbCommonKeyPrefix | key_suffix | col_data`):
 //! - `[0..2]`:           `cbCommonKeyPrefix` (u16 LE)
@@ -19,10 +12,7 @@
 //!   - `[col_start+32..+36]`: `L2ProfileId` (i32 LE) → `profile_id`
 //!   - `[col_start+36..+40]`: `ConnectedTime` (u32 LE) → `connected_time`
 
-use srum_core::{
-    ole_date_to_datetime, filetime_to_datetime, NetworkConnectivityRecord,
-    NETWORK_CONNECTIVITY_RECORD_SIZE,
-};
+use srum_core::{ole_date_to_datetime, NetworkConnectivityRecord};
 
 use crate::SrumError;
 
@@ -38,28 +28,11 @@ pub fn decode_connectivity_record(
     page: u32,
     tag: usize,
 ) -> Result<NetworkConnectivityRecord, SrumError> {
-    if data.len() == NETWORK_CONNECTIVITY_RECORD_SIZE {
-        return decode_synthetic(data, page, tag);
-    }
-    if data.len() > NETWORK_CONNECTIVITY_RECORD_SIZE {
-        return decode_real_ese(data, page, tag);
-    }
-    Err(SrumError::DecodeError {
-        page,
-        tag,
-        detail: format!(
-            "connectivity record too short: {} < {NETWORK_CONNECTIVITY_RECORD_SIZE}",
-            data.len()
-        ),
-    })
-}
-
-fn decode_real_ese(data: &[u8], page: u32, tag: usize) -> Result<NetworkConnectivityRecord, SrumError> {
     if data.len() < 2 {
         return Err(SrumError::DecodeError {
             page,
             tag,
-            detail: "connectivity real ESE record too short for cbCommonKeyPrefix".to_string(),
+            detail: format!("connectivity record too short: {}", data.len()),
         });
     }
     let cb_pfx = u16::from_le_bytes([data[0], data[1]]) as usize;
@@ -112,35 +85,6 @@ fn decode_real_ese(data: &[u8], page: u32, tag: usize) -> Result<NetworkConnecti
 
     Ok(NetworkConnectivityRecord {
         timestamp,
-        app_id,
-        user_id,
-        profile_id,
-        connected_time,
-    })
-}
-
-fn decode_synthetic(data: &[u8], page: u32, tag: usize) -> Result<NetworkConnectivityRecord, SrumError> {
-    if data.len() < NETWORK_CONNECTIVITY_RECORD_SIZE {
-        return Err(SrumError::DecodeError {
-            page,
-            tag,
-            detail: format!(
-                "connectivity record too short: {} < {NETWORK_CONNECTIVITY_RECORD_SIZE}",
-                data.len()
-            ),
-        });
-    }
-    let filetime = u64::from_le_bytes([
-        data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7],
-    ]);
-    let app_id = i32::from_le_bytes([data[8], data[9], data[10], data[11]]);
-    let user_id = i32::from_le_bytes([data[12], data[13], data[14], data[15]]);
-    let profile_id = i32::from_le_bytes([data[16], data[17], data[18], data[19]]);
-    let connected_time = u64::from_le_bytes([
-        data[20], data[21], data[22], data[23], data[24], data[25], data[26], data[27],
-    ]);
-    Ok(NetworkConnectivityRecord {
-        timestamp: filetime_to_datetime(filetime),
         app_id,
         user_id,
         profile_id,

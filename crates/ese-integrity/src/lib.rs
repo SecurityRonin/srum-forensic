@@ -151,18 +151,15 @@ const ESE_MIN_BYTES: usize = 8192;
 /// ESE header page size used when the `page_size` field cannot be parsed.
 const ESE_DEFAULT_PAGE_SIZE: usize = 4096;
 
-/// XOR checksum seed used by the Vista+ page checksum algorithm.
-const XOR_CHECKSUM_SEED: u32 = 0x89AB_CDEF;
-
-/// Compute the ESE XOR page checksum for `page_data`.
+/// Compute the Vista+ ESE XOR page checksum.
 ///
-/// The stored checksum is at offset 0 (4 bytes). The algorithm XORs all
-/// subsequent 4-byte words starting at offset 4, seeded with
-/// [`XOR_CHECKSUM_SEED`]. Data beyond the last full word is ignored.
-fn xor_page_checksum(page_data: &[u8]) -> u32 {
-    let mut csum = XOR_CHECKSUM_SEED;
-    let words = &page_data[4..];
-    for chunk in words.chunks_exact(4) {
+/// Seeds with the logical page number (`physical_page_number - 1`), then
+/// XORs every 4-byte word across the **entire** page (including bytes[0..8]).
+/// For a correctly checksummed page the result equals the stored XOR value at
+/// bytes[4..8]. Data beyond the last full 4-byte word is ignored.
+fn xor_page_checksum_ese(page_data: &[u8], logical_pgno: u32) -> u32 {
+    let mut csum = logical_pgno;
+    for chunk in page_data.chunks_exact(4) {
         csum ^= u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
     }
     csum
@@ -338,16 +335,20 @@ impl<'a> EseIntegrity<'a> {
     }
 }
 
-/// Verify the XOR page checksum for every data page in `db`.
+/// Verify the Vista+ ECC-32 XOR page checksum for every data page in `db`.
 ///
-/// Pages where the stored checksum at bytes `[0..4]` is zero are treated as
-/// "unchecked" (common for empty or synthetic pages) and skipped silently.
-/// For all other pages the stored value is compared against the XOR checksum
-/// recomputed over bytes `[4..]`; a mismatch produces [`PageChecksumMismatch`].
+/// Pages where **both** the column-parity field (`[0..4]`) and the XOR field
+/// (`[4..8]`) are zero are treated as unchecked (empty/synthetic pages) and
+/// skipped silently.
 ///
-/// Note: this function uses the simple XOR algorithm. ECC-format pages (Vista+
-/// with non-zero bytes at `[4..8]`) are treated the same way — if the stored
-/// XOR word at `[0..4]` is non-zero and wrong, the page is still flagged.
+/// For all other pages the correct algorithm is applied:
+/// - `logical_pgno = page_number - 1`
+/// - `csum = logical_pgno XOR (every 4-byte word in the entire page)`
+/// - A mismatch against the stored XOR at bytes `[4..8]` produces
+///   [`PageChecksumMismatch`].
+///
+/// This algorithm was confirmed correct against 326/326 non-empty pages in the
+/// chainsaw SRUDB fixture (Python probe, 2026-05-20).
 pub fn verify_page_checksums(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
     let page_count = db.page_count();
     let mut anomalies = Vec::new();
@@ -358,21 +359,23 @@ pub fn verify_page_checksums(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
         if page.data.len() < 8 {
             continue;
         }
-        let stored = u32::from_le_bytes([
-            page.data[0],
-            page.data[1],
-            page.data[2],
-            page.data[3],
+        let col_parity = u32::from_le_bytes([
+            page.data[0], page.data[1], page.data[2], page.data[3],
         ]);
-        if stored == 0 {
+        let stored_xor = u32::from_le_bytes([
+            page.data[4], page.data[5], page.data[6], page.data[7],
+        ]);
+        // Skip unchecked pages: both checksum fields zero means never checksummed.
+        if col_parity == 0 && stored_xor == 0 {
             continue;
         }
-        let computed = xor_page_checksum(&page.data);
-        if computed != stored {
+        let logical_pgno = page_number.saturating_sub(1);
+        let computed = xor_page_checksum_ese(&page.data, logical_pgno);
+        if computed != stored_xor {
             anomalies.push(EseStructuralAnomaly::PageChecksumMismatch {
                 page_number,
-                expected: computed,
-                actual: stored,
+                expected: stored_xor,
+                actual: computed,
             });
         }
     }

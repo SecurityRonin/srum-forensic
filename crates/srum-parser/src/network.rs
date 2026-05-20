@@ -1,17 +1,7 @@
-//! [`NetworkUsageRecord`] binary decoder.
+//! [`NetworkUsageRecord`] binary decoder — real ESE raw-tag format only.
 //!
-//! Supports two wire formats, distinguished by record length:
-//!
-//! **Synthetic (32 bytes)** — used by test fixtures:
-//! - `[0..8]`:   `filetime` (u64) — Windows FILETIME (100ns ticks since 1601-01-01)
-//! - `[8..12]`:  `app_id` (i32)
-//! - `[12..16]`: `user_id` (i32)
-//! - `[16..24]`: `bytes_sent` (u64)
-//! - `[24..32]`: `bytes_recv` (u64)
-//!
-//! **Real ESE per-record delta (>32 bytes)** — produced by Windows SRUDB.dat.
-//! Each record is the delta between consecutive tag end-positions on a cumulative
-//! B-tree leaf page.  Layout (all little-endian):
+//! **Real ESE per-record layout** — produced by Windows SRUDB.dat.
+//! Layout (all little-endian):
 //! - `[0..2]`:            `cbCommonKeyPrefix` (u16) — shared prefix bytes with previous key
 //! - `[2..2+(16-pfx)]`:   key suffix (`16 - cbCommonKeyPrefix` bytes; total key = 16 bytes)
 //! - `[col..col+4]`:      unknown (4 bytes); `col = 18 - cbCommonKeyPrefix`
@@ -23,63 +13,26 @@
 //! - `[col+40..col+48]`:  `BytesSent` (u64)
 //! - `[col+48..col+56]`:  `BytesRecvd` (u64)
 
-use srum_core::{filetime_to_datetime, ole_date_to_datetime, NetworkUsageRecord, NETWORK_RECORD_SIZE};
+use srum_core::{ole_date_to_datetime, NetworkUsageRecord};
 
 use crate::SrumError;
 
 /// ESE network table total key length (verified across 96 records in chainsaw_SRUDB.dat).
 const ESE_KEY_LEN: usize = 16;
 
-/// Decode one raw record into a [`NetworkUsageRecord`].
-///
-/// Detects format by length: 32 bytes → synthetic FILETIME format;
-/// >32 bytes → real ESE per-record delta with OLE date.
-///
-/// # Errors
-///
-/// Returns [`SrumError::DecodeError`] if `data` is too short or contains
-/// an invalid `cbCommonKeyPrefix` value.
 pub fn decode_network_record(
     data: &[u8],
     page: u32,
     tag: usize,
 ) -> Result<NetworkUsageRecord, SrumError> {
-    if data.len() < NETWORK_RECORD_SIZE {
+    if data.len() < 2 {
         return Err(SrumError::DecodeError {
             page,
             tag,
-            detail: format!(
-                "network record too short: {} < {NETWORK_RECORD_SIZE}",
-                data.len()
-            ),
+            detail: format!("network record too short: {}", data.len()),
         });
     }
 
-    if data.len() == NETWORK_RECORD_SIZE {
-        // Synthetic 32-byte fixture format
-        let filetime = u64::from_le_bytes([
-            data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7],
-        ]);
-        let app_id = i32::from_le_bytes([data[8], data[9], data[10], data[11]]);
-        let user_id = i32::from_le_bytes([data[12], data[13], data[14], data[15]]);
-        let bytes_sent = u64::from_le_bytes([
-            data[16], data[17], data[18], data[19], data[20], data[21], data[22], data[23],
-        ]);
-        let bytes_recv = u64::from_le_bytes([
-            data[24], data[25], data[26], data[27], data[28], data[29], data[30], data[31],
-        ]);
-        return Ok(NetworkUsageRecord {
-            timestamp: filetime_to_datetime(filetime),
-            app_id,
-            user_id,
-            bytes_sent,
-            bytes_recv,
-            auto_inc_id: page,
-        });
-    }
-
-    // Real ESE per-record delta format (data.len() > 32)
-    // col_start = 2 (cbPfx field) + key_suffix_len = 2 + (ESE_KEY_LEN - cbPfx)
     let cb_pfx = u16::from_le_bytes([data[0], data[1]]) as usize;
     if cb_pfx > ESE_KEY_LEN {
         return Err(SrumError::DecodeError {
@@ -94,10 +47,7 @@ pub fn decode_network_record(
         return Err(SrumError::DecodeError {
             page,
             tag,
-            detail: format!(
-                "network delta too short: need {need}, got {}",
-                data.len()
-            ),
+            detail: format!("network delta too short: need {need}, got {}", data.len()),
         });
     }
 
