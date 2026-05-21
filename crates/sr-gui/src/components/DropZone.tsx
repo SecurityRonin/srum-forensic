@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { SrumFile } from '../types';
 import { COLORS } from '../colors';
@@ -9,14 +10,20 @@ interface Props {
   onFile: (f: SrumFile) => void;
 }
 
+interface Progress {
+  pct: number;
+  label: string;
+}
+
 export function DropZone({ onFile }: Props) {
-  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const unlistenProgress = useRef<UnlistenFn | null>(null);
 
   useEffect(() => {
     const webview = getCurrentWebview();
-    let unlisten: (() => void) | undefined;
+    let unlisten: UnlistenFn | undefined;
 
     webview.onDragDropEvent((event) => {
       if (event.payload.type === 'enter' || event.payload.type === 'over') {
@@ -27,11 +34,8 @@ export function DropZone({ onFile }: Props) {
         setDragOver(false);
         const paths: string[] = event.payload.paths;
         const dat = paths.find(p => /\.(dat|DAT)$/.test(p) || p.toLowerCase().endsWith('srudb.dat'));
-        if (dat) {
-          parseFile(dat);
-        } else if (paths.length > 0) {
-          parseFile(paths[0]);
-        }
+        if (dat) parseFile(dat);
+        else if (paths.length > 0) parseFile(paths[0]);
       }
     }).then(fn => { unlisten = fn; });
 
@@ -49,17 +53,30 @@ export function DropZone({ onFile }: Props) {
   }
 
   async function parseFile(path: string) {
-    setLoading(true);
     setError(null);
+    setProgress({ pct: 0, label: 'Opening…' });
+
+    unlistenProgress.current = await listen<Progress>('parse-progress', (e) => {
+      setProgress(e.payload);
+    });
+
     try {
       const result = await invoke<SrumFile>('open_file', { path });
-      onFile(result);
+      setProgress({ pct: 100, label: 'Done' });
+      setTimeout(() => {
+        unlistenProgress.current?.();
+        onFile(result);
+      }, 300);
     } catch (e) {
       setError(String(e));
+      setProgress(null);
     } finally {
-      setLoading(false);
+      unlistenProgress.current?.();
+      unlistenProgress.current = null;
     }
   }
+
+  const loading = progress !== null;
 
   return (
     <div
@@ -83,23 +100,43 @@ export function DropZone({ onFile }: Props) {
       <p style={{ color: COLORS.textSecondary, margin: 0 }}>
         {dragOver ? 'Drop to open' : 'Drop SRUDB.dat here, or click below'}
       </p>
-      <button
-        onClick={openFile}
-        disabled={loading}
-        style={{
-          padding: '12px 32px',
-          background: COLORS.informational,
-          color: '#fff',
-          border: 'none',
-          borderRadius: 6,
-          cursor: loading ? 'not-allowed' : 'pointer',
-          fontSize: 14,
-          fontWeight: 600,
-          opacity: loading ? 0.6 : 1,
-        }}
-      >
-        {loading ? 'Parsing…' : 'Open SRUDB.dat'}
-      </button>
+
+      {loading ? (
+        <div style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: COLORS.textSecondary, fontSize: 13 }}>{progress.label}</span>
+            <span style={{ color: COLORS.textSecondary, fontSize: 13 }}>{progress.pct}%</span>
+          </div>
+          <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+            <div
+              style={{
+                height: '100%',
+                width: `${progress.pct}%`,
+                borderRadius: 3,
+                background: COLORS.informational,
+                transition: 'width 300ms ease',
+              }}
+            />
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={openFile}
+          style={{
+            padding: '12px 32px',
+            background: COLORS.informational,
+            color: '#fff',
+            border: 'none',
+            borderRadius: 6,
+            cursor: 'pointer',
+            fontSize: 14,
+            fontWeight: 600,
+          }}
+        >
+          Open SRUDB.dat
+        </button>
+      )}
+
       {error && (
         <p style={{ color: COLORS.critical, maxWidth: 480, textAlign: 'center' }}>{error}</p>
       )}
