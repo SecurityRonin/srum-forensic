@@ -14,6 +14,7 @@ pub const HEURISTIC_KEYS: &[&str] = &[
     "suspicious_path",
     "masquerade_candidate",
     "user_present",
+    "qwcrypt_ioc_process",
 ];
 
 pub fn build_timeline(
@@ -237,6 +238,15 @@ pub fn apply_beaconing_signals(all: &mut Vec<serde_json::Value>) {
             }
         }
     }
+}
+
+/// Detect QWCrypt/RedCurl-specific process images in SRUM app usage records.
+///
+/// Fires on `apps` table rows where `app_name` basename matches an entry in
+/// `QWCRYPT_IOC_FILENAMES` (`rbcw.exe`, `ADNotificationManager.exe`).  Sets
+/// `qwcrypt_ioc_process: true` and appends `"T1486"` to `mitre_techniques`.
+pub fn apply_qwcrypt_ioc_signals(_values: &mut Vec<serde_json::Value>) {
+    todo!("implement apply_qwcrypt_ioc_signals")
 }
 
 const NOTIFICATION_C2_MIN_COUNT: u64 = 10;
@@ -489,5 +499,71 @@ mod tests {
         ];
         apply_notification_c2_signal(&mut all);
         assert_eq!(all[1]["notification_c2"], json!(true));
+    }
+
+    #[test]
+    fn apply_qwcrypt_ioc_signals_flags_rbcw_exe() {
+        let mut all = vec![json!({
+            "source_table": "apps",
+            "app_id": 1_i64,
+            "timestamp": "2024-01-01T00:00:00Z",
+            "app_name": "C:\\Users\\victim\\AppData\\Local\\Temp\\rbcw.exe",
+        })];
+        apply_qwcrypt_ioc_signals(&mut all);
+        assert_eq!(all[0]["qwcrypt_ioc_process"], json!(true));
+    }
+
+    #[test]
+    fn apply_qwcrypt_ioc_signals_flags_adnotification_manager() {
+        let mut all = vec![json!({
+            "source_table": "apps",
+            "app_id": 2_i64,
+            "timestamp": "2024-01-01T00:00:00Z",
+            "app_name": "C:\\Windows\\Temp\\ADNotificationManager.exe",
+        })];
+        apply_qwcrypt_ioc_signals(&mut all);
+        assert_eq!(all[0]["qwcrypt_ioc_process"], json!(true));
+    }
+
+    #[test]
+    fn apply_qwcrypt_ioc_signals_does_not_flag_benign_process() {
+        let mut all = vec![json!({
+            "source_table": "apps",
+            "app_id": 3_i64,
+            "timestamp": "2024-01-01T00:00:00Z",
+            "app_name": "C:\\Windows\\System32\\notepad.exe",
+        })];
+        apply_qwcrypt_ioc_signals(&mut all);
+        assert!(all[0].get("qwcrypt_ioc_process").is_none());
+    }
+
+    #[test]
+    fn apply_qwcrypt_ioc_signals_does_not_flag_non_apps_table() {
+        let mut all = vec![json!({
+            "source_table": "network",
+            "app_id": 1_i64,
+            "timestamp": "2024-01-01T00:00:00Z",
+            "app_name": "rbcw.exe",
+        })];
+        apply_qwcrypt_ioc_signals(&mut all);
+        assert!(all[0].get("qwcrypt_ioc_process").is_none());
+    }
+
+    #[test]
+    fn apply_qwcrypt_ioc_signals_includes_t1486_in_mitre_techniques() {
+        let mut all = vec![json!({
+            "source_table": "apps",
+            "app_id": 1_i64,
+            "timestamp": "2024-01-01T00:00:00Z",
+            "app_name": "rbcw.exe",
+        })];
+        apply_qwcrypt_ioc_signals(&mut all);
+        let techs = all[0]["mitre_techniques"].as_array().expect("mitre_techniques array");
+        assert!(techs.iter().any(|t| t == "T1486"));
+    }
+
+    #[test]
+    fn qwcrypt_ioc_process_is_in_heuristic_keys() {
+        assert!(HEURISTIC_KEYS.contains(&"qwcrypt_ioc_process"));
     }
 }
