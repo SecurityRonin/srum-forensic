@@ -85,6 +85,13 @@ fn card_text(flag: &str, agg: &FlagAgg) -> (String, String) {
             "ANTI-FORENSICS INDICATOR".into(),
             format!("{} gap(s) — records deleted selectively, not system shutdown", agg.count),
         ),
+        "qwcrypt_ioc_process" => (
+            "QWCRYPT RANSOMWARE IOC".into(),
+            format!(
+                "{} occurrence(s) — '{}' is a known QWCrypt/RedCurl binary (T1486)",
+                agg.count, agg.app_name
+            ),
+        ),
         _ => (
             flag.to_uppercase().replace('_', " "),
             format!("{} occurrence(s)", agg.count),

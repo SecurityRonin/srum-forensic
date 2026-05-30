@@ -61,6 +61,7 @@ pub fn build_timeline(
     apply_cross_table_signals(&mut all);
     apply_beaconing_signals(&mut all);
     apply_notification_c2_signal(&mut all);
+    apply_qwcrypt_ioc_signals(&mut all);
     annotate_user_presence(&mut all);
 
     all.sort_by(|a, b| {
@@ -113,6 +114,7 @@ pub fn mitre_techniques_for(obj: &serde_json::Map<String, serde_json::Value>) ->
     if obj.contains_key("notification_c2")          { techs.push("T1092"); }
     if obj.contains_key("suspicious_path")          { techs.push("T1036.005"); }
     if obj.contains_key("masquerade_candidate")     { techs.push("T1036.005"); }
+    if obj.contains_key("qwcrypt_ioc_process")      { techs.push("T1486"); }
     techs.sort_unstable();
     techs.dedup();
     techs
@@ -245,8 +247,38 @@ pub fn apply_beaconing_signals(all: &mut Vec<serde_json::Value>) {
 /// Fires on `apps` table rows where `app_name` basename matches an entry in
 /// `QWCRYPT_IOC_FILENAMES` (`rbcw.exe`, `ADNotificationManager.exe`).  Sets
 /// `qwcrypt_ioc_process: true` and appends `"T1486"` to `mitre_techniques`.
-pub fn apply_qwcrypt_ioc_signals(_values: &mut Vec<serde_json::Value>) {
-    todo!("implement apply_qwcrypt_ioc_signals")
+pub fn apply_qwcrypt_ioc_signals(values: &mut Vec<serde_json::Value>) {
+    use forensicnomicon::heuristics::evtx::QWCRYPT_IOC_FILENAMES;
+    for v in values.iter_mut() {
+        if v.get(TABLE_KEY).and_then(|t| t.as_str()) != Some("apps") {
+            continue;
+        }
+        if let Some(obj) = v.as_object_mut() {
+            let app_name = obj
+                .get("app_name")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("");
+            let base = app_name
+                .rsplit(|c| c == '\\' || c == '/')
+                .next()
+                .unwrap_or(app_name);
+            let is_ioc = QWCRYPT_IOC_FILENAMES
+                .iter()
+                .any(|&ioc| base.eq_ignore_ascii_case(ioc));
+            if is_ioc {
+                obj.insert("qwcrypt_ioc_process".to_owned(), serde_json::Value::Bool(true));
+                let techs = obj
+                    .entry("mitre_techniques")
+                    .or_insert_with(|| serde_json::Value::Array(Vec::new()));
+                if let serde_json::Value::Array(arr) = techs {
+                    let t1486 = serde_json::Value::String("T1486".to_owned());
+                    if !arr.contains(&t1486) {
+                        arr.push(t1486);
+                    }
+                }
+            }
+        }
+    }
 }
 
 const NOTIFICATION_C2_MIN_COUNT: u64 = 10;
