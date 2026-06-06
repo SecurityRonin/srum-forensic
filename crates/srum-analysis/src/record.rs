@@ -51,6 +51,39 @@ pub struct TemporalSpan {
     pub last: String,
 }
 
+
+impl FindingCard {
+    /// Convert this triage card into a canonical [`forensicnomicon::report::Finding`],
+    /// mapping the triage severity (`Clean`/`Informational`/`Suspicious`/`Critical`)
+    /// onto the shared 5-level scale.
+    #[must_use]
+    pub fn to_finding(&self, source: forensicnomicon::report::Source) -> forensicnomicon::report::Finding {
+        use forensicnomicon::report::{Category, ExternalRef, Finding, Severity as Canon};
+        let severity = match self.severity {
+            Severity::Clean => Canon::Info,
+            Severity::Informational => Canon::Low,
+            Severity::Suspicious => Canon::High,
+            Severity::Critical => Canon::Critical,
+        };
+        let code = format!("SRUM-{}", self.filter_flag.to_uppercase().replace('_', "-"));
+        let category = if self.mitre_techniques.is_empty() {
+            Category::from_code(&code)
+        } else {
+            Category::Threat
+        };
+        let mut builder = Finding::observation(severity, category, code)
+            .note(self.description.clone())
+            .source(source)
+            .evidence("app", self.app_name.clone())
+            .evidence("title", self.title.clone())
+            .occurrences(self.count as u64);
+        for technique in &self.mitre_techniques {
+            builder = builder.external_ref(ExternalRef::mitre_attack(technique.clone()));
+        }
+        builder.build()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
