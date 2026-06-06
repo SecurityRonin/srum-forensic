@@ -104,7 +104,7 @@ fn minimal_valid_database_has_no_anomalies() {
     );
 
     let anomalies = EseIntegrity::new(&bytes).analyse();
-    let errors_or_above: Vec<_> = anomalies_at_least(&anomalies, Severity::Error);
+    let errors_or_above: Vec<_> = anomalies_at_least(&anomalies, Severity::High);
     assert!(
         errors_or_above.is_empty(),
         "clean minimal database must produce no Error/Critical anomalies; got: {errors_or_above:?}"

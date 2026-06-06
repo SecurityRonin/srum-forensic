@@ -1,12 +1,13 @@
 [package]
 name = "ese-integrity"
-version = "0.1.0"
+version = "0.2.0"
 description = "ESE database structural anomaly detection — raw binary-format facts, not forensic conclusions"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+forensicnomicon.workspace = true
 ese-core.workspace = true
 serde.workspace = true
 thiserror.workspace = true

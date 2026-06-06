@@ -6,22 +6,9 @@
 
 use ese_core::{EseDatabase, EseHeader};
 
-/// Forensic severity level for a detected structural anomaly.
-///
-/// Declaration order is ascending: `Info < Warning < Error < Critical`.
-/// This ordering is reflected in the derived [`Ord`] implementation so
-/// `anomaly.severity() >= Severity::Warning` works as a filter predicate.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Severity {
-    /// Consistent with legitimate operation; worth noting.
-    Info,
-    /// Suspicious; plausible legitimate explanation but warrants investigation.
-    Warning,
-    /// Strong indicator of tampering or structural corruption.
-    Error,
-    /// Database cannot be reliably decoded; forensic conclusions unsupported.
-    Critical,
-}
+/// The canonical 5-level severity scale, shared across every SecurityRonin
+/// analyzer via [`forensicnomicon::report`].
+pub use forensicnomicon::report::Severity;
 
 /// A raw structural anomaly detected in an ESE database binary.
 ///
@@ -122,17 +109,17 @@ impl EseStructuralAnomaly {
     pub fn severity(&self) -> Severity {
         match self {
             Self::DirtyDatabase { .. } => Severity::Info,
-            Self::TimestampSkew { .. } => Severity::Error,
-            Self::SlackRegionData { .. } => Severity::Warning,
-            Self::PageChecksumMismatch { .. } => Severity::Error,
-            Self::BTreeLinkBroken { .. } => Severity::Error,
-            Self::PageFlagInconsistency { .. } => Severity::Warning,
-            Self::OrphanedSrumTable { .. } => Severity::Warning,
-            Self::MissingSrumTable { .. } => Severity::Warning,
+            Self::TimestampSkew { .. } => Severity::High,
+            Self::SlackRegionData { .. } => Severity::Medium,
+            Self::PageChecksumMismatch { .. } => Severity::High,
+            Self::BTreeLinkBroken { .. } => Severity::High,
+            Self::PageFlagInconsistency { .. } => Severity::Medium,
+            Self::OrphanedSrumTable { .. } => Severity::Medium,
+            Self::MissingSrumTable { .. } => Severity::Medium,
             Self::TruncatedDatabase { .. } => Severity::Critical,
-            Self::DeletedRecordPresent { .. } => Severity::Warning,
-            Self::AutoIncIdGap { .. } => Severity::Warning,
-            Self::OrphanedCatalogEntry { .. } => Severity::Error,
+            Self::DeletedRecordPresent { .. } => Severity::Medium,
+            Self::AutoIncIdGap { .. } => Severity::Medium,
+            Self::OrphanedCatalogEntry { .. } => Severity::High,
         }
     }
 
@@ -593,4 +580,42 @@ pub fn scan_slack_regions(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
         }
     }
     anomalies
+}
+
+
+impl EseStructuralAnomaly {
+    /// Stable, scheme-prefixed machine code for this anomaly.
+    #[must_use]
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::DirtyDatabase { .. } => "SRUM-ESE-DIRTY-DATABASE",
+            Self::TimestampSkew { .. } => "SRUM-ESE-TIMESTAMP-SKEW",
+            Self::SlackRegionData { .. } => "SRUM-ESE-SLACK-REGION-DATA",
+            Self::PageChecksumMismatch { .. } => "SRUM-ESE-PAGE-CHECKSUM-MISMATCH",
+            Self::BTreeLinkBroken { .. } => "SRUM-ESE-BTREE-LINK-BROKEN",
+            Self::PageFlagInconsistency { .. } => "SRUM-ESE-PAGE-FLAG-INCONSISTENCY",
+            Self::OrphanedSrumTable { .. } => "SRUM-ESE-ORPHANED-SRUM-TABLE",
+            Self::MissingSrumTable { .. } => "SRUM-ESE-MISSING-SRUM-TABLE",
+            Self::TruncatedDatabase { .. } => "SRUM-ESE-TRUNCATED-DATABASE",
+            Self::OrphanedCatalogEntry { .. } => "SRUM-ESE-ORPHANED-CATALOG-ENTRY",
+            Self::AutoIncIdGap { .. } => "SRUM-ESE-AUTO-INC-ID-GAP",
+            Self::DeletedRecordPresent { .. } => "SRUM-ESE-DELETED-RECORD-PRESENT",
+        }
+    }
+}
+
+impl forensicnomicon::report::Observation for EseStructuralAnomaly {
+    fn severity(&self) -> Option<Severity> {
+        Some(self.severity())
+    }
+    fn code(&self) -> &'static str {
+        self.code()
+    }
+    fn note(&self) -> String {
+        self.code()
+            .strip_prefix("SRUM-ESE-")
+            .unwrap_or_default()
+            .to_ascii_lowercase()
+            .replace('-', " ")
+    }
 }

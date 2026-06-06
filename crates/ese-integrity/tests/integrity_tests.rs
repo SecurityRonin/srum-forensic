@@ -101,7 +101,7 @@ fn timestamp_skew_severity_is_error() {
         header_db_time_low: 100,
         page_db_time: 500,
     };
-    assert_eq!(a.severity(), Severity::Error);
+    assert_eq!(a.severity(), Severity::High);
 }
 
 #[test]
@@ -111,7 +111,7 @@ fn slack_region_data_severity_is_warning() {
         offset_in_page: 80,
         length: 16,
     };
-    assert_eq!(a.severity(), Severity::Warning);
+    assert_eq!(a.severity(), Severity::Medium);
 }
 
 #[test]
@@ -121,7 +121,7 @@ fn page_checksum_mismatch_severity_is_error() {
         expected: 0xDEAD_BEEF,
         actual: 0x1234_5678,
     };
-    assert_eq!(a.severity(), Severity::Error);
+    assert_eq!(a.severity(), Severity::High);
 }
 
 #[test]
@@ -130,7 +130,7 @@ fn btree_link_broken_severity_is_error() {
         page_number: 4,
         broken_sibling: 99,
     };
-    assert_eq!(a.severity(), Severity::Error);
+    assert_eq!(a.severity(), Severity::High);
 }
 
 #[test]
@@ -140,7 +140,7 @@ fn page_flag_inconsistency_severity_is_warning() {
         flags: 0x0002,
         context: "leaf flag on internal node",
     };
-    assert_eq!(a.severity(), Severity::Warning);
+    assert_eq!(a.severity(), Severity::Medium);
 }
 
 #[test]
@@ -148,7 +148,7 @@ fn orphaned_srum_table_severity_is_warning() {
     let a = EseStructuralAnomaly::OrphanedSrumTable {
         table_guid: "{deadbeef-dead-beef-dead-beefdeadbeef}".to_owned(),
     };
-    assert_eq!(a.severity(), Severity::Warning);
+    assert_eq!(a.severity(), Severity::Medium);
 }
 
 #[test]
@@ -157,7 +157,7 @@ fn missing_srum_table_severity_is_warning() {
         table_guid: "{d10ca2fe-6fcf-4f6d-848e-b2e99266fa89}",
         table_name: "SruDbNetworkUsageTable",
     };
-    assert_eq!(a.severity(), Severity::Warning);
+    assert_eq!(a.severity(), Severity::Medium);
 }
 
 #[test]
@@ -179,7 +179,7 @@ fn at_least_exact_severity_returns_true() {
         page_db_time: 500,
     };
     // severity() is Error; at_least(Error) must be true
-    assert!(a.at_least(Severity::Error));
+    assert!(a.at_least(Severity::High));
 }
 
 #[test]
@@ -190,7 +190,7 @@ fn at_least_lower_threshold_returns_true() {
         page_db_time: 500,
     };
     // Error >= Warning: true
-    assert!(a.at_least(Severity::Warning));
+    assert!(a.at_least(Severity::Medium));
 }
 
 #[test]
@@ -375,7 +375,7 @@ fn deleted_record_present_severity_is_warning() {
         page_number: 1,
         tag_index: 0,
     };
-    assert_eq!(a.severity(), Severity::Warning);
+    assert_eq!(a.severity(), Severity::Medium);
 }
 
 // ── detect_autoinc_gaps (Phase 4, stories 13-16) ─────────────────────────────
@@ -414,7 +414,7 @@ fn detect_autoinc_gaps_empty_for_single_element() {
 #[test]
 fn autoinc_id_gap_severity_is_warning() {
     let a = EseStructuralAnomaly::AutoIncIdGap { prev: 3, next: 5 };
-    assert_eq!(a.severity(), Severity::Warning);
+    assert_eq!(a.severity(), Severity::Medium);
 }
 
 // ── detect_orphaned_catalog (Phase 4, stories 17-18) ─────────────────────────
