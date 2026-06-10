@@ -251,7 +251,11 @@ pub fn decode_record(data: &[u8], columns: &[ColumnDef]) -> Result<Vec<(String, 
             break;
         }
 
-        let size = fixed_col_size(col.coltyp).unwrap();
+        // Variable/tagged columns were skipped above, so this is always Some;
+        // read it fallibly anyway so a future change can never turn it into a panic.
+        let Some(size) = fixed_col_size(col.coltyp) else {
+            continue; // cov:unreachable: fixed_col_size(col.coltyp).is_none() already `continue`d
+        };
         if fixed_cursor + size > data.len() {
             break;
         }

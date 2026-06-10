@@ -15,6 +15,19 @@
 
 use crate::EseError;
 
+/// Read a little-endian `u32` from `data` at `off`, bounds-checked.
+///
+/// Returns 0 when the 4-byte window falls outside `data` — never panics. ESE
+/// records come from untrusted, attacker-controllable images, so every offset
+/// read must degrade gracefully rather than index out of bounds.
+fn le_u32_at(data: &[u8], off: usize) -> u32 {
+    let mut b = [0u8; 4];
+    if let Some(s) = data.get(off..off + 4) {
+        b.copy_from_slice(s);
+    }
+    u32::from_le_bytes(b)
+}
+
 /// One entry from the ESE catalog.
 #[derive(Debug, Clone)]
 pub struct CatalogEntry {
@@ -141,11 +154,11 @@ impl CatalogEntry {
                 i += 1;
                 continue;
             }
-            // Safety: i >= 20, so i-16 and i-20 are both in-bounds.
-            let pgnofdf_raw =
-                u32::from_le_bytes(data_area[i - 16..i - 12].try_into().unwrap());
-            let object_id =
-                u32::from_le_bytes(data_area[i - 20..i - 16].try_into().unwrap());
+            // i >= 20 here, so i-16 and i-20 are both in-bounds. Read each u32
+            // through a bounds-checked slice so a future change to the loop guard
+            // can never turn these into a panic on attacker-controlled bytes.
+            let pgnofdf_raw = le_u32_at(data_area, i - 16);
+            let object_id = le_u32_at(data_area, i - 20);
             seen.insert(name);
             entries.push(Self {
                 object_type: 1,

@@ -251,11 +251,22 @@ impl EseDatabase {
         let mut leaves = Vec::new();
         for i in 1..tag_count {
             let data = page.record_data(i)?;
-            let n = data.len();
-            if n < 4 {
+            // Child page reference is the trailing 4 bytes (after any B-tree key
+            // prefix). Read it through a bounds-checked slice so a record shorter
+            // than 4 bytes is skipped, never a panic — no .unwrap() on an
+            // attacker-controllable length.
+            let Some(child_bytes) = data.get(data.len().saturating_sub(4)..) else {
+                continue; // cov:unreachable: data.len()-4 clamps to 0, slice always valid
+            };
+            if child_bytes.len() < 4 {
                 continue;
             }
-            let child_ese = u32::from_le_bytes(data[n - 4..n].try_into().unwrap());
+            let child_ese = u32::from_le_bytes([
+                child_bytes[0],
+                child_bytes[1],
+                child_bytes[2],
+                child_bytes[3],
+            ]);
             let child_page = child_ese + 1; // ESE 0-based → physical page
             let mut child_leaves = self.walk_leaf_pages(child_page)?;
             leaves.append(&mut child_leaves);
