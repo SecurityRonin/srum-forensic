@@ -47,6 +47,24 @@ pub fn make_parent_page_with_children(ese_children: &[u32]) -> Vec<u8> {
     builder.build()
 }
 
+/// Build a parent page whose child-reference records each carry a B-tree key
+/// prefix *before* the trailing 4-byte child page number.
+///
+/// Real ESE branch pages store `[key_prefix..][child_page_u32]`; the child page
+/// reference is the **last 4 bytes** of the record, not the whole record.
+/// `key_prefix` is prepended to every child entry so the traversal must skip it
+/// and read only the trailing u32.
+#[allow(dead_code)]
+pub fn make_parent_page_with_prefixed_children(key_prefix: &[u8], ese_children: &[u32]) -> Vec<u8> {
+    let mut builder = PageBuilder::new(PAGE_SIZE).parent();
+    for &ese_page in ese_children {
+        let mut rec = key_prefix.to_vec();
+        rec.extend_from_slice(&ese_page.to_le_bytes());
+        builder = builder.add_record(&rec);
+    }
+    builder.build()
+}
+
 /// Write a complete multi-page ESE file to a temp file.
 ///
 /// `pages[0]` is the header page (page 0); subsequent entries are data pages.
