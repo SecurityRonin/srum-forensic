@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DB_STATE_CLEAN_SHUTDOWN","DB_STATE_DIRTY_SHUTDOWN","DB_STATE_JUST_CREATED"],"struct":["EseHeader"]};

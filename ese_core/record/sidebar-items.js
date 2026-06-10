@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["XOR_CHECKSUM_SEED"],"enum":["ChecksumResult","EseValue"],"fn":["column_parity_ecc","decode_fixed","decode_record","fixed_col_size","verify_page_checksum","xor_page_checksum"],"mod":["coltyp"],"struct":["ColumnDef"]};

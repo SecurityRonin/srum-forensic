@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["COL_ID_INDEX_OFF","COL_TAGGED_OFF","ESE_KEY_LEN","TAGGED_DESCRIPTOR_LEN"],"fn":["decode_id_map_entry"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["COL_APP_ID_OFF","COL_CONNECTED_TIME_OFF","COL_L2_PROFILE_ID_OFF","COL_TIMESTAMP_OFF","COL_USER_ID_OFF","ESE_KEY_LEN"],"fn":["decode_connectivity_record"]};

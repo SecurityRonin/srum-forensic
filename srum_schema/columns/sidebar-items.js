@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["BASE"],"fn":["column_defs_for"],"static":["APP_TIMELINE_COLS","APP_USAGE_COLS","ENERGY_USAGE_COLS","ID_MAP_COLS","NETWORK_CONN_COLS","NETWORK_USAGE_COLS","PUSH_NOTIF_COLS"],"struct":["SrumColumnDef"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HuntSignature"],"fn":["filter_by_app","hunt_filter"]};
