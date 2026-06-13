@@ -966,9 +966,9 @@ checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
 
 [[package]]
 name = "forensicnomicon"
-version = "0.3.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f66c898c0f3813cb476c7d1f9e78919566e753b8ce5d581ca8d0f364a55b04b5"
+checksum = "400941417db642eead53b0b483f4c37e023d572aca402001ce31e127ca0141dc"
 
 [[package]]
 name = "form_urlencoded"
