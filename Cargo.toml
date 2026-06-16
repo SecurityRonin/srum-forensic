@@ -80,3 +80,6 @@ items_after_statements = "allow"
 implicit_hasher = "allow"
 similar_names = "allow"
 return_self_not_must_use = "allow"
+# clippy >= 1.96; these fixtures encode ESE tag words from decimal sizes/offsets,
+# where decimal operands read more clearly than forced hex.
+decimal_bitwise_operands = "allow"
