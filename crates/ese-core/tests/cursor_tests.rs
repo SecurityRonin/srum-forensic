@@ -7,7 +7,7 @@ use ese_core::EseDatabase;
 fn table_records_from_root_yields_record_bytes() {
     let record = vec![0xABu8; 16];
     let header = fixtures::make_ese_header_page();
-    let leaf = fixtures::make_leaf_page_with_records(0, &[record.clone()]);
+    let leaf = fixtures::make_leaf_page_with_records(0, std::slice::from_ref(&record));
     // page 0 = header, page 1 = leaf
     let tmp = fixtures::write_ese_file(&[header, leaf]);
     let db = EseDatabase::open(tmp.path()).expect("open");
