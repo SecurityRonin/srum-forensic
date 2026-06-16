@@ -56,7 +56,7 @@ forensicnomicon   = "0.5.0"
 srum-core         = { path = "crates/srum-core", version = "0.1.0" }
 srum-parser       = { path = "crates/srum-parser", version = "0.1.0" }
 srum-schema       = { path = "crates/srum-schema" }
-srum-analysis     = { path = "crates/srum-analysis" }
+srum-analysis     = { path = "crates/srum-analysis", version = "0.2.0" }
 
 # GUI
 tauri               = { version = "2" }
