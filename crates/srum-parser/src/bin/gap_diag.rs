@@ -4,14 +4,24 @@ fn main() {
 
     for (name, fixture) in &[
         ("chainsaw", "tests/data/srudb/chainsaw_SRUDB.dat"),
-        ("rathbunvm_win10", "tests/data/srudb/museum_rathbunvm_win10_SRUDB.dat"),
-        ("rathbunvm_win11", "tests/data/srudb/museum_rathbunvm_win11_SRUDB.dat"),
+        (
+            "rathbunvm_win10",
+            "tests/data/srudb/museum_rathbunvm_win10_SRUDB.dat",
+        ),
+        (
+            "rathbunvm_win11",
+            "tests/data/srudb/museum_rathbunvm_win11_SRUDB.dat",
+        ),
     ] {
         let path = std::path::Path::new(fixture);
-        if !path.exists() { println!("{name}: MISSING"); continue; }
+        if !path.exists() {
+            println!("{name}: MISSING");
+            continue;
+        }
         let db = EseDatabase::open(path).expect("open");
         let Ok(cursor) = db.table_records(TABLE_APP_RESOURCE_USAGE) else {
-            println!("{name}: table missing"); continue;
+            println!("{name}: table missing");
+            continue;
         };
 
         // Collect record lengths and cb_pfx values to determine COL_DATA_LEN
@@ -22,7 +32,9 @@ fn main() {
 
         for r in cursor {
             let Ok((_, _, data)) = r else { continue };
-            if data.len() < 2 { continue; }
+            if data.len() < 2 {
+                continue;
+            }
             let cb_pfx = u16::from_le_bytes([data[0], data[1]]) as usize;
             *len_freq.entry(data.len()).or_insert(0) += 1;
             // Sample col_data assuming KEY_LEN=16 (might be wrong for some)
@@ -34,21 +46,27 @@ fn main() {
             }
             count += 1;
         }
-        let most_common_col_data = col_data_samples.iter()
-            .fold(std::collections::HashMap::new(), |mut m, &v| { *m.entry(v).or_insert(0u64) += 1; m })
-            .into_iter().max_by_key(|&(_, cnt)| cnt)
+        let most_common_col_data = col_data_samples
+            .iter()
+            .fold(std::collections::HashMap::new(), |mut m, &v| {
+                *m.entry(v).or_insert(0u64) += 1;
+                m
+            })
+            .into_iter()
+            .max_by_key(|&(_, cnt)| cnt)
             .map(|(len, _)| len);
 
         let mut lens: Vec<(usize, u64)> = len_freq.into_iter().collect();
         lens.sort_by_key(|&(_, cnt)| std::cmp::Reverse(cnt));
-        let lens_str: Vec<String> = lens.iter().take(5).map(|(l, c)| format!("len={l}:{c}")).collect();
+        let lens_str: Vec<String> = lens
+            .iter()
+            .take(5)
+            .map(|(l, c)| format!("len={l}:{c}"))
+            .collect();
 
-        println!("{name}: total={count} most_common_col_data={most_common_col_data:?} len_freq=[{}]", lens_str.join(", "));
+        println!(
+            "{name}: total={count} most_common_col_data={most_common_col_data:?} len_freq=[{}]",
+            lens_str.join(", ")
+        );
     }
 }
-
-struct Reverse<T>(T);
-impl<T: Ord> Ord for Reverse<T> { fn cmp(&self, o: &Self) -> std::cmp::Ordering { o.0.cmp(&self.0) } }
-impl<T: Ord> PartialOrd for Reverse<T> { fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> { Some(self.cmp(o)) } }
-impl<T: Eq> Eq for Reverse<T> {}
-impl<T: PartialEq> PartialEq for Reverse<T> { fn eq(&self, o: &Self) -> bool { self.0 == o.0 } }

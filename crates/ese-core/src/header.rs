@@ -42,6 +42,9 @@ impl EseHeader {
     /// - Offset 0x0C (4 bytes): format revision
     /// - Offset 0xEC (4 bytes): page size (0 means 4096)
     pub fn from_bytes(data: &[u8]) -> Result<Self, EseError> {
+        // Only the four power-of-two sizes that ESE actually uses are valid.
+        // Any other value indicates a corrupt or crafted header.
+        const VALID_PAGE_SIZES: [u32; 4] = [4096, 8192, 16384, 32768];
         if data.len() < Self::SIZE {
             return Err(EseError::Corrupt {
                 page: 0,
@@ -75,9 +78,6 @@ impl EseHeader {
         } else {
             raw_page_size
         };
-        // Guard: only the four power-of-two sizes that ESE actually uses are valid.
-        // Any other value indicates a corrupt or crafted header.
-        const VALID_PAGE_SIZES: [u32; 4] = [4096, 8192, 16384, 32768];
         if !VALID_PAGE_SIZES.contains(&page_size) {
             return Err(EseError::Corrupt {
                 page: 0,

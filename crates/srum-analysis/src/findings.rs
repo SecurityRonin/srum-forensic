@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::record::{AnnotatedRecord, FindingCard, Severity};
+use std::collections::HashMap;
 
 pub fn compute_findings(timeline: &[AnnotatedRecord]) -> Vec<FindingCard> {
     let mut by_flag: HashMap<String, FlagAgg> = HashMap::new();
@@ -8,7 +8,10 @@ pub fn compute_findings(timeline: &[AnnotatedRecord]) -> Vec<FindingCard> {
         for flag in &rec.flags {
             let agg = by_flag.entry(flag.clone()).or_insert_with(|| FlagAgg {
                 count: 0,
-                app_name: rec.app_name.clone().unwrap_or_else(|| format!("ID {}", rec.app_id)),
+                app_name: rec
+                    .app_name
+                    .clone()
+                    .unwrap_or_else(|| format!("ID {}", rec.app_id)),
                 severity: rec.severity.clone(),
                 mitre: rec.mitre_techniques.clone(),
             });
@@ -22,9 +25,9 @@ pub fn compute_findings(timeline: &[AnnotatedRecord]) -> Vec<FindingCard> {
 
     let mut cards: Vec<FindingCard> = by_flag
         .into_iter()
-        .filter_map(|(flag, agg)| {
+        .map(|(flag, agg)| {
             let (title, description) = card_text(&flag, &agg);
-            Some(FindingCard {
+            FindingCard {
                 title,
                 app_name: agg.app_name,
                 description,
@@ -32,7 +35,7 @@ pub fn compute_findings(timeline: &[AnnotatedRecord]) -> Vec<FindingCard> {
                 severity: agg.severity,
                 filter_flag: flag,
                 count: agg.count,
-            })
+            }
         })
         .collect();
 
@@ -51,39 +54,66 @@ fn card_text(flag: &str, agg: &FlagAgg) -> (String, String) {
     match flag {
         "automated_execution" => (
             "AUTOMATED EXECUTION".into(),
-            format!("{} occurrence(s) — process held focus with zero user input", agg.count),
+            format!(
+                "{} occurrence(s) — process held focus with zero user input",
+                agg.count
+            ),
         ),
         "beaconing" => (
             "POSSIBLE BEACONING".into(),
-            format!("{} occurrence(s) — regular network intervals detected", agg.count),
+            format!(
+                "{} occurrence(s) — regular network intervals detected",
+                agg.count
+            ),
         ),
         "background_cpu_dominant" => (
             "BACKGROUND CPU DOMINANT".into(),
-            format!("{} occurrence(s) — CPU in background exceeds foreground", agg.count),
+            format!(
+                "{} occurrence(s) — CPU in background exceeds foreground",
+                agg.count
+            ),
         ),
         "exfil_signal" => (
             "EXFILTRATION SIGNAL".into(),
-            format!("{} occurrence(s) — large outbound transfer, no user activity", agg.count),
+            format!(
+                "{} occurrence(s) — large outbound transfer, no user activity",
+                agg.count
+            ),
         ),
         "suspicious_path" => (
             "SUSPICIOUS PROCESS PATH".into(),
-            format!("{} occurrence(s) — executed from temp/downloads/UNC", agg.count),
+            format!(
+                "{} occurrence(s) — executed from temp/downloads/UNC",
+                agg.count
+            ),
         ),
         "masquerade_candidate" => (
             "PROCESS MASQUERADE".into(),
-            format!("{} occurrence(s) — name similar to system binary, wrong directory", agg.count),
+            format!(
+                "{} occurrence(s) — name similar to system binary, wrong directory",
+                agg.count
+            ),
         ),
         "phantom_foreground" => (
             "PHANTOM FOREGROUND".into(),
-            format!("{} occurrence(s) — foreground CPU with no focus time", agg.count),
+            format!(
+                "{} occurrence(s) — foreground CPU with no focus time",
+                agg.count
+            ),
         ),
         "notification_c2" => (
             "NOTIFICATION C2 CHANNEL".into(),
-            format!("{} occurrence(s) — high notification volume, background CPU, no focus", agg.count),
+            format!(
+                "{} occurrence(s) — high notification volume, background CPU, no focus",
+                agg.count
+            ),
         ),
         "selective_gap" => (
             "ANTI-FORENSICS INDICATOR".into(),
-            format!("{} gap(s) — records deleted selectively, not system shutdown", agg.count),
+            format!(
+                "{} gap(s) — records deleted selectively, not system shutdown",
+                agg.count
+            ),
         ),
         "qwcrypt_ioc_process" => (
             "QWCRYPT RANSOMWARE IOC".into(),
@@ -113,7 +143,7 @@ mod tests {
             app_name: Some("test.exe".into()),
             key_metric_label: "cycles".into(),
             key_metric_value: 0.0,
-            flags: flags.iter().map(|s| s.to_string()).collect(),
+            flags: flags.iter().map(|s| (*s).to_string()).collect(),
             severity,
             raw: json!({}),
             background_cycles: None,

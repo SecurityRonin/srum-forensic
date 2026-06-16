@@ -13,11 +13,14 @@ pub fn build_sessions(all: &[serde_json::Value]) -> Vec<serde_json::Value> {
 
     for v in all {
         if let Some(ts) = v.get("timestamp").and_then(|x| x.as_str()) {
-            if v.get("user_present").and_then(|x| x.as_bool()) == Some(true) {
+            if v.get("user_present").and_then(serde_json::Value::as_bool) == Some(true) {
                 present_ts.insert(ts.to_owned());
             }
             if v.get(TABLE_KEY).and_then(|x| x.as_str()) == Some("apps") {
-                if let Some(ms) = v.get("user_input_time_ms").and_then(|x| x.as_u64()) {
+                if let Some(ms) = v
+                    .get("user_input_time_ms")
+                    .and_then(serde_json::Value::as_u64)
+                {
                     *input_by_ts.entry(ts.to_owned()).or_insert(0) += ms;
                 }
             }
@@ -41,10 +44,10 @@ pub fn build_sessions(all: &[serde_json::Value]) -> Vec<serde_json::Value> {
         let gap = super::iso_diff_secs(&session_end, ts);
         if gap > SESSION_GAP_SECS {
             sessions.push(make_session(&session_start, &session_end, session_input));
-            session_start = ts.clone();
+            session_start.clone_from(ts);
             session_input = 0;
         }
-        session_end = ts.clone();
+        session_end.clone_from(ts);
         session_input += input_by_ts.get(ts).copied().unwrap_or(0);
     }
     sessions.push(make_session(&session_start, &session_end, session_input));
@@ -74,7 +77,9 @@ mod tests {
 
     #[test]
     fn build_sessions_no_user_present_returns_empty() {
-        let all = vec![json!({"source_table": "apps", "timestamp": "2024-01-01T00:00:00Z", "user_present": false})];
+        let all = vec![
+            json!({"source_table": "apps", "timestamp": "2024-01-01T00:00:00Z", "user_present": false}),
+        ];
         assert!(build_sessions(&all).is_empty());
     }
 }

@@ -55,7 +55,10 @@ pub fn interpret(record: &AnnotatedRecord) -> Option<String> {
              Regular timing is a hallmark of command-and-control beaconing."
         ));
     }
-    if record.flags.contains(&"background_cpu_dominant".to_string()) {
+    if record
+        .flags
+        .contains(&"background_cpu_dominant".to_string())
+    {
         return Some(format!(
             "{name} consumed significant CPU in the background with little or no foreground activity. \
              Possible mining, covert computation, or malware hiding behind a cover process."
@@ -71,9 +74,8 @@ pub fn interpret(record: &AnnotatedRecord) -> Option<String> {
         let sent_mb = record
             .raw
             .get("bytes_sent")
-            .and_then(|v| v.as_f64())
-            .map(|b| b / 1_048_576.0)
-            .unwrap_or(0.0);
+            .and_then(serde_json::Value::as_f64)
+            .map_or(0.0, |b| b / 1_048_576.0);
         return Some(format!(
             "{name} sent {sent_mb:.1} MB with no corresponding foreground or focus activity. \
              Data transfer occurring while the user was not interacting — possible exfiltration."
@@ -86,10 +88,11 @@ pub fn interpret(record: &AnnotatedRecord) -> Option<String> {
         ));
     }
     if record.flags.contains(&"masquerade_candidate".to_string()) {
-        return Some(format!(
+        return Some(
             "The process name is very similar to a known Windows system binary but ran from \
              an unexpected directory. Possible process name masquerading."
-        ));
+                .to_string(),
+        );
     }
     if record.flags.contains(&"notification_c2".to_string()) {
         return Some(format!(
@@ -103,9 +106,20 @@ pub fn interpret(record: &AnnotatedRecord) -> Option<String> {
 
 pub fn value_to_timeline_record(value: serde_json::Value) -> Option<AnnotatedRecord> {
     // Extract all fields from a borrowed reference, then drop the borrow
-    let (timestamp, source_table, app_id, app_name, key_metric_label, key_metric_value,
-         flags, background_cycles, foreground_cycles, focus_time_ms, user_input_time_ms,
-         mitre_techniques) = {
+    let (
+        timestamp,
+        source_table,
+        app_id,
+        app_name,
+        key_metric_label,
+        key_metric_value,
+        flags,
+        background_cycles,
+        foreground_cycles,
+        focus_time_ms,
+        user_input_time_ms,
+        mitre_techniques,
+    ) = {
         let obj = value.as_object()?;
         let timestamp = obj.get("timestamp")?.as_str()?.to_string();
         let source_table = obj
@@ -115,28 +129,52 @@ pub fn value_to_timeline_record(value: serde_json::Value) -> Option<AnnotatedRec
             .to_string();
         let app_id = obj
             .get("app_id")
-            .and_then(|v| v.as_i64())
+            .and_then(serde_json::Value::as_i64)
             .and_then(|v| i32::try_from(v).ok())
             .unwrap_or(0);
-        let app_name = obj.get("app_name").and_then(|v| v.as_str()).map(str::to_string);
+        let app_name = obj
+            .get("app_name")
+            .and_then(|v| v.as_str())
+            .map(str::to_string);
         let (key_metric_label, key_metric_value) = key_metric(obj, &source_table);
         let flags: Vec<String> = HEURISTIC_KEYS
             .iter()
-            .filter(|&&k| obj.get(k).and_then(|v| v.as_bool()) == Some(true))
+            .filter(|&&k| obj.get(k).and_then(serde_json::Value::as_bool) == Some(true))
             .map(|&k| k.to_owned())
             .collect();
-        let background_cycles = obj.get("background_cycles").and_then(|v| v.as_u64());
-        let foreground_cycles = obj.get("foreground_cycles").and_then(|v| v.as_u64());
-        let focus_time_ms = obj.get("focus_time_ms").and_then(|v| v.as_u64());
-        let user_input_time_ms = obj.get("user_input_time_ms").and_then(|v| v.as_u64());
+        let background_cycles = obj
+            .get("background_cycles")
+            .and_then(serde_json::Value::as_u64);
+        let foreground_cycles = obj
+            .get("foreground_cycles")
+            .and_then(serde_json::Value::as_u64);
+        let focus_time_ms = obj.get("focus_time_ms").and_then(serde_json::Value::as_u64);
+        let user_input_time_ms = obj
+            .get("user_input_time_ms")
+            .and_then(serde_json::Value::as_u64);
         let mitre_techniques: Vec<String> = obj
             .get("mitre_techniques")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(str::to_string)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(str::to_string))
+                    .collect()
+            })
             .unwrap_or_default();
-        (timestamp, source_table, app_id, app_name, key_metric_label, key_metric_value,
-         flags, background_cycles, foreground_cycles, focus_time_ms, user_input_time_ms,
-         mitre_techniques)
+        (
+            timestamp,
+            source_table,
+            app_id,
+            app_name,
+            key_metric_label,
+            key_metric_value,
+            flags,
+            background_cycles,
+            foreground_cycles,
+            focus_time_ms,
+            user_input_time_ms,
+            mitre_techniques,
+        )
     }; // obj borrow dropped here — value is no longer borrowed
 
     let severity = severity_from_flags(&flags);
@@ -174,7 +212,7 @@ fn key_metric(obj: &serde_json::Map<String, serde_json::Value>, table: &str) -> 
         _ => &[],
     };
     for &label in candidates {
-        if let Some(v) = obj.get(label).and_then(|v| v.as_f64()) {
+        if let Some(v) = obj.get(label).and_then(serde_json::Value::as_f64) {
             return (label.to_string(), v);
         }
     }
@@ -232,7 +270,7 @@ mod tests {
         assert_eq!(rec.source_table, "network");
         assert_eq!(rec.app_id, 42);
         assert_eq!(rec.key_metric_label, "bytes_sent");
-        assert_eq!(rec.key_metric_value, 1_000_000.0);
+        assert!((rec.key_metric_value - 1_000_000.0).abs() < f64::EPSILON);
     }
 
     #[test]

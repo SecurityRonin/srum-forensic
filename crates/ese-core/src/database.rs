@@ -174,7 +174,7 @@ impl EseDatabase {
 
     /// Read and parse all entries from the ESE catalog (physical page 5).
     ///
-    /// The catalog (MSysObjects) maps table names to their root B-tree page
+    /// The catalog (`MSysObjects`) maps table names to their root B-tree page
     /// numbers. Physical page 5 is the catalog root in real SRUDB.dat files
     /// (fdp=2, ROOT|PARENT or ROOT|LEAF).
     ///
@@ -195,7 +195,8 @@ impl EseDatabase {
         // entry registered second. Walking the B-tree in key order, the second entry
         // resides on a later leaf page and must overwrite the first so that
         // find_table_page() returns the correct (non-empty) root page.
-        let mut by_name: std::collections::HashMap<String, CatalogEntry> = Default::default();
+        let mut by_name: std::collections::HashMap<String, CatalogEntry> =
+            std::collections::HashMap::default();
         for page_num in leaf_pages {
             let page = self.read_page(page_num)?;
             // First attempt: scan the raw page data area for real ESE catalog records.
@@ -203,11 +204,7 @@ impl EseDatabase {
             // where early records live before the first tag offset — scanning the full
             // data area (header end → tag-array start) finds them all.
             let real_entries = CatalogEntry::scan_catalog_page_data(page.raw_data_area()?);
-            if !real_entries.is_empty() {
-                for entry in real_entries {
-                    by_name.insert(entry.object_name.clone(), entry);
-                }
-            } else {
+            if real_entries.is_empty() {
                 // Fallback for synthetic test-fixture pages that use the simple
                 // fixed-layout format (no \xff\x00 tagged-column encoding).
                 let tags = page.tags()?;
@@ -218,6 +215,10 @@ impl EseDatabase {
                     } else if let Ok(entry) = CatalogEntry::from_bytes(data) {
                         by_name.insert(entry.object_name.clone(), entry);
                     }
+                }
+            } else {
+                for entry in real_entries {
+                    by_name.insert(entry.object_name.clone(), entry);
                 }
             }
         }
@@ -311,8 +312,8 @@ impl EseDatabase {
 
     /// Return the column definitions for a named table from the catalog.
     ///
-    /// Reads the catalog, finds the table entry (object_type 1) whose name
-    /// matches `table_name`, then collects all column entries (object_type 2)
+    /// Reads the catalog, finds the table entry (`object_type` 1) whose name
+    /// matches `table_name`, then collects all column entries (`object_type` 2)
     /// whose `parent_object_id` equals the table's `object_id`. In the
     /// synthetic catalog format, column entries store the JET coltyp in the
     /// `table_page` field. Results are sorted ascending by `column_id`.
@@ -326,7 +327,9 @@ impl EseDatabase {
         let table = entries
             .iter()
             .find(|e| e.object_type == 1 && e.object_name == table_name)
-            .ok_or_else(|| EseError::TableNotFound { name: table_name.to_owned() })?;
+            .ok_or_else(|| EseError::TableNotFound {
+                name: table_name.to_owned(),
+            })?;
         let table_obj_id = table.object_id;
         let mut cols: Vec<ColumnDef> = entries
             .iter()

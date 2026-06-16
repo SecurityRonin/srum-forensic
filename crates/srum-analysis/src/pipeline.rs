@@ -29,7 +29,10 @@ pub fn build_timeline(
                 for r in records {
                     if let Ok(mut v) = serde_json::to_value(r) {
                         if let Some(obj) = v.as_object_mut() {
-                            obj.insert(TABLE_KEY.to_owned(), serde_json::Value::String($name.to_owned()));
+                            obj.insert(
+                                TABLE_KEY.to_owned(),
+                                serde_json::Value::String($name.to_owned()),
+                            );
                         }
                         all.push(v);
                     }
@@ -38,11 +41,11 @@ pub fn build_timeline(
         };
     }
 
-    load_table!("network",       srum_parser::parse_network_usage);
-    load_table!("apps",          srum_parser::parse_app_usage);
-    load_table!("connectivity",  srum_parser::parse_network_connectivity);
-    load_table!("energy",        srum_parser::parse_energy_usage);
-    load_table!("energy-lt",     srum_parser::parse_energy_lt);
+    load_table!("network", srum_parser::parse_network_usage);
+    load_table!("apps", srum_parser::parse_app_usage);
+    load_table!("connectivity", srum_parser::parse_network_connectivity);
+    load_table!("energy", srum_parser::parse_energy_usage);
+    load_table!("energy-lt", srum_parser::parse_energy_lt);
     load_table!("notifications", srum_parser::parse_push_notifications);
 
     // Focus data: joined into apps rows, not added as standalone records
@@ -53,7 +56,10 @@ pub fn build_timeline(
         .collect();
 
     if let Some(map) = id_map {
-        all = all.into_iter().map(|v| crate::enrich::enrich_value(v, map)).collect();
+        all = all
+            .into_iter()
+            .map(|v| crate::enrich::enrich_value(v, map))
+            .collect();
     }
 
     merge_focus_into_apps(&mut all, focus_values);
@@ -73,14 +79,17 @@ pub fn build_timeline(
     all
 }
 
-pub fn merge_focus_into_apps(all: &mut Vec<serde_json::Value>, focus: Vec<serde_json::Value>) {
+pub fn merge_focus_into_apps(all: &mut [serde_json::Value], focus: Vec<serde_json::Value>) {
     let mut focus_map: HashMap<(i64, String), (u64, u64)> = HashMap::new();
     for f in focus {
         if let (Some(app_id), Some(ts), Some(focus_ms), Some(input_ms)) = (
             f.get("app_id").and_then(serde_json::Value::as_i64),
-            f.get("timestamp").and_then(serde_json::Value::as_str).map(str::to_owned),
+            f.get("timestamp")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned),
             f.get("focus_time_ms").and_then(serde_json::Value::as_u64),
-            f.get("user_input_time_ms").and_then(serde_json::Value::as_u64),
+            f.get("user_input_time_ms")
+                .and_then(serde_json::Value::as_u64),
         ) {
             focus_map.insert((app_id, ts), (focus_ms, input_ms));
         }
@@ -90,9 +99,11 @@ pub fn merge_focus_into_apps(all: &mut Vec<serde_json::Value>, focus: Vec<serde_
             continue;
         }
         if let Some(obj) = v.as_object_mut() {
-            let key = obj
-                .get("app_id").and_then(serde_json::Value::as_i64)
-                .zip(obj.get("timestamp").and_then(serde_json::Value::as_str).map(str::to_owned));
+            let key = obj.get("app_id").and_then(serde_json::Value::as_i64).zip(
+                obj.get("timestamp")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_owned),
+            );
             if let Some((app_id, ts)) = key {
                 if let Some(&(focus_ms, input_ms)) = focus_map.get(&(app_id, ts)) {
                     obj.insert("focus_time_ms".to_owned(), focus_ms.into());
@@ -105,22 +116,42 @@ pub fn merge_focus_into_apps(all: &mut Vec<serde_json::Value>, focus: Vec<serde_
 
 pub fn mitre_techniques_for(obj: &serde_json::Map<String, serde_json::Value>) -> Vec<&'static str> {
     let mut techs: Vec<&'static str> = Vec::new();
-    if obj.contains_key("background_cpu_dominant") { techs.push("T1496"); }
-    if obj.contains_key("no_focus_with_cpu")       { techs.push("T1564"); }
-    if obj.contains_key("phantom_foreground")       { techs.push("T1036"); }
-    if obj.contains_key("automated_execution")      { techs.push("T1059"); }
-    if obj.contains_key("exfil_signal")             { techs.push("T1048"); }
-    if obj.contains_key("beaconing")                { techs.push("T1071"); }
-    if obj.contains_key("notification_c2")          { techs.push("T1092"); }
-    if obj.contains_key("suspicious_path")          { techs.push("T1036.005"); }
-    if obj.contains_key("masquerade_candidate")     { techs.push("T1036.005"); }
-    if obj.contains_key("qwcrypt_ioc_process")      { techs.push("T1486"); }
+    if obj.contains_key("background_cpu_dominant") {
+        techs.push("T1496");
+    }
+    if obj.contains_key("no_focus_with_cpu") {
+        techs.push("T1564");
+    }
+    if obj.contains_key("phantom_foreground") {
+        techs.push("T1036");
+    }
+    if obj.contains_key("automated_execution") {
+        techs.push("T1059");
+    }
+    if obj.contains_key("exfil_signal") {
+        techs.push("T1048");
+    }
+    if obj.contains_key("beaconing") {
+        techs.push("T1071");
+    }
+    if obj.contains_key("notification_c2") {
+        techs.push("T1092");
+    }
+    if obj.contains_key("suspicious_path") {
+        techs.push("T1036.005");
+    }
+    if obj.contains_key("masquerade_candidate") {
+        techs.push("T1036.005");
+    }
+    if obj.contains_key("qwcrypt_ioc_process") {
+        techs.push("T1486");
+    }
     techs.sort_unstable();
     techs.dedup();
     techs
 }
 
-pub fn apply_heuristics(values: &mut Vec<serde_json::Value>) {
+pub fn apply_heuristics(values: &mut [serde_json::Value]) {
     use forensicnomicon::heuristics::srum::{
         is_automated_execution, is_background_cpu_dominant, is_phantom_foreground,
     };
@@ -129,27 +160,54 @@ pub fn apply_heuristics(values: &mut Vec<serde_json::Value>) {
             continue;
         }
         if let Some(obj) = v.as_object_mut() {
-            let bg = obj.get("background_cycles").and_then(serde_json::Value::as_u64).unwrap_or(0);
-            let fg = obj.get("foreground_cycles").and_then(serde_json::Value::as_u64).unwrap_or(0);
+            let bg = obj
+                .get("background_cycles")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(0);
+            let fg = obj
+                .get("foreground_cycles")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(0);
             if is_background_cpu_dominant(bg, fg) {
-                obj.insert("background_cpu_dominant".to_owned(), serde_json::Value::Bool(true));
+                obj.insert(
+                    "background_cpu_dominant".to_owned(),
+                    serde_json::Value::Bool(true),
+                );
             }
             if obj.contains_key("focus_time_ms") {
-                let focus_ms = obj.get("focus_time_ms").and_then(serde_json::Value::as_u64).unwrap_or(0);
-                let input_ms = obj.get("user_input_time_ms").and_then(serde_json::Value::as_u64).unwrap_or(0);
+                let focus_ms = obj
+                    .get("focus_time_ms")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(0);
+                let input_ms = obj
+                    .get("user_input_time_ms")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(0);
                 if bg > 0 && focus_ms == 0 {
-                    obj.insert("no_focus_with_cpu".to_owned(), serde_json::Value::Bool(true));
+                    obj.insert(
+                        "no_focus_with_cpu".to_owned(),
+                        serde_json::Value::Bool(true),
+                    );
                 }
                 if is_phantom_foreground(fg, focus_ms) {
-                    obj.insert("phantom_foreground".to_owned(), serde_json::Value::Bool(true));
+                    obj.insert(
+                        "phantom_foreground".to_owned(),
+                        serde_json::Value::Bool(true),
+                    );
                 }
                 if is_automated_execution(focus_ms, input_ms) {
-                    obj.insert("automated_execution".to_owned(), serde_json::Value::Bool(true));
+                    obj.insert(
+                        "automated_execution".to_owned(),
+                        serde_json::Value::Bool(true),
+                    );
                 }
                 if focus_ms > 0 {
                     let ratio = input_ms as f64 / focus_ms as f64;
                     if let Some(n) = serde_json::Number::from_f64(ratio) {
-                        obj.insert("interactivity_ratio".to_owned(), serde_json::Value::Number(n));
+                        obj.insert(
+                            "interactivity_ratio".to_owned(),
+                            serde_json::Value::Number(n),
+                        );
                     }
                 }
             }
@@ -162,7 +220,7 @@ pub fn apply_heuristics(values: &mut Vec<serde_json::Value>) {
     }
 }
 
-pub fn apply_cross_table_signals(all: &mut Vec<serde_json::Value>) {
+pub fn apply_cross_table_signals(all: &mut [serde_json::Value]) {
     use forensicnomicon::heuristics::srum::{is_exfil_ratio, is_exfil_volume};
 
     let mut net_map: HashMap<(i64, String), (u64, u64)> = HashMap::new();
@@ -170,7 +228,9 @@ pub fn apply_cross_table_signals(all: &mut Vec<serde_json::Value>) {
         if v.get(TABLE_KEY).and_then(|t| t.as_str()) == Some("network") {
             if let (Some(app_id), Some(ts), Some(sent), Some(recv)) = (
                 v.get("app_id").and_then(serde_json::Value::as_i64),
-                v.get("timestamp").and_then(serde_json::Value::as_str).map(str::to_owned),
+                v.get("timestamp")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_owned),
                 v.get("bytes_sent").and_then(serde_json::Value::as_u64),
                 v.get("bytes_recv").and_then(serde_json::Value::as_u64),
             ) {
@@ -179,21 +239,33 @@ pub fn apply_cross_table_signals(all: &mut Vec<serde_json::Value>) {
         }
     }
     for v in all.iter_mut() {
-        if v.get(TABLE_KEY).and_then(|t| t.as_str()) != Some("apps") { continue; }
+        if v.get(TABLE_KEY).and_then(|t| t.as_str()) != Some("apps") {
+            continue;
+        }
         if let Some(obj) = v.as_object_mut() {
-            let key = obj.get("app_id").and_then(serde_json::Value::as_i64)
-                .zip(obj.get("timestamp").and_then(serde_json::Value::as_str).map(str::to_owned));
+            let key = obj.get("app_id").and_then(serde_json::Value::as_i64).zip(
+                obj.get("timestamp")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_owned),
+            );
             if let Some((app_id, ts)) = key {
                 if let Some(&(sent, recv)) = net_map.get(&(app_id, ts)) {
                     let net_exfil = is_exfil_volume(sent) || is_exfil_ratio(sent, recv);
-                    let bg = obj.get("background_cycles").and_then(serde_json::Value::as_u64).unwrap_or(0);
+                    let bg = obj
+                        .get("background_cycles")
+                        .and_then(serde_json::Value::as_u64)
+                        .unwrap_or(0);
                     let focus_ms = obj.get("focus_time_ms").and_then(serde_json::Value::as_u64);
                     if net_exfil && bg > 0 && focus_ms.map_or(true, |ms| ms == 0) {
                         obj.insert("exfil_signal".to_owned(), serde_json::Value::Bool(true));
                         let techs = mitre_techniques_for(obj);
                         if !techs.is_empty() {
-                            let arr: Vec<serde_json::Value> = techs.iter().map(|&t| t.into()).collect();
-                            obj.insert("mitre_techniques".to_owned(), serde_json::Value::Array(arr));
+                            let arr: Vec<serde_json::Value> =
+                                techs.iter().map(|&t| t.into()).collect();
+                            obj.insert(
+                                "mitre_techniques".to_owned(),
+                                serde_json::Value::Array(arr),
+                            );
                         }
                     }
                 }
@@ -202,14 +274,14 @@ pub fn apply_cross_table_signals(all: &mut Vec<serde_json::Value>) {
     }
 }
 
-pub fn apply_beaconing_signals(all: &mut Vec<serde_json::Value>) {
+pub fn apply_beaconing_signals(all: &mut [serde_json::Value]) {
     use forensicnomicon::heuristics::srum::is_beaconing;
 
     let mut net_ts: HashMap<i64, Vec<String>> = HashMap::new();
     for v in all.iter() {
         if v.get(TABLE_KEY).and_then(|t| t.as_str()) == Some("network") {
             if let (Some(app_id), Some(ts)) = (
-                v.get("app_id").and_then(|x| x.as_i64()),
+                v.get("app_id").and_then(serde_json::Value::as_i64),
                 v.get("timestamp").and_then(|x| x.as_str()),
             ) {
                 net_ts.entry(app_id).or_default().push(ts.to_owned());
@@ -219,22 +291,34 @@ pub fn apply_beaconing_signals(all: &mut Vec<serde_json::Value>) {
     let mut beaconing_apps: std::collections::HashSet<i64> = std::collections::HashSet::new();
     for (app_id, mut timestamps) in net_ts {
         timestamps.sort();
-        let secs: Vec<i64> = timestamps.iter()
-            .filter_map(|ts| chrono::DateTime::parse_from_rfc3339(ts).ok().map(|dt| dt.timestamp()))
+        let secs: Vec<i64> = timestamps
+            .iter()
+            .filter_map(|ts| {
+                chrono::DateTime::parse_from_rfc3339(ts)
+                    .ok()
+                    .map(|dt| dt.timestamp())
+            })
             .collect();
-        if is_beaconing(&secs) { beaconing_apps.insert(app_id); }
+        if is_beaconing(&secs) {
+            beaconing_apps.insert(app_id);
+        }
     }
     for v in all.iter_mut() {
-        if v.get(TABLE_KEY).and_then(|t| t.as_str()) != Some("network") { continue; }
-        if let Some(app_id) = v.get("app_id").and_then(|x| x.as_i64()) {
+        if v.get(TABLE_KEY).and_then(|t| t.as_str()) != Some("network") {
+            continue;
+        }
+        if let Some(app_id) = v.get("app_id").and_then(serde_json::Value::as_i64) {
             if beaconing_apps.contains(&app_id) {
                 if let Some(obj) = v.as_object_mut() {
                     obj.insert("beaconing".to_owned(), serde_json::Value::Bool(true));
-                    let techs = obj.entry("mitre_techniques")
+                    let techs = obj
+                        .entry("mitre_techniques")
                         .or_insert_with(|| serde_json::Value::Array(Vec::new()));
                     if let serde_json::Value::Array(arr) = techs {
                         let t1071 = serde_json::Value::String("T1071".to_owned());
-                        if !arr.contains(&t1071) { arr.push(t1071); }
+                        if !arr.contains(&t1071) {
+                            arr.push(t1071);
+                        }
                     }
                 }
             }
@@ -247,7 +331,7 @@ pub fn apply_beaconing_signals(all: &mut Vec<serde_json::Value>) {
 /// Fires on `apps` table rows where `app_name` basename matches an entry in
 /// `QWCRYPT_IOC_FILENAMES` (`rbcw.exe`, `ADNotificationManager.exe`).  Sets
 /// `qwcrypt_ioc_process: true` and appends `"T1486"` to `mitre_techniques`.
-pub fn apply_qwcrypt_ioc_signals(values: &mut Vec<serde_json::Value>) {
+pub fn apply_qwcrypt_ioc_signals(values: &mut [serde_json::Value]) {
     use forensicnomicon::heuristics::evtx::QWCRYPT_IOC_FILENAMES;
     for v in values.iter_mut() {
         if v.get(TABLE_KEY).and_then(|t| t.as_str()) != Some("apps") {
@@ -258,15 +342,15 @@ pub fn apply_qwcrypt_ioc_signals(values: &mut Vec<serde_json::Value>) {
                 .get("app_name")
                 .and_then(serde_json::Value::as_str)
                 .unwrap_or("");
-            let base = app_name
-                .rsplit(|c| c == '\\' || c == '/')
-                .next()
-                .unwrap_or(app_name);
+            let base = app_name.rsplit(['\\', '/']).next().unwrap_or(app_name);
             let is_ioc = QWCRYPT_IOC_FILENAMES
                 .iter()
                 .any(|&ioc| base.eq_ignore_ascii_case(ioc));
             if is_ioc {
-                obj.insert("qwcrypt_ioc_process".to_owned(), serde_json::Value::Bool(true));
+                obj.insert(
+                    "qwcrypt_ioc_process".to_owned(),
+                    serde_json::Value::Bool(true),
+                );
                 let techs = obj
                     .entry("mitre_techniques")
                     .or_insert_with(|| serde_json::Value::Array(Vec::new()));
@@ -283,36 +367,52 @@ pub fn apply_qwcrypt_ioc_signals(values: &mut Vec<serde_json::Value>) {
 
 const NOTIFICATION_C2_MIN_COUNT: u64 = 10;
 
-pub fn apply_notification_c2_signal(all: &mut Vec<serde_json::Value>) {
+pub fn apply_notification_c2_signal(all: &mut [serde_json::Value]) {
     let mut notif_map: HashMap<(i64, String), u64> = HashMap::new();
     for v in all.iter() {
         if v.get(TABLE_KEY).and_then(|t| t.as_str()) == Some("notifications") {
             if let (Some(app_id), Some(ts)) = (
-                v.get("app_id").and_then(|x| x.as_i64()),
-                v.get("timestamp").and_then(|x| x.as_str()).map(str::to_owned),
+                v.get("app_id").and_then(serde_json::Value::as_i64),
+                v.get("timestamp")
+                    .and_then(|x| x.as_str())
+                    .map(str::to_owned),
             ) {
-                let count = v.get("notification_count").and_then(|x| x.as_u64()).unwrap_or(1);
+                let count = v
+                    .get("notification_count")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(1);
                 *notif_map.entry((app_id, ts)).or_insert(0) += count;
             }
         }
     }
     for v in all.iter_mut() {
-        if v.get(TABLE_KEY).and_then(|t| t.as_str()) != Some("apps") { continue; }
+        if v.get(TABLE_KEY).and_then(|t| t.as_str()) != Some("apps") {
+            continue;
+        }
         if let Some(obj) = v.as_object_mut() {
-            let key = obj.get("app_id").and_then(|x| x.as_i64())
-                .zip(obj.get("timestamp").and_then(|x| x.as_str()).map(str::to_owned));
+            let key = obj.get("app_id").and_then(serde_json::Value::as_i64).zip(
+                obj.get("timestamp")
+                    .and_then(|x| x.as_str())
+                    .map(str::to_owned),
+            );
             if let Some((app_id, ts)) = key {
                 if let Some(&count) = notif_map.get(&(app_id, ts)) {
                     if count > NOTIFICATION_C2_MIN_COUNT {
-                        let bg = obj.get("background_cycles").and_then(|x| x.as_u64()).unwrap_or(0);
-                        let focus_ms = obj.get("focus_time_ms").and_then(|x| x.as_u64());
+                        let bg = obj
+                            .get("background_cycles")
+                            .and_then(serde_json::Value::as_u64)
+                            .unwrap_or(0);
+                        let focus_ms = obj.get("focus_time_ms").and_then(serde_json::Value::as_u64);
                         if bg > 0 && focus_ms.map_or(true, |ms| ms == 0) {
                             obj.insert("notification_c2".to_owned(), serde_json::Value::Bool(true));
-                            let techs = obj.entry("mitre_techniques")
+                            let techs = obj
+                                .entry("mitre_techniques")
                                 .or_insert_with(|| serde_json::Value::Array(Vec::new()));
                             if let serde_json::Value::Array(arr) = techs {
                                 let t1092 = serde_json::Value::String("T1092".to_owned());
-                                if !arr.contains(&t1092) { arr.push(t1092); }
+                                if !arr.contains(&t1092) {
+                                    arr.push(t1092);
+                                }
                             }
                         }
                     }
@@ -324,13 +424,16 @@ pub fn apply_notification_c2_signal(all: &mut Vec<serde_json::Value>) {
 
 const USER_PRESENCE_THRESHOLD_MS: u64 = 10_000;
 
-pub fn annotate_user_presence(all: &mut Vec<serde_json::Value>) {
+pub fn annotate_user_presence(all: &mut [serde_json::Value]) {
     let mut totals: HashMap<String, u64> = HashMap::new();
     for v in all.iter() {
         if v.get(TABLE_KEY).and_then(|t| t.as_str()) == Some("apps") {
             if let (Some(ts), Some(ms)) = (
-                v.get("timestamp").and_then(serde_json::Value::as_str).map(str::to_owned),
-                v.get("user_input_time_ms").and_then(serde_json::Value::as_u64),
+                v.get("timestamp")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_owned),
+                v.get("user_input_time_ms")
+                    .and_then(serde_json::Value::as_u64),
             ) {
                 let slot = totals.entry(ts).or_insert(0);
                 *slot = slot.saturating_add(ms);
@@ -378,7 +481,10 @@ mod tests {
         })];
         merge_focus_into_apps(&mut all, focus);
         assert_eq!(all[0]["focus_time_ms"], json!(60_000_u64));
-        assert!(all[1].get("focus_time_ms").is_none(), "network row must not get focus data");
+        assert!(
+            all[1].get("focus_time_ms").is_none(),
+            "network row must not get focus data"
+        );
     }
 
     #[test]
@@ -499,13 +605,15 @@ mod tests {
         ];
         let mut all: Vec<serde_json::Value> = timestamps
             .iter()
-            .map(|&ts| json!({
-                "source_table": "network",
-                "app_id": 55_i64,
-                "timestamp": ts,
-                "bytes_sent": 1024_u64,
-                "bytes_recv": 512_u64,
-            }))
+            .map(|&ts| {
+                json!({
+                    "source_table": "network",
+                    "app_id": 55_i64,
+                    "timestamp": ts,
+                    "bytes_sent": 1024_u64,
+                    "bytes_recv": 512_u64,
+                })
+            })
             .collect();
         apply_beaconing_signals(&mut all);
         assert!(all.iter().all(|v| v["beaconing"] == json!(true)));
@@ -590,7 +698,9 @@ mod tests {
             "app_name": "rbcw.exe",
         })];
         apply_qwcrypt_ioc_signals(&mut all);
-        let techs = all[0]["mitre_techniques"].as_array().expect("mitre_techniques array");
+        let techs = all[0]["mitre_techniques"]
+            .as_array()
+            .expect("mitre_techniques array");
         assert!(techs.iter().any(|t| t == "T1486"));
     }
 

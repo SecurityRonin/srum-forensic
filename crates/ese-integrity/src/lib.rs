@@ -6,7 +6,7 @@
 
 use ese_core::{EseDatabase, EseHeader};
 
-/// The canonical 5-level severity scale, shared across every SecurityRonin
+/// The canonical 5-level severity scale, shared across every `SecurityRonin`
 /// analyzer via [`forensicnomicon::report`].
 pub use forensicnomicon::report::Severity;
 
@@ -82,15 +82,15 @@ pub enum EseStructuralAnomaly {
         /// The highest valid page index in the file.
         last_valid_page: u32,
     },
-    /// One or more AutoIncId values are missing from a contiguous sequence.
+    /// One or more `AutoIncId` values are missing from a contiguous sequence.
     ///
     /// A gap between `prev` and `next` (non-adjacent integers) indicates that
     /// records were deleted without leaving a deleted-tag marker — either via
     /// bulk deletion or external manipulation of the ESE store.
     AutoIncIdGap {
-        /// The AutoIncId immediately before the gap.
+        /// The `AutoIncId` immediately before the gap.
         prev: i32,
-        /// The AutoIncId immediately after the gap.
+        /// The `AutoIncId` immediately after the gap.
         next: i32,
     },
     /// A record tag has the deleted-record flag set (bit 29 of the tag word).
@@ -106,6 +106,9 @@ pub enum EseStructuralAnomaly {
 
 impl EseStructuralAnomaly {
     /// Return the forensic severity of this anomaly.
+    // One variant per arm is the severity contract — keep each anomaly kind on
+    // its own line for readability even when several map to the same severity.
+    #[allow(clippy::match_same_arms)]
     pub fn severity(&self) -> Severity {
         match self {
             Self::DirtyDatabase { .. } => Severity::Info,
@@ -193,8 +196,8 @@ impl<'a> EseIntegrity<'a> {
     /// [`ESE_MIN_BYTES`] or shorter than the declared page count implies.
     pub fn check_layout(&self) -> Vec<EseStructuralAnomaly> {
         if self.data.len() < ESE_MIN_BYTES {
-            let actual_pages = u32::try_from(self.data.len() / ESE_DEFAULT_PAGE_SIZE)
-                .unwrap_or(u32::MAX);
+            let actual_pages =
+                u32::try_from(self.data.len() / ESE_DEFAULT_PAGE_SIZE).unwrap_or(u32::MAX);
             // Try to read declared page count from header; fall back to 0.
             let declared_pages = self.try_read_declared_pages().unwrap_or(0);
             return vec![EseStructuralAnomaly::TruncatedDatabase {
@@ -207,8 +210,7 @@ impl<'a> EseIntegrity<'a> {
         if let Some(declared) = self.try_read_declared_pages() {
             let expected_bytes = (declared as usize).saturating_mul(page_size);
             if expected_bytes > self.data.len() {
-                let actual_pages =
-                    u32::try_from(self.data.len() / page_size).unwrap_or(u32::MAX);
+                let actual_pages = u32::try_from(self.data.len() / page_size).unwrap_or(u32::MAX);
                 return vec![EseStructuralAnomaly::TruncatedDatabase {
                     declared_pages: declared,
                     actual_pages,
@@ -252,7 +254,10 @@ impl<'a> EseIntegrity<'a> {
                 }
                 ChecksumResult::EccMismatch => {
                     let actual = u32::from_le_bytes([
-                        page_data[0], page_data[1], page_data[2], page_data[3],
+                        page_data[0],
+                        page_data[1],
+                        page_data[2],
+                        page_data[3],
                     ]);
                     anomalies.push(EseStructuralAnomaly::PageChecksumMismatch {
                         page_number,
@@ -295,8 +300,12 @@ impl<'a> EseIntegrity<'a> {
         if self.data.len() < 240 {
             return None;
         }
-        let raw =
-            u32::from_le_bytes([self.data[236], self.data[237], self.data[238], self.data[239]]);
+        let raw = u32::from_le_bytes([
+            self.data[236],
+            self.data[237],
+            self.data[238],
+            self.data[239],
+        ]);
         if raw == 0 {
             Some(ESE_DEFAULT_PAGE_SIZE)
         } else {
@@ -346,12 +355,10 @@ pub fn verify_page_checksums(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
         if page.data.len() < 8 {
             continue;
         }
-        let col_parity = u32::from_le_bytes([
-            page.data[0], page.data[1], page.data[2], page.data[3],
-        ]);
-        let stored_xor = u32::from_le_bytes([
-            page.data[4], page.data[5], page.data[6], page.data[7],
-        ]);
+        let col_parity =
+            u32::from_le_bytes([page.data[0], page.data[1], page.data[2], page.data[3]]);
+        let stored_xor =
+            u32::from_le_bytes([page.data[4], page.data[5], page.data[6], page.data[7]]);
         // Skip unchecked pages: both checksum fields zero means never checksummed.
         if col_parity == 0 && stored_xor == 0 {
             continue;
@@ -411,7 +418,7 @@ pub fn detect_orphaned_catalog(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
         .collect()
 }
 
-/// Detect non-adjacent AutoIncId values in a sorted (or unsorted) id slice.
+/// Detect non-adjacent `AutoIncId` values in a sorted (or unsorted) id slice.
 ///
 /// Any pair of adjacent elements where `next > prev + 1` indicates that one or
 /// more records were removed without leaving an in-place deleted-tag marker.
@@ -437,7 +444,7 @@ pub fn detect_autoinc_gaps(ids: &[i32]) -> Vec<EseStructuralAnomaly> {
 
 /// Scan every data page for tags that have the deleted-record flag set.
 ///
-/// Per MS-ESEDB spec: ESE marks deleted records in-place by setting TAG_DEFUNCT=0x2
+/// Per MS-ESEDB spec: ESE marks deleted records in-place by setting `TAG_DEFUNCT=0x2`
 /// in bits 13-15 of the offset word of the 4-byte tag. In the 32-bit tag word this
 /// is bit 14 (`0x4000`). The record bytes are left intact, allowing forensic recovery.
 /// Each such tag is reported as [`DeletedRecordPresent`].
@@ -479,10 +486,10 @@ pub fn find_deleted_records(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
 }
 
 /// Filter `anomalies` to those at or above `min` severity.
-pub fn anomalies_at_least<'a>(
-    anomalies: &'a [EseStructuralAnomaly],
+pub fn anomalies_at_least(
+    anomalies: &[EseStructuralAnomaly],
     min: Severity,
-) -> Vec<&'a EseStructuralAnomaly> {
+) -> Vec<&EseStructuralAnomaly> {
     anomalies.iter().filter(|a| a.at_least(min)).collect()
 }
 
@@ -581,7 +588,6 @@ pub fn scan_slack_regions(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
     }
     anomalies
 }
-
 
 impl EseStructuralAnomaly {
     /// Stable, scheme-prefixed machine code for this anomaly.

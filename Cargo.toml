@@ -9,8 +9,8 @@ members = [
     "crates/srum-parser",
     "crates/srum-schema",
     "crates/srum-analysis",
-    "crates/sr-cli",
-    "crates/sr-gui/src-tauri",
+    "crates/srum-cli",
+    "crates/srum-gui/src-tauri",
 ]
 
 [workspace.package]
@@ -69,3 +69,14 @@ must_use_candidate = "allow"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 module_name_repetitions = "allow"
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_sign_loss = "allow"
+cast_precision_loss = "allow"
+too_many_lines = "allow"
+needless_pass_by_value = "allow"
+map_unwrap_or = "allow"
+items_after_statements = "allow"
+implicit_hasher = "allow"
+similar_names = "allow"
+return_self_not_must_use = "allow"

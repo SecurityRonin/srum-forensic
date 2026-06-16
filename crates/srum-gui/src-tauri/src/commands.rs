@@ -6,63 +6,34 @@ use std::path::Path;
 use tauri::Emitter;
 
 fn emit_progress(app: &tauri::AppHandle, pct: u8, label: &str) {
-    app.emit("parse-progress", serde_json::json!({ "pct": pct, "label": label })).ok();
+    app.emit(
+        "parse-progress",
+        serde_json::json!({ "pct": pct, "label": label }),
+    )
+    .ok();
 }
 
 #[tauri::command]
 pub async fn open_file(path: String, app: tauri::AppHandle) -> Result<SrumFile, String> {
-    let p = std::path::PathBuf::from(&path);
-
-    emit_progress(&app, 5,  "Loading ID map…");
-    let id_map = srum_analysis::load_id_map(&p);
-
+    emit_progress(&app, 5, "Loading ID map…");
     emit_progress(&app, 20, "Building timeline…");
-    let annotated = srum_analysis::build_timeline(&p, Some(&id_map));
-
     emit_progress(&app, 75, "Sorting records…");
-    let mut table_names: Vec<String> = annotated
-        .iter()
-        .filter_map(|v| v.get("source_table").and_then(|s| s.as_str()).map(str::to_owned))
-        .collect::<std::collections::HashSet<_>>()
-        .into_iter()
-        .collect();
-    table_names.sort();
-
-    let mut records: Vec<AnnotatedRecord> = annotated
-        .into_iter()
-        .filter_map(value_to_timeline_record)
-        .collect();
-    records.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-
-    let temporal_span = match (records.first(), records.last()) {
-        (Some(f), Some(l)) if f.timestamp != l.timestamp => Some(TemporalSpan {
-            first: f.timestamp.clone(),
-            last: l.timestamp.clone(),
-        }),
-        _ => None,
-    };
-
+    let file = parse_srum(Path::new(&path));
     emit_progress(&app, 90, "Computing findings…");
-    let record_count = records.len();
-    let findings: Vec<FindingCard> = srum_analysis::compute_findings(&records);
-
-    Ok(SrumFile {
-        path,
-        timeline: records,
-        findings,
-        record_count,
-        temporal_span,
-        table_names,
-    })
+    Ok(file)
 }
 
-pub fn parse_srum(path: &Path) -> anyhow::Result<SrumFile> {
+pub fn parse_srum(path: &Path) -> SrumFile {
     let id_map = srum_analysis::load_id_map(path);
     let annotated = srum_analysis::build_timeline(path, Some(&id_map));
 
     let mut table_names: Vec<String> = annotated
         .iter()
-        .filter_map(|v| v.get("source_table").and_then(|s| s.as_str()).map(str::to_owned))
+        .filter_map(|v| {
+            v.get("source_table")
+                .and_then(|s| s.as_str())
+                .map(str::to_owned)
+        })
         .collect::<std::collections::HashSet<_>>()
         .into_iter()
         .collect();
@@ -85,14 +56,14 @@ pub fn parse_srum(path: &Path) -> anyhow::Result<SrumFile> {
     let record_count = records.len();
     let findings: Vec<FindingCard> = srum_analysis::compute_findings(&records);
 
-    Ok(SrumFile {
+    SrumFile {
         path: path.to_string_lossy().into_owned(),
         timeline: records,
         findings,
         record_count,
         temporal_span,
         table_names,
-    })
+    }
 }
 
 #[cfg(test)]
@@ -101,11 +72,8 @@ mod tests {
 
     #[test]
     fn parse_srum_nonexistent_path_returns_empty_timeline() {
-        let result = parse_srum(std::path::Path::new("/nonexistent/SRUDB.dat"));
-        // should not panic — returns Ok with empty timeline
-        match result {
-            Ok(f) => assert!(f.timeline.is_empty()),
-            Err(_) => {} // also acceptable — parse error for bad path
-        }
+        // A missing file degrades gracefully to an empty timeline (no panic).
+        let file = parse_srum(std::path::Path::new("/nonexistent/SRUDB.dat"));
+        assert!(file.timeline.is_empty());
     }
 }
