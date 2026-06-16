@@ -3,7 +3,32 @@ targets = []
 
 [advisories]
 version = 2
-ignore = []
+# All entries below are `unmaintained` advisories (not vulnerabilities) on
+# transitive dependencies pulled in by the optional `srum-gui` Tauri front end.
+# None has a safe upgrade path — they ship inside Tauri 2's GTK3/wry stack and
+# its url-pattern parser. The forensic libraries (ese-*, srum-* CLI/parser) do
+# not depend on any of them.
+ignore = [
+    # gtk-rs GTK3 bindings — archived/unmaintained, reached via tauri → wry/gtk.
+    "RUSTSEC-2024-0411", # gdkwayland-sys
+    "RUSTSEC-2024-0412", # gdk
+    "RUSTSEC-2024-0413", # atk
+    "RUSTSEC-2024-0414", # gdkx11-sys
+    "RUSTSEC-2024-0415", # gtk
+    "RUSTSEC-2024-0416", # atk-sys
+    "RUSTSEC-2024-0417", # gdkx11
+    "RUSTSEC-2024-0418", # gdk-sys
+    "RUSTSEC-2024-0419", # gtk3-macros
+    "RUSTSEC-2024-0420", # gtk-sys
+    # proc-macro-error — unmaintained, reached via tauri build-time macros.
+    "RUSTSEC-2024-0370",
+    # rust-unic Unicode crates — unmaintained, reached via tauri-utils → urlpattern.
+    "RUSTSEC-2025-0075", # unic-char-range
+    "RUSTSEC-2025-0080", # unic-common
+    "RUSTSEC-2025-0081", # unic-char-property
+    "RUSTSEC-2025-0098", # unic-ucd-version
+    "RUSTSEC-2025-0100", # unic-ucd-ident
+]
 
 [licenses]
 version = 2
@@ -19,6 +44,11 @@ allow = [
     "CC0-1.0",
     "OpenSSL",
     "Zlib",
+    # Weak, file-level copyleft — imposes no obligations on our own source.
+    # Reached only through the optional srum-gui Tauri stack (cssparser,
+    # selectors, dtoa-short, option-ext).
+    "MPL-2.0",
+    "BSL-1.0",
 ]
 # Confidence threshold for license detection
 confidence-threshold = 0.8
