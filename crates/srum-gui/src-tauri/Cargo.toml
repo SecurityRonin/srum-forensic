@@ -1,5 +1,5 @@
 [package]
-name = "sr-gui"
+name = "srum-gui"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -11,7 +11,7 @@ name = "sr_gui_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [[bin]]
-name = "sr-gui"
+name = "srum-gui"
 path = "src/main.rs"
 
 [dependencies]

@@ -1,9 +1,9 @@
-//! `sr` — SRUM forensic analysis CLI.
+//! `srum4n6` — SRUM forensic analysis CLI.
 //!
 //! Subcommands:
-//! - `sr network <path>` — parse and print network usage records as JSON
-//! - `sr apps <path>`   — parse and print application usage records as JSON
-//! - `sr idmap <path>`  — dump the `SruDbIdMapTable` as JSON
+//! - `srum4n6 network <path>` — parse and print network usage records as JSON
+//! - `srum4n6 apps <path>`   — parse and print application usage records as JSON
+//! - `srum4n6 idmap <path>`  — dump the `SruDbIdMapTable` as JSON
 
 use std::path::PathBuf;
 
@@ -20,7 +20,7 @@ use output::OutputFormat;
 /// Reads SRUDB.dat (Windows System Resource Usage Monitor database) and
 /// extracts per-process network and application usage records.
 #[derive(Parser)]
-#[command(name = "sr", about = "SRUM forensic analysis tool", version)]
+#[command(name = "srum4n6", about = "SRUM forensic analysis tool", version)]
 struct Cli {
     #[command(subcommand)]
     command: Cmd,
@@ -147,7 +147,7 @@ enum Cmd {
     },
     /// Show all SRUM activity for a single process across all tables.
     ///
-    /// Accepts an integer app_id or a substring of the resolved process name
+    /// Accepts an integer `app_id` or a substring of the resolved process name
     /// (requires --resolve for name matching).
     #[command(name = "process")]
     Process {
@@ -155,7 +155,7 @@ enum Cmd {
         app: String,
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
-        /// Resolve app_id and user_id to names from SruDbIdMapTable.
+        /// Resolve `app_id` and `user_id` to names from `SruDbIdMapTable`.
         #[arg(long)]
         resolve: bool,
         /// Output format (json, csv, or ndjson).
@@ -165,8 +165,8 @@ enum Cmd {
     /// Aggregate per-process statistics across all SRUM tables.
     ///
     /// Builds a merged timeline and summarises each app's CPU cycles, bytes,
-    /// active intervals, and heuristic flags. Output sorted by flag_count desc,
-    /// then total_background_cycles desc. Best-effort: always exits 0.
+    /// active intervals, and heuristic flags. Output sorted by `flag_count` desc,
+    /// then `total_background_cycles` desc. Best-effort: always exits 0.
     Stats {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
@@ -231,7 +231,7 @@ enum Cmd {
         baseline: PathBuf,
         /// Suspect SRUDB.dat (after the incident).
         suspect: PathBuf,
-        /// Resolve app_id/user_id to names for process matching.
+        /// Resolve `app_id/user_id` to names for process matching.
         #[arg(long)]
         resolve: bool,
         #[arg(long, value_enum, default_value_t)]
@@ -268,38 +268,77 @@ enum Cmd {
 fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Cmd::Network { path, resolve, format } =>
-            cmd::tables::run_network(&path, resolve, &format),
-        Cmd::Apps { path, resolve, format } =>
-            cmd::tables::run_apps(&path, resolve, &format),
-        Cmd::Idmap { path, format } =>
-            cmd::tables::run_idmap(&path, &format),
-        Cmd::Connectivity { path, resolve, format } =>
-            cmd::tables::run_connectivity(&path, resolve, &format),
-        Cmd::Energy { path, resolve, format } =>
-            cmd::tables::run_energy(&path, resolve, &format),
-        Cmd::EnergyLt { path, resolve, format } =>
-            cmd::tables::run_energy_lt(&path, resolve, &format),
-        Cmd::Notifications { path, resolve, format } =>
-            cmd::tables::run_notifications(&path, resolve, &format),
-        Cmd::AppTimeline { path, resolve, format } =>
-            cmd::tables::run_app_timeline(&path, resolve, &format),
-        Cmd::Stats { path, resolve, format } =>
-            cmd::analysis::run_stats(&path, resolve, &format),
-        Cmd::Sessions { path, format } =>
-            cmd::analysis::run_sessions(&path, &format),
-        Cmd::Timeline { path, resolve, format } =>
-            cmd::analysis::run_timeline(&path, resolve, &format),
-        Cmd::Process { app, path, resolve, format } =>
-            cmd::analysis::run_process(&app, &path, resolve, &format),
-        Cmd::Gaps { path, threshold_hours, format } =>
-            cmd::analysis::run_gaps(&path, threshold_hours, &format),
-        Cmd::Hunt { signature, path, resolve, format } =>
-            cmd::analysis::run_hunt(&signature, &path, resolve, &format),
-        Cmd::Compare { baseline, suspect, resolve, format } =>
-            cmd::forensics::run_compare(&baseline, &suspect, resolve, &format),
-        Cmd::Metadata { path, format } =>
-            cmd::forensics::run_metadata(&path, &format),
+        Cmd::Network {
+            path,
+            resolve,
+            format,
+        } => cmd::tables::run_network(&path, resolve, &format),
+        Cmd::Apps {
+            path,
+            resolve,
+            format,
+        } => cmd::tables::run_apps(&path, resolve, &format),
+        Cmd::Idmap { path, format } => cmd::tables::run_idmap(&path, &format),
+        Cmd::Connectivity {
+            path,
+            resolve,
+            format,
+        } => cmd::tables::run_connectivity(&path, resolve, &format),
+        Cmd::Energy {
+            path,
+            resolve,
+            format,
+        } => cmd::tables::run_energy(&path, resolve, &format),
+        Cmd::EnergyLt {
+            path,
+            resolve,
+            format,
+        } => cmd::tables::run_energy_lt(&path, resolve, &format),
+        Cmd::Notifications {
+            path,
+            resolve,
+            format,
+        } => cmd::tables::run_notifications(&path, resolve, &format),
+        Cmd::AppTimeline {
+            path,
+            resolve,
+            format,
+        } => cmd::tables::run_app_timeline(&path, resolve, &format),
+        Cmd::Stats {
+            path,
+            resolve,
+            format,
+        } => cmd::analysis::run_stats(&path, resolve, &format),
+        Cmd::Sessions { path, format } => cmd::analysis::run_sessions(&path, &format),
+        Cmd::Timeline {
+            path,
+            resolve,
+            format,
+        } => cmd::analysis::run_timeline(&path, resolve, &format),
+        Cmd::Process {
+            app,
+            path,
+            resolve,
+            format,
+        } => cmd::analysis::run_process(&app, &path, resolve, &format),
+        Cmd::Gaps {
+            path,
+            threshold_hours,
+            format,
+        } => cmd::analysis::run_gaps(&path, threshold_hours, &format),
+        Cmd::Hunt {
+            signature,
+            path,
+            resolve,
+            format,
+        } => cmd::analysis::run_hunt(&signature, &path, resolve, &format),
+        Cmd::Compare {
+            baseline,
+            suspect,
+            resolve,
+            format,
+        } => cmd::forensics::run_compare(&baseline, &suspect, resolve, &format),
+        Cmd::Metadata { path, format } => cmd::forensics::run_metadata(&path, &format),
     }
 }
 

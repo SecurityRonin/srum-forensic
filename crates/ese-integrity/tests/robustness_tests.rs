@@ -1,7 +1,7 @@
 //! Robustness tests for [`ese_integrity::EseIntegrity`] unified analyser.
 //!
-//! These tests verify that EseIntegrity correctly detects structural problems
-//! in crafted malformed byte buffers — cases where EseDatabase::open would
+//! These tests verify that `EseIntegrity` correctly detects structural problems
+//! in crafted malformed byte buffers — cases where `EseDatabase::open` would
 //! either panic, fail, or silently accept corrupt data.
 
 mod fixtures;
@@ -13,9 +13,9 @@ use ese_integrity::{anomalies_at_least, EseIntegrity, EseStructuralAnomaly, Seve
 #[test]
 fn empty_buffer_returns_truncated_database() {
     let anomalies = EseIntegrity::new(&[]).analyse();
-    let found = anomalies.iter().any(|a| {
-        matches!(a, EseStructuralAnomaly::TruncatedDatabase { .. })
-    });
+    let found = anomalies
+        .iter()
+        .any(|a| matches!(a, EseStructuralAnomaly::TruncatedDatabase { .. }));
     assert!(found, "empty buffer must produce TruncatedDatabase");
 }
 
@@ -28,9 +28,9 @@ fn undersized_buffer_returns_truncated_database() {
     buf[236..240].copy_from_slice(&4096_u32.to_le_bytes()); // page_size = 4096
 
     let anomalies = EseIntegrity::new(&buf).analyse();
-    let found = anomalies.iter().any(|a| {
-        matches!(a, EseStructuralAnomaly::TruncatedDatabase { .. })
-    });
+    let found = anomalies
+        .iter()
+        .any(|a| matches!(a, EseStructuralAnomaly::TruncatedDatabase { .. }));
     assert!(found, "buffer < 8192 bytes must produce TruncatedDatabase");
 }
 
@@ -71,9 +71,9 @@ fn make_buf_with_bad_page_checksum() -> Vec<u8> {
 fn page_with_bad_checksum_returns_checksum_mismatch() {
     let buf = make_buf_with_bad_page_checksum();
     let anomalies = EseIntegrity::new(&buf).analyse();
-    let found = anomalies.iter().any(|a| {
-        matches!(a, EseStructuralAnomaly::PageChecksumMismatch { .. })
-    });
+    let found = anomalies
+        .iter()
+        .any(|a| matches!(a, EseStructuralAnomaly::PageChecksumMismatch { .. }));
     assert!(
         found,
         "page with bad XOR checksum must produce PageChecksumMismatch"
@@ -167,8 +167,8 @@ fn make_buf_with_valid_ecc_page() -> Vec<u8> {
 }
 
 /// Build a 3-page ESE buffer where page 1 is a Vista+ ECC page with a TAMPERED
-/// data byte — the stored checksum no longer matches the body. check_pages() must
-/// detect this and emit PageChecksumMismatch.
+/// data byte — the stored checksum no longer matches the body. `check_pages()` must
+/// detect this and emit `PageChecksumMismatch`.
 fn make_buf_with_tampered_ecc_page() -> Vec<u8> {
     let mut buf = make_buf_with_valid_ecc_page();
     let page_size = 4096_usize;
@@ -185,7 +185,10 @@ fn valid_ecc_page_does_not_produce_false_positive() {
     let buf = make_buf_with_valid_ecc_page();
     let anomalies = EseIntegrity::new(&buf).analyse();
     let false_pos = anomalies.iter().any(|a| {
-        matches!(a, EseStructuralAnomaly::PageChecksumMismatch { page_number: 1, .. })
+        matches!(
+            a,
+            EseStructuralAnomaly::PageChecksumMismatch { page_number: 1, .. }
+        )
     });
     assert!(
         !false_pos,
@@ -199,7 +202,10 @@ fn tampered_ecc_page_produces_checksum_mismatch() {
     let buf = make_buf_with_tampered_ecc_page();
     let anomalies = EseIntegrity::new(&buf).analyse();
     let detected = anomalies.iter().any(|a| {
-        matches!(a, EseStructuralAnomaly::PageChecksumMismatch { page_number: 1, .. })
+        matches!(
+            a,
+            EseStructuralAnomaly::PageChecksumMismatch { page_number: 1, .. }
+        )
     });
     assert!(
         detected,

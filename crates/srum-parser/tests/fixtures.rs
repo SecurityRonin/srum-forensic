@@ -11,7 +11,7 @@ use tempfile::NamedTempFile;
 /// Layout:
 /// - page 0: ESE file header
 /// - pages 1–4: zero-padded (ESE reserves pages 1-4 for internal metadata)
-/// - page 5: catalog with one entry for `table_name` → page 6  (matches CATALOG_ROOT=5)
+/// - page 5: catalog with one entry for `table_name` → page 6  (matches `CATALOG_ROOT=5`)
 /// - page 6: leaf page containing `raw_records`
 fn make_srudb(table_name: &str, object_id: u32, raw_records: &[Vec<u8>]) -> NamedTempFile {
     let catalog_entry = CatalogEntry {

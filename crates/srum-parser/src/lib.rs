@@ -126,11 +126,13 @@ pub fn parse_energy_usage(
 /// # Errors
 ///
 /// Returns an error if the file cannot be read or is not a valid ESE database.
-pub fn parse_energy_lt(
-    path: &std::path::Path,
-) -> anyhow::Result<Vec<srum_core::EnergyLtRecord>> {
+pub fn parse_energy_lt(path: &std::path::Path) -> anyhow::Result<Vec<srum_core::EnergyLtRecord>> {
     let db = ese_core::EseDatabase::open(path)?;
-    collect_table(&db, TABLE_ENERGY_USAGE_LT, energy_lt::decode_energy_lt_record)
+    collect_table(
+        &db,
+        TABLE_ENERGY_USAGE_LT,
+        energy_lt::decode_energy_lt_record,
+    )
 }
 
 /// Parse push notification records from a SRUDB.dat file.
@@ -166,7 +168,11 @@ pub fn parse_app_timeline(
     path: &std::path::Path,
 ) -> anyhow::Result<Vec<srum_core::AppTimelineRecord>> {
     let db = ese_core::EseDatabase::open(path)?;
-    collect_table(&db, TABLE_APP_TIMELINE, app_timeline::decode_app_timeline_record)
+    collect_table(
+        &db,
+        TABLE_APP_TIMELINE,
+        app_timeline::decode_app_timeline_record,
+    )
 }
 
 /// Parse ID map entries from a SRUDB.dat file.

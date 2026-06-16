@@ -32,15 +32,11 @@ pub fn verify_page_checksum(page_data: &[u8], _page_number: u32) -> ChecksumResu
     if page_data.len() < 8 {
         return ChecksumResult::Unknown;
     }
-    let stored_xor = u32::from_le_bytes([
-        page_data[0], page_data[1], page_data[2], page_data[3],
-    ]);
+    let stored_xor = u32::from_le_bytes([page_data[0], page_data[1], page_data[2], page_data[3]]);
     if stored_xor == 0 {
         return ChecksumResult::Unknown;
     }
-    let stored_ecc = u32::from_le_bytes([
-        page_data[4], page_data[5], page_data[6], page_data[7],
-    ]);
+    let stored_ecc = u32::from_le_bytes([page_data[4], page_data[5], page_data[6], page_data[7]]);
 
     if stored_ecc == 0 {
         // Legacy XOR format: covers bytes 4+.
@@ -48,7 +44,10 @@ pub fn verify_page_checksum(page_data: &[u8], _page_number: u32) -> ChecksumResu
         if computed == stored_xor {
             ChecksumResult::Valid
         } else {
-            ChecksumResult::LegacyXorMismatch { stored: stored_xor, computed }
+            ChecksumResult::LegacyXorMismatch {
+                stored: stored_xor,
+                computed,
+            }
         }
     } else {
         // Vista+ ECC format: XOR + column-parity ECC, both covering bytes 8+.
@@ -85,7 +84,7 @@ fn column_parity_ecc(data: &[u8]) -> u32 {
     ecc
 }
 
-/// JET column type codes (coltyp field in MSysObjects).
+/// JET column type codes (coltyp field in `MSysObjects`).
 pub mod coltyp {
     pub const BIT: u8 = 1;
     pub const UNSIGNED_BYTE: u8 = 2;
@@ -109,7 +108,7 @@ pub mod coltyp {
 /// A column definition from the ESE catalog.
 #[derive(Debug, Clone)]
 pub struct ColumnDef {
-    /// 1-based column identifier (matches ESE catalog column_id).
+    /// 1-based column identifier (matches ESE catalog `column_id`).
     pub column_id: u32,
     /// Human-readable column name.
     pub name: String,
@@ -139,14 +138,17 @@ pub enum EseValue {
 }
 
 /// Return the fixed byte size for a fixed-length coltyp, or `None` for
-/// variable-length (Binary, Text) and tagged (LongBinary, LongText) types.
+/// variable-length (Binary, Text) and tagged (`LongBinary`, `LongText`) types.
 pub fn fixed_col_size(coltyp: u8) -> Option<usize> {
     match coltyp {
         coltyp::BIT | coltyp::UNSIGNED_BYTE => Some(1),
         coltyp::SHORT | coltyp::UNSIGNED_SHORT => Some(2),
         coltyp::LONG | coltyp::UNSIGNED_LONG | coltyp::IEEE_SINGLE => Some(4),
-        coltyp::CURRENCY | coltyp::IEEE_DOUBLE | coltyp::DATE_TIME
-        | coltyp::LONG_LONG | coltyp::UNSIGNED_LONG_LONG => Some(8),
+        coltyp::CURRENCY
+        | coltyp::IEEE_DOUBLE
+        | coltyp::DATE_TIME
+        | coltyp::LONG_LONG
+        | coltyp::UNSIGNED_LONG_LONG => Some(8),
         coltyp::GUID => Some(16),
         _ => None, // variable or tagged
     }
@@ -200,7 +202,7 @@ fn decode_fixed(data: &[u8], coltyp: u8) -> EseValue {
 /// (var_data_offset - 4 - fixed_size) / 2 entries before var data: end offsets
 /// ```
 ///
-/// Fixed-column data is packed contiguously in column_id order starting at byte 4.
+/// Fixed-column data is packed contiguously in `column_id` order starting at byte 4.
 /// Each column occupies exactly [`fixed_col_size`] bytes regardless of nullity
 /// (null fixed columns are stored as zero bytes in their normal slot).
 ///
@@ -212,12 +214,15 @@ fn decode_fixed(data: &[u8], coltyp: u8) -> EseValue {
 ///
 /// Returns `EseError::Corrupt` if the header cannot be read or an offset is out
 /// of bounds. Unknown coltypes are returned as `EseValue::Binary`.
-pub fn decode_record(data: &[u8], columns: &[ColumnDef]) -> Result<Vec<(String, EseValue)>, EseError> {
+pub fn decode_record(
+    data: &[u8],
+    columns: &[ColumnDef],
+) -> Result<Vec<(String, EseValue)>, EseError> {
     if data.len() < 4 {
         return Ok(Vec::new());
     }
 
-    let last_fixed_col = data[0] as u32;
+    let last_fixed_col = u32::from(data[0]);
     let num_var_cols = data[1] as usize;
     let var_data_offset = u16::from_le_bytes([data[2], data[3]]) as usize;
 

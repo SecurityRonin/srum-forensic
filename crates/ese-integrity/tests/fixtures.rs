@@ -46,11 +46,11 @@ pub fn make_ese_with_slack_bytes(slack: &[u8]) -> NamedTempFile {
 
 /// ESE file with a leaf page that has one "live" record and one deleted record.
 ///
-/// Per MS-ESEDB spec: ESE marks deleted records by setting TAG_DEFUNCT=0x2 in
+/// Per MS-ESEDB spec: ESE marks deleted records by setting `TAG_DEFUNCT=0x2` in
 /// bits 13-15 of the OFFSET word (bit 14 of the u32 tag = 0x4000).
 ///
-///   relative_offset = 0, size = 4, defunct_flag in offset word
-///   → tag_raw = (0 | 0x4000) | (4 << 16) = 0x0004_4000
+///   `relative_offset` = 0, size = 4, `defunct_flag` in offset word
+///   → `tag_raw` = (0 | 0x4000) | (4 << 16) = `0x0004_4000`
 pub fn make_ese_with_deleted_record() -> NamedTempFile {
     let mut data_page = vec![0u8; PAGE_SIZE];
     // Vista+ header: page_flags at 0x24
@@ -107,7 +107,7 @@ pub fn make_ese_with_orphaned_catalog_entry() -> NamedTempFile {
         .add_page(blank.clone()) // page 2
         .add_page(blank.clone()) // page 3
         .add_page(blank.clone()) // page 4
-        .add_page(catalog_leaf)  // page 5 = catalog leaf (matches CATALOG_ROOT)
+        .add_page(catalog_leaf) // page 5 = catalog leaf (matches CATALOG_ROOT)
         .write()
 }
 

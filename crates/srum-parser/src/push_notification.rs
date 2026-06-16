@@ -2,7 +2,7 @@
 //!
 //! **Real ESE raw-tag layout** (`cbCommonKeyPrefix | key_suffix | col_data`):
 //! - `[0..2]`:           `cbCommonKeyPrefix` (u16 LE)
-//! - `[2..2+(16-pfx)]`:  key suffix (KEY_LEN=16 for `{D10CA2FE-…}`)
+//! - `[2..2+(16-pfx)]`:  key suffix (`KEY_LEN=16` for `{D10CA2FE-…}`)
 //! - `col_start = 2 + (16 - cb_pfx)`:
 //!   - `[col_start+4..+8]`:  `AutoIncId` (u32 LE)
 //!   - `[col_start+8..+16]`: `TimeStamp` as OLE Automation Date (f64 LE) → `timestamp`
@@ -58,31 +58,55 @@ pub fn decode_push_notification_record(
 
     let ts_off = col_start + COL_TIMESTAMP_OFF;
     let timestamp_raw = f64::from_le_bytes([
-        data[ts_off], data[ts_off + 1], data[ts_off + 2], data[ts_off + 3],
-        data[ts_off + 4], data[ts_off + 5], data[ts_off + 6], data[ts_off + 7],
+        data[ts_off],
+        data[ts_off + 1],
+        data[ts_off + 2],
+        data[ts_off + 3],
+        data[ts_off + 4],
+        data[ts_off + 5],
+        data[ts_off + 6],
+        data[ts_off + 7],
     ]);
     let timestamp = ole_date_to_datetime(timestamp_raw);
 
     let app_off = col_start + COL_APP_ID_OFF;
     let app_id = i32::from_le_bytes([
-        data[app_off], data[app_off + 1], data[app_off + 2], data[app_off + 3],
+        data[app_off],
+        data[app_off + 1],
+        data[app_off + 2],
+        data[app_off + 3],
     ]);
 
     let usr_off = col_start + COL_USER_ID_OFF;
     let user_id = i32::from_le_bytes([
-        data[usr_off], data[usr_off + 1], data[usr_off + 2], data[usr_off + 3],
+        data[usr_off],
+        data[usr_off + 1],
+        data[usr_off + 2],
+        data[usr_off + 3],
     ]);
 
     let fg_off = col_start + COL_FG_CYCLE_OFF;
     let foreground_cycle_time = u64::from_le_bytes([
-        data[fg_off], data[fg_off + 1], data[fg_off + 2], data[fg_off + 3],
-        data[fg_off + 4], data[fg_off + 5], data[fg_off + 6], data[fg_off + 7],
+        data[fg_off],
+        data[fg_off + 1],
+        data[fg_off + 2],
+        data[fg_off + 3],
+        data[fg_off + 4],
+        data[fg_off + 5],
+        data[fg_off + 6],
+        data[fg_off + 7],
     ]);
 
     let bg_off = col_start + COL_BG_CYCLE_OFF;
     let background_cycle_time = u64::from_le_bytes([
-        data[bg_off], data[bg_off + 1], data[bg_off + 2], data[bg_off + 3],
-        data[bg_off + 4], data[bg_off + 5], data[bg_off + 6], data[bg_off + 7],
+        data[bg_off],
+        data[bg_off + 1],
+        data[bg_off + 2],
+        data[bg_off + 3],
+        data[bg_off + 4],
+        data[bg_off + 5],
+        data[bg_off + 6],
+        data[bg_off + 7],
     ]);
 
     Ok(PushNotificationRecord {

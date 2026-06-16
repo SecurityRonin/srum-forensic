@@ -5,7 +5,7 @@
 
 use ese_core::{EseHeader, EsePage};
 
-/// Build a minimal valid ESE header buffer with the given raw page_size value.
+/// Build a minimal valid ESE header buffer with the given raw `page_size` value.
 fn header_buf_with_page_size(raw_page_size: u32) -> Vec<u8> {
     let mut buf = vec![0u8; 4096];
     // ESE magic at offset 4
@@ -33,7 +33,10 @@ fn page_size_33000_is_rejected() {
     // page_size = 33000 > 32768; must return Err.
     let buf = header_buf_with_page_size(33000);
     let result = EseHeader::from_bytes(&buf);
-    assert!(result.is_err(), "page_size=33000 must be rejected (> 32768)");
+    assert!(
+        result.is_err(),
+        "page_size=33000 must be rejected (> 32768)"
+    );
 }
 
 #[test]
@@ -41,7 +44,10 @@ fn page_size_5000_is_rejected() {
     // 5000 is not a power-of-two ESE page size; must return Err.
     let buf = header_buf_with_page_size(5000);
     let result = EseHeader::from_bytes(&buf);
-    assert!(result.is_err(), "page_size=5000 must be rejected (not in valid set)");
+    assert!(
+        result.is_err(),
+        "page_size=5000 must be rejected (not in valid set)"
+    );
 }
 
 #[test]
@@ -111,7 +117,10 @@ fn make_page_with_out_of_bounds_tag(page_size: usize) -> EsePage {
     let pos1 = page_size - 8;
     data[pos1..pos1 + 4].copy_from_slice(&tag1.to_le_bytes());
 
-    EsePage { page_number: 1, data }
+    EsePage {
+        page_number: 1,
+        data,
+    }
 }
 
 #[test]
@@ -131,8 +140,8 @@ fn tags_with_out_of_bounds_offset_returns_err() {
 
 /// Build a page with one tag whose cb_ (size, LOW bits) has bits 13-14 set,
 /// simulating real SRUDB.dat tags where the size word carries extra flag bits.
-/// raw=0x4010_000A from chainsaw: LOW=0x000A (cb_/size=10), HIGH=0x4010 (ib_/offset=16).
-/// This function tests the cb_ masking: true_size | 0x4000 in the LOW bits.
+/// `raw=0x4010_000A` from chainsaw: LOW=0x000A (cb_/size=10), HIGH=0x4010 (ib_/offset=16).
+/// This function tests the cb_ masking: `true_size` | 0x4000 in the LOW bits.
 fn make_page_with_high_size_bits(page_size: usize, true_size: usize) -> EsePage {
     let mut data = vec![0u8; page_size];
     let tag_count: u16 = 1;
@@ -148,7 +157,10 @@ fn make_page_with_high_size_bits(page_size: usize, true_size: usize) -> EsePage 
     let pos = page_size - 4;
     data[pos..pos + 4].copy_from_slice(&tag0.to_le_bytes());
 
-    EsePage { page_number: 1, data }
+    EsePage {
+        page_number: 1,
+        data,
+    }
 }
 
 #[test]
@@ -160,8 +172,7 @@ fn tags_strips_high_bits_from_size_word_returns_13bit_size() {
     let page = make_page_with_high_size_bits(4096, true_size);
     let tags = page.tags().expect("tags must succeed — no out-of-bounds");
     assert_eq!(
-        tags[0].1 as usize,
-        true_size,
+        tags[0].1 as usize, true_size,
         "size must be the 13-bit cb_ value (0x1FFF mask), not the full 15-bit word"
     );
 }
@@ -182,11 +193,13 @@ fn tags_strips_high_bits_from_offset_word_returns_13bit_offset() {
     let pos = 4096 - 4;
     data[pos..pos + 4].copy_from_slice(&tag0.to_le_bytes());
 
-    let page = EsePage { page_number: 1, data };
+    let page = EsePage {
+        page_number: 1,
+        data,
+    };
     let tags = page.tags().expect("tags must succeed");
     assert_eq!(
-        tags[0].0 as usize,
-        10,
+        tags[0].0 as usize, 10,
         "offset must be the 13-bit ib_ value (0x1FFF mask), stripping flag bits"
     );
 }

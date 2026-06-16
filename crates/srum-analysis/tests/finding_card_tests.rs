@@ -23,6 +23,6 @@ fn finding_card_converts_to_a_canonical_finding() {
     });
     assert_eq!(f.code, "SRUM-QWCRYPT-RANSOMWARE");
     assert_eq!(f.severity, Some(Canon::High)); // Suspicious -> High
-    assert_eq!(f.context.occurrences.map(|n| n.get()), Some(3));
+    assert_eq!(f.context.occurrences.map(std::num::NonZero::get), Some(3));
     assert_eq!(f.context.external_refs[0].id, "T1486");
 }

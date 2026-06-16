@@ -1,7 +1,7 @@
 //! Static SRUM table registry.
 //!
 //! GUIDs sourced from forensicnomicon constants and verified against
-//! the sr-cli/srum-parser codebase.
+//! the srum-cli/srum-parser codebase.
 
 /// Metadata for one SRUM extension table.
 pub struct SrumTableInfo {

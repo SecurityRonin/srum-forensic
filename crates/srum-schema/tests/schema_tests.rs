@@ -1,8 +1,8 @@
 //! Tests for srum-schema — Phase 2 stories 1–10.
 //!
-//! GUIDs match forensicnomicon constants and the existing sr-cli/srum-parser codebase.
+//! GUIDs match forensicnomicon constants and the existing srum-cli/srum-parser codebase.
 
-use srum_schema::{all_srum_tables, srum_column_defs, srum_table_name, SrumColumnDef, SrumTableInfo};
+use srum_schema::{all_srum_tables, srum_column_defs, srum_table_name};
 
 // ── story 1/2: srum_table_name ────────────────────────────────────────────────
 
@@ -46,7 +46,11 @@ fn srum_column_defs_network_usage_has_bytes_sent_at_col_8() {
         .expect("network usage schema must exist");
     let bytes_sent = defs.iter().find(|c| c.name == "BytesSent");
     assert!(bytes_sent.is_some(), "BytesSent column must be present");
-    assert_eq!(bytes_sent.unwrap().column_id, 8, "BytesSent must be at column 8");
+    assert_eq!(
+        bytes_sent.unwrap().column_id,
+        8,
+        "BytesSent must be at column 8"
+    );
 }
 
 #[test]
@@ -94,7 +98,11 @@ fn all_srum_tables_contains_id_map() {
 fn srum_column_defs_app_usage_has_19_columns() {
     let defs = srum_column_defs("{5C8CF1C7-7257-4F13-B223-970EF5939312}")
         .expect("app resource usage schema must exist");
-    assert_eq!(defs.len(), 19, "App Resource Usage must have 19 columns (1-19)");
+    assert_eq!(
+        defs.len(),
+        19,
+        "App Resource Usage must have 19 columns (1-19)"
+    );
 }
 
 #[test]
@@ -109,8 +117,8 @@ fn srum_column_defs_app_usage_foreground_cycle_time_at_col_5() {
 
 #[test]
 fn srum_column_def_type_fields_accessible() {
-    let defs = srum_column_defs("{973F5D5C-1D90-4944-BE8E-24B94231A174}")
-        .expect("network usage schema");
+    let defs =
+        srum_column_defs("{973F5D5C-1D90-4944-BE8E-24B94231A174}").expect("network usage schema");
     let col = &defs[0];
     let _: u32 = col.column_id;
     let _: &str = col.name;

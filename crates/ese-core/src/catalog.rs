@@ -174,7 +174,7 @@ impl CatalogEntry {
 
     /// Try to parse a real ESE catalog TABLE entry from a leaf-page tag byte slice.
     ///
-    /// Real ESE MSysObjects records use a tagged-column encoding where the `Name`
+    /// Real ESE `MSysObjects` records use a tagged-column encoding where the `Name`
     /// column (column 128) is preceded by a two-byte marker `[0xFF, 0x00]` followed
     /// by a two-byte LE length and the ASCII name bytes.  The `pgnoFDP` (root B-tree
     /// page of the table) lives 16 bytes before the `0xFF` marker, and the object ID

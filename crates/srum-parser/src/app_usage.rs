@@ -2,7 +2,7 @@
 //!
 //! **Real ESE raw-tag layout** (`cbCommonKeyPrefix | key_suffix | col_data`):
 //! - `[0..2]`:           `cbCommonKeyPrefix` (u16 LE)
-//! - `[2..2+(KEY_LEN-pfx)]`:  key suffix bytes (KEY_LEN varies: 16 or 28 observed)
+//! - `[2..2+(KEY_LEN-pfx)]`:  key suffix bytes (`KEY_LEN` varies: 16 or 28 observed)
 //! - column data is always `COL_DATA_LEN` bytes at the tail of the record:
 //!   - `[col_start+0..+4]`:  ESE record header
 //!   - `[col_start+4..+8]`:  `AutoIncId` (u32 LE) → `auto_inc_id`
@@ -15,8 +15,8 @@ use srum_core::{ole_date_to_datetime, AppUsageRecord};
 
 use crate::SrumError;
 
-/// Column data is always 290 bytes at the tail, regardless of KEY_LEN variant.
-/// Verified across chainsaw (1660 records), rathbunvm_win10 (163), rathbunvm_win11 (791).
+/// Column data is always 290 bytes at the tail, regardless of `KEY_LEN` variant.
+/// Verified across chainsaw (1660 records), `rathbunvm_win10` (163), `rathbunvm_win11` (791).
 const COL_DATA_LEN: usize = 290;
 const COL_AUTO_INC_OFF: usize = 4;
 const COL_TIMESTAMP_OFF: usize = 8;
@@ -50,19 +50,31 @@ fn decode_real_ese(data: &[u8], page: u32, tag: usize) -> Result<AppUsageRecord,
 
     let ts_off = col_start + COL_TIMESTAMP_OFF;
     let timestamp_raw = f64::from_le_bytes([
-        data[ts_off], data[ts_off + 1], data[ts_off + 2], data[ts_off + 3],
-        data[ts_off + 4], data[ts_off + 5], data[ts_off + 6], data[ts_off + 7],
+        data[ts_off],
+        data[ts_off + 1],
+        data[ts_off + 2],
+        data[ts_off + 3],
+        data[ts_off + 4],
+        data[ts_off + 5],
+        data[ts_off + 6],
+        data[ts_off + 7],
     ]);
     let timestamp = ole_date_to_datetime(timestamp_raw);
 
     let app_off = col_start + COL_APP_ID_OFF;
     let app_id = i32::from_le_bytes([
-        data[app_off], data[app_off + 1], data[app_off + 2], data[app_off + 3],
+        data[app_off],
+        data[app_off + 1],
+        data[app_off + 2],
+        data[app_off + 3],
     ]);
 
     let usr_off = col_start + COL_USER_ID_OFF;
     let user_id = i32::from_le_bytes([
-        data[usr_off], data[usr_off + 1], data[usr_off + 2], data[usr_off + 3],
+        data[usr_off],
+        data[usr_off + 1],
+        data[usr_off + 2],
+        data[usr_off + 3],
     ]);
 
     Ok(AppUsageRecord {

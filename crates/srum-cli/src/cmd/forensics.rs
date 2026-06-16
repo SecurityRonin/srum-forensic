@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::output::{OutputFormat, values_to_csv};
+use crate::output::{values_to_csv, OutputFormat};
 
 /// Map a SRUM table GUID (or well-known name) to its friendly table name.
 fn guid_to_table_name(guid: &str) -> Option<&'static str> {
@@ -113,10 +113,8 @@ pub fn run_compare(
 ) -> anyhow::Result<()> {
     let id_map_baseline = resolve.then(|| srum_analysis::load_id_map(baseline));
     let id_map_suspect = resolve.then(|| srum_analysis::load_id_map(suspect));
-    let baseline_timeline =
-        srum_analysis::build_timeline(baseline, id_map_baseline.as_ref());
-    let suspect_timeline =
-        srum_analysis::build_timeline(suspect, id_map_suspect.as_ref());
+    let baseline_timeline = srum_analysis::build_timeline(baseline, id_map_baseline.as_ref());
+    let suspect_timeline = srum_analysis::build_timeline(suspect, id_map_suspect.as_ref());
     let baseline_stats = srum_analysis::analysis::build_stats(baseline_timeline);
     let suspect_stats = srum_analysis::analysis::build_stats(suspect_timeline);
     let result = srum_analysis::analysis::compare_databases(baseline_stats, suspect_stats);
@@ -129,7 +127,9 @@ pub fn run_compare(
             if let Some(arr) = result.get("new_processes").and_then(|v| v.as_array()) {
                 for r in arr {
                     let mut r = r.clone();
-                    r.as_object_mut().unwrap().insert("diff_type".into(), "new".into());
+                    r.as_object_mut()
+                        .unwrap()
+                        .insert("diff_type".into(), "new".into());
                     flat.push(r);
                 }
             }
@@ -168,4 +168,3 @@ pub fn run_metadata(path: &Path, format: &OutputFormat) -> anyhow::Result<()> {
     }
     Ok(())
 }
-

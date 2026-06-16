@@ -17,7 +17,7 @@ pub fn compare_databases(
             .map(str::to_owned)
             .unwrap_or_else(|| {
                 v.get("app_id")
-                    .and_then(|x| x.as_i64())
+                    .and_then(serde_json::Value::as_i64)
                     .map(|id| id.to_string())
                     .unwrap_or_default()
             })
@@ -44,10 +44,16 @@ pub fn compare_databases(
         if !suspect_map.contains_key(key) {
             let mut entry = serde_json::json!({});
             if let Some(id) = bv.get("app_id") {
-                entry.as_object_mut().unwrap().insert("app_id".into(), id.clone());
+                entry
+                    .as_object_mut()
+                    .unwrap()
+                    .insert("app_id".into(), id.clone());
             }
             if let Some(name) = bv.get("app_name") {
-                entry.as_object_mut().unwrap().insert("app_name".into(), name.clone());
+                entry
+                    .as_object_mut()
+                    .unwrap()
+                    .insert("app_name".into(), name.clone());
             }
             departed_processes.push(entry);
         }
@@ -59,12 +65,20 @@ pub fn compare_databases(
             let b_flags: Vec<String> = bv
                 .get("heuristic_flags")
                 .and_then(|f| f.as_array())
-                .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_owned)).collect())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_str().map(str::to_owned))
+                        .collect()
+                })
                 .unwrap_or_default();
             let s_flags: Vec<String> = sv
                 .get("heuristic_flags")
                 .and_then(|f| f.as_array())
-                .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_owned)).collect())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_str().map(str::to_owned))
+                        .collect()
+                })
                 .unwrap_or_default();
 
             let new_flags: Vec<&str> = s_flags
@@ -73,12 +87,24 @@ pub fn compare_databases(
                 .map(String::as_str)
                 .collect();
 
-            let b_bytes = bv.get("total_bytes_sent").and_then(|x| x.as_i64()).unwrap_or(0);
-            let s_bytes = sv.get("total_bytes_sent").and_then(|x| x.as_i64()).unwrap_or(0);
+            let b_bytes = bv
+                .get("total_bytes_sent")
+                .and_then(serde_json::Value::as_i64)
+                .unwrap_or(0);
+            let s_bytes = sv
+                .get("total_bytes_sent")
+                .and_then(serde_json::Value::as_i64)
+                .unwrap_or(0);
             let delta_bytes = s_bytes - b_bytes;
 
-            let b_bg = bv.get("total_background_cycles").and_then(|x| x.as_i64()).unwrap_or(0);
-            let s_bg = sv.get("total_background_cycles").and_then(|x| x.as_i64()).unwrap_or(0);
+            let b_bg = bv
+                .get("total_background_cycles")
+                .and_then(serde_json::Value::as_i64)
+                .unwrap_or(0);
+            let s_bg = sv
+                .get("total_background_cycles")
+                .and_then(serde_json::Value::as_i64)
+                .unwrap_or(0);
             let delta_bg = s_bg - b_bg;
 
             if !new_flags.is_empty() || delta_bytes != 0 || delta_bg != 0 {
@@ -88,10 +114,16 @@ pub fn compare_databases(
                     "delta_background_cycles": delta_bg,
                 });
                 if let Some(id) = sv.get("app_id") {
-                    entry.as_object_mut().unwrap().insert("app_id".into(), id.clone());
+                    entry
+                        .as_object_mut()
+                        .unwrap()
+                        .insert("app_id".into(), id.clone());
                 }
                 if let Some(name) = sv.get("app_name") {
-                    entry.as_object_mut().unwrap().insert("app_name".into(), name.clone());
+                    entry
+                        .as_object_mut()
+                        .unwrap()
+                        .insert("app_name".into(), name.clone());
                 }
                 changed.push(entry);
             }
@@ -100,8 +132,14 @@ pub fn compare_databases(
 
     // Sort each section by app_id for deterministic output.
     let sort_by_id = |a: &serde_json::Value, b: &serde_json::Value| {
-        let ia = a.get("app_id").and_then(|x| x.as_i64()).unwrap_or(0);
-        let ib = b.get("app_id").and_then(|x| x.as_i64()).unwrap_or(0);
+        let ia = a
+            .get("app_id")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0);
+        let ib = b
+            .get("app_id")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0);
         ia.cmp(&ib)
     };
     new_processes.sort_by(sort_by_id);

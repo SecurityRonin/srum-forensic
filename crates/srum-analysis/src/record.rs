@@ -3,15 +3,19 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {
-    Clean,           // lowest — declaration order is severity order
+    Clean, // lowest — declaration order is severity order
     Informational,
     Suspicious,
-    Critical,        // highest
+    Critical, // highest
 }
 
 impl Severity {
     pub fn max(self, other: Self) -> Self {
-        if self >= other { self } else { other }
+        if self >= other {
+            self
+        } else {
+            other
+        }
     }
 }
 
@@ -51,13 +55,15 @@ pub struct TemporalSpan {
     pub last: String,
 }
 
-
 impl FindingCard {
     /// Convert this triage card into a canonical [`forensicnomicon::report::Finding`],
     /// mapping the triage severity (`Clean`/`Informational`/`Suspicious`/`Critical`)
     /// onto the shared 5-level scale.
     #[must_use]
-    pub fn to_finding(&self, source: forensicnomicon::report::Source) -> forensicnomicon::report::Finding {
+    pub fn to_finding(
+        &self,
+        source: forensicnomicon::report::Source,
+    ) -> forensicnomicon::report::Finding {
         use forensicnomicon::report::{Category, ExternalRef, Finding, Severity as Canon};
         let severity = match self.severity {
             Severity::Clean => Canon::Info,
@@ -96,8 +102,14 @@ mod tests {
 
     #[test]
     fn severity_max_critical_wins() {
-        assert_eq!(Severity::Suspicious.max(Severity::Critical), Severity::Critical);
-        assert_eq!(Severity::Clean.max(Severity::Informational), Severity::Informational);
+        assert_eq!(
+            Severity::Suspicious.max(Severity::Critical),
+            Severity::Critical
+        );
+        assert_eq!(
+            Severity::Clean.max(Severity::Informational),
+            Severity::Informational
+        );
     }
 
     #[test]

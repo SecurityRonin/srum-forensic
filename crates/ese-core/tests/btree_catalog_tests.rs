@@ -1,8 +1,8 @@
-//! Tests for catalog_entries() following multi-page B-tree — Phase 1 stories 17–18.
+//! Tests for `catalog_entries()` following multi-page B-tree — Phase 1 stories 17–18.
 //!
-//! The catalog lives at page 5 (CATALOG_ROOT). When it spans multiple leaf
-//! pages (parent + leaves), catalog_entries() must walk all leaf pages via
-//! walk_leaf_pages(5).
+//! The catalog lives at page 5 (`CATALOG_ROOT`). When it spans multiple leaf
+//! pages (parent + leaves), `catalog_entries()` must walk all leaf pages via
+//! `walk_leaf_pages(5)`.
 
 mod fixtures;
 use ese_core::{CatalogEntry, EseDatabase};
@@ -11,9 +11,9 @@ use ese_test_fixtures::{EseFileBuilder, PageBuilder, PAGE_SIZE};
 /// Build an ESE file with a two-level catalog B-tree.
 ///
 /// Layout:
-/// - page 5 = parent page (CATALOG_ROOT), child ESE page refs = [5, 6]
-/// - page 6 = leaf with a single entry ("TableA")  (ESE page 5 → physical 6)
-/// - page 7 = leaf with a single entry ("TableB")  (ESE page 6 → physical 7)
+/// - page 5 = parent page (`CATALOG_ROOT`), child ESE page refs = [5, 6]
+/// - page 6 = leaf with a single entry ("`TableA`")  (ESE page 5 → physical 6)
+/// - page 7 = leaf with a single entry ("`TableB`")  (ESE page 6 → physical 7)
 fn make_two_page_catalog() -> (EseDatabase, tempfile::NamedTempFile) {
     let entry_a = CatalogEntry {
         object_type: 1,
@@ -45,9 +45,9 @@ fn make_two_page_catalog() -> (EseDatabase, tempfile::NamedTempFile) {
         .add_page(blank.clone()) // page 2
         .add_page(blank.clone()) // page 3
         .add_page(blank.clone()) // page 4
-        .add_page(parent)         // page 5 = catalog root (CATALOG_ROOT)
-        .add_page(leaf_a)         // page 6 = catalog leaf A (ESE page 5)
-        .add_page(leaf_b)         // page 7 = catalog leaf B (ESE page 6)
+        .add_page(parent) // page 5 = catalog root (CATALOG_ROOT)
+        .add_page(leaf_a) // page 6 = catalog leaf A (ESE page 5)
+        .add_page(leaf_b) // page 7 = catalog leaf B (ESE page 6)
         .write();
     let db = EseDatabase::open(tmp.path()).expect("open db");
     (db, tmp)

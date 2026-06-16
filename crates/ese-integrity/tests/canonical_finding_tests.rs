@@ -1,7 +1,7 @@
 //! ese-integrity structural anomalies normalize onto `forensicnomicon::report`.
 
-use forensicnomicon::report::{Observation, Source};
 use ese_integrity::EseStructuralAnomaly;
+use forensicnomicon::report::{Observation, Source};
 
 #[test]
 fn anomaly_converts_to_a_canonical_finding() {

@@ -54,10 +54,7 @@ pub fn detect_gaps(all: &[serde_json::Value], threshold_hours: u64) -> Vec<serde
     // Group gaps by (start, end) to determine system_off vs selective
     let mut gap_map: HashMap<(String, String), Vec<String>> = HashMap::new();
     for g in all_gaps {
-        gap_map
-            .entry((g.start, g.end))
-            .or_default()
-            .push(g.table);
+        gap_map.entry((g.start, g.end)).or_default().push(g.table);
     }
 
     let mut result: Vec<serde_json::Value> = Vec::new();

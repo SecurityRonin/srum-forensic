@@ -2,7 +2,7 @@
 //!
 //! **Real ESE raw-tag layout** (`cbCommonKeyPrefix | key_suffix | col_data`):
 //! - `[0..2]`:           `cbCommonKeyPrefix` (u16 LE)
-//! - `[2..2+(28-pfx)]`:  key suffix (KEY_LEN=28 for `{7ACBBAA3-…}`)
+//! - `[2..2+(28-pfx)]`:  key suffix (`KEY_LEN=28` for `{7ACBBAA3-…}`)
 //! - `col_start = 2 + (28 - cb_pfx)`:
 //!   - `[col_start+0..+4]`:  ESE record header (`07 80 …`)
 //!   - `[col_start+4..+8]`:  `AutoIncId` (i32 LE)

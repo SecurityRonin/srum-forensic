@@ -9,8 +9,8 @@
 //! absent (CI must download them first; see `tests/data/srudb/SOURCES.md`).
 //!
 //! Sources:
-//!   - chainsaw_SRUDB.dat — WithSecure Labs / Chainsaw test suite (Apache-2.0)
-//!   - plaso_SRUDB.dat   — log2timeline / Plaso regression test   (Apache-2.0)
+//!   - `chainsaw_SRUDB.dat` — `WithSecure` Labs / Chainsaw test suite (Apache-2.0)
+//!   - `plaso_SRUDB.dat`   — log2timeline / Plaso regression test   (Apache-2.0)
 
 use std::path::Path;
 
@@ -26,11 +26,15 @@ use srum_parser::{
 
 // ── fixture paths ─────────────────────────────────────────────────────────────
 
-const CHAINSAW: &str =
-    concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/data/srudb/chainsaw_SRUDB.dat");
+const CHAINSAW: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/chainsaw_SRUDB.dat"
+);
 
-const PLASO: &str =
-    concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/data/srudb/plaso_SRUDB.dat");
+const PLASO: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/data/srudb/plaso_SRUDB.dat"
+);
 
 const MUSEUM_RATHBUNVM_WIN10: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -91,7 +95,11 @@ fn chainsaw_srudb_has_expected_page_count() {
     let Some(p) = fixture(CHAINSAW) else { return };
     let db = EseDatabase::open(p).expect("open");
     // 1,835,008 bytes / 4096 bytes per page = 448 pages
-    assert_eq!(db.page_count(), 448, "chainsaw SRUDB.dat must have 448 pages");
+    assert_eq!(
+        db.page_count(),
+        448,
+        "chainsaw SRUDB.dat must have 448 pages"
+    );
 }
 
 #[test]
@@ -99,7 +107,11 @@ fn plaso_srudb_has_expected_page_count() {
     let Some(p) = fixture(PLASO) else { return };
     let db = EseDatabase::open(p).expect("open");
     // 7,864,320 bytes / 4096 bytes per page = 1920 pages
-    assert_eq!(db.page_count(), 1920, "plaso SRUDB.dat must have 1920 pages");
+    assert_eq!(
+        db.page_count(),
+        1920,
+        "plaso SRUDB.dat must have 1920 pages"
+    );
 }
 
 // ── catalog entries ───────────────────────────────────────────────────────────
@@ -174,7 +186,10 @@ fn chainsaw_srudb_network_records_have_plausible_fields() {
     );
     // At least one record should have non-zero byte counts.
     let has_traffic = records.iter().any(|r| r.bytes_sent > 0 || r.bytes_recv > 0);
-    assert!(has_traffic, "at least one network record must have non-zero byte counts");
+    assert!(
+        has_traffic,
+        "at least one network record must have non-zero byte counts"
+    );
 }
 
 // ── app resource usage parsing ────────────────────────────────────────────────
@@ -207,7 +222,10 @@ fn chainsaw_srudb_id_map_parses_without_panic() {
     // plaso noted an edge case: some SRUDB.dat files are missing IdBlob values.
     // We must not panic — either Ok(records) or Err is acceptable.
     let result = parse_id_map(p);
-    assert!(result.is_ok(), "parse_id_map must not return Err on chainsaw SRUDB.dat: {result:?}");
+    assert!(
+        result.is_ok(),
+        "parse_id_map must not return Err on chainsaw SRUDB.dat: {result:?}"
+    );
 }
 
 #[test]
@@ -253,16 +271,18 @@ fn chainsaw_srudb_timestamps_are_after_windows8_launch() {
 
 // ── catalog last-wins deduplication (rathbunvm files) ────────────────────────
 
-/// Real SRUDB.dat files from rathbunvm VMs contain two MSysObjects catalog
+/// Real SRUDB.dat files from rathbunvm VMs contain two `MSysObjects` catalog
 /// entries with the same GUID name `{5C8CF1C7-...}`:
-///   - first  (obj_id=12/15, page 48/64): empty placeholder page (tag_count=1)
-///   - second (obj_id=13/17, page 64/80): actual data B-tree root (tag_count>>1)
+///   - first  (`obj_id=12/15`, page 48/64): empty placeholder page (`tag_count=1`)
+///   - second (`obj_id=13/17`, page 64/80): actual data B-tree root (`tag_count>>1`)
 ///
 /// `catalog_entries()` must use last-wins deduplication so `find_table_page`
 /// resolves to the correct (second) entry, not the empty placeholder.
 #[test]
 fn rathbunvm_win10_app_usage_catalog_last_wins_deduplication() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else {
+        return;
+    };
     let db = EseDatabase::open(p).expect("open");
     let table_page = db
         .find_table_page("{5C8CF1C7-7257-4F13-B223-970EF5939312}")
@@ -276,7 +296,9 @@ fn rathbunvm_win10_app_usage_catalog_last_wins_deduplication() {
 
 #[test]
 fn rathbunvm_win10_app_usage_count_matches_dissect() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else {
+        return;
+    };
     let records = parse_app_usage(p).expect("parse_app_usage must not error");
     assert!(
         records.len() == 163,
@@ -287,7 +309,9 @@ fn rathbunvm_win10_app_usage_count_matches_dissect() {
 
 #[test]
 fn rathbunvm_win11_app_usage_count_matches_dissect() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else {
+        return;
+    };
     let records = parse_app_usage(p).expect("parse_app_usage must not error");
     assert!(
         records.len() == 791,
@@ -300,7 +324,9 @@ fn rathbunvm_win11_app_usage_count_matches_dissect() {
 
 #[test]
 fn rathbunvm_win10_idmap_count_matches_dissect() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else {
+        return;
+    };
     let entries = parse_id_map(p).expect("parse_id_map must not error");
     assert!(
         entries.len() == 288,
@@ -311,7 +337,9 @@ fn rathbunvm_win10_idmap_count_matches_dissect() {
 
 #[test]
 fn rathbunvm_win10_idmap_string_entry_has_correct_id_and_name() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else {
+        return;
+    };
     let entries = parse_id_map(p).expect("parse ok");
     let entry3 = entries.iter().find(|e| e.id == 3);
     assert!(entry3.is_some(), "must have entry with id=3");
@@ -326,7 +354,9 @@ fn rathbunvm_win10_idmap_string_entry_has_correct_id_and_name() {
 
 #[test]
 fn rathbunvm_win10_app_timeline_count_matches_dissect() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else {
+        return;
+    };
     let records = parse_app_timeline(p).expect("parse ok");
     assert!(
         records.len() == 4,
@@ -337,7 +367,9 @@ fn rathbunvm_win10_app_timeline_count_matches_dissect() {
 
 #[test]
 fn rathbunvm_win10_app_timeline_records_have_correct_app_id() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else {
+        return;
+    };
     let records = parse_app_timeline(p).expect("parse ok");
     assert!(!records.is_empty(), "must have at least one record");
     assert_eq!(
@@ -349,7 +381,9 @@ fn rathbunvm_win10_app_timeline_records_have_correct_app_id() {
 
 #[test]
 fn rathbunvm_win10_app_timeline_records_have_correct_user_id() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else {
+        return;
+    };
     let records = parse_app_timeline(p).expect("parse ok");
     assert!(!records.is_empty(), "must have at least one record");
     assert_eq!(
@@ -382,22 +416,26 @@ fn chainsaw_network_connectivity_parses_without_panic() {
     let Some(p) = fixture(CHAINSAW) else { return };
     let r = parse_network_connectivity(p);
     let records = r.expect("chainsaw: parse_network_connectivity must not error");
-    assert_eq!(records.len(), 6,
-        "chainsaw network_connectivity count must match dissect exactly: expected 6, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        6,
+        "chainsaw network_connectivity count must match dissect exactly: expected 6, got {}",
+        records.len()
+    );
 }
 
 #[test]
 fn chainsaw_energy_usage_parses_without_panic() {
     let Some(p) = fixture(CHAINSAW) else { return };
     let r = parse_energy_usage(p);
-    assert!(r.is_ok(), "chainsaw: parse_energy_usage failed: {:?}", r);
+    assert!(r.is_ok(), "chainsaw: parse_energy_usage failed: {r:?}");
 }
 
 #[test]
 fn chainsaw_energy_lt_parses_without_panic() {
     let Some(p) = fixture(CHAINSAW) else { return };
     let r = parse_energy_lt(p);
-    assert!(r.is_ok(), "chainsaw: parse_energy_lt failed: {:?}", r);
+    assert!(r.is_ok(), "chainsaw: parse_energy_lt failed: {r:?}");
 }
 
 #[test]
@@ -405,8 +443,12 @@ fn chainsaw_push_notifications_parses_without_panic() {
     let Some(p) = fixture(CHAINSAW) else { return };
     let r = parse_push_notifications(p);
     let records = r.expect("chainsaw: parse_push_notifications must not error");
-    assert_eq!(records.len(), 562,
-        "chainsaw push_notifications count must match dissect exactly: expected 562, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        562,
+        "chainsaw push_notifications count must match dissect exactly: expected 562, got {}",
+        records.len()
+    );
 }
 
 #[test]
@@ -414,8 +456,12 @@ fn chainsaw_app_timeline_parses_without_panic() {
     let Some(p) = fixture(CHAINSAW) else { return };
     let r = parse_app_timeline(p);
     let records = r.expect("chainsaw: parse_app_timeline must not error");
-    assert_eq!(records.len(), 26,
-        "chainsaw app_timeline count must match dissect exactly: expected 26, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        26,
+        "chainsaw app_timeline count must match dissect exactly: expected 26, got {}",
+        records.len()
+    );
 }
 
 #[test]
@@ -429,20 +475,29 @@ fn chainsaw_id_map_parses_non_empty() {
     );
 }
 
-
 // chainsaw: energy tables exist in catalog but contain 0 records (no battery hardware in VM)
 #[test]
 fn chainsaw_energy_usage_returns_empty() {
     let Some(p) = fixture(CHAINSAW) else { return };
     let r = parse_energy_usage(p).expect("chainsaw: parse_energy_usage must not error");
-    assert_eq!(r.len(), 0, "chainsaw energy_usage must be empty (dissect: 0), got {}", r.len());
+    assert_eq!(
+        r.len(),
+        0,
+        "chainsaw energy_usage must be empty (dissect: 0), got {}",
+        r.len()
+    );
 }
 
 #[test]
 fn chainsaw_energy_lt_returns_empty() {
     let Some(p) = fixture(CHAINSAW) else { return };
     let r = parse_energy_lt(p).expect("chainsaw: parse_energy_lt must not error");
-    assert_eq!(r.len(), 0, "chainsaw energy_lt must be empty (dissect: 0), got {}", r.len());
+    assert_eq!(
+        r.len(),
+        0,
+        "chainsaw energy_lt must be empty (dissect: 0), got {}",
+        r.len()
+    );
 }
 
 // ── plaso ─────────────────────────────────────────────────────────────────────
@@ -452,8 +507,12 @@ fn plaso_network_connectivity_parses_without_panic() {
     let Some(p) = fixture(PLASO) else { return };
     let r = parse_network_connectivity(p);
     let records = r.expect("plaso: parse_network_connectivity must not error");
-    assert_eq!(records.len(), 260,
-        "plaso network_connectivity count must match dissect exactly: expected 260, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        260,
+        "plaso network_connectivity count must match dissect exactly: expected 260, got {}",
+        records.len()
+    );
 }
 
 #[test]
@@ -461,8 +520,12 @@ fn plaso_energy_lt_parses_without_panic() {
     let Some(p) = fixture(PLASO) else { return };
     let r = parse_energy_lt(p);
     let records = r.expect("plaso: parse_energy_lt must not error");
-    assert_eq!(records.len(), 2,
-        "plaso energy_lt count must match dissect exactly: expected 2, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        2,
+        "plaso energy_lt count must match dissect exactly: expected 2, got {}",
+        records.len()
+    );
 }
 
 #[test]
@@ -470,8 +533,12 @@ fn plaso_push_notifications_parses_without_panic() {
     let Some(p) = fixture(PLASO) else { return };
     let r = parse_push_notifications(p);
     let records = r.expect("plaso: parse_push_notifications must not error");
-    assert_eq!(records.len(), 16183,
-        "plaso push_notifications count must match dissect exactly: expected 16183, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        16183,
+        "plaso push_notifications count must match dissect exactly: expected 16183, got {}",
+        records.len()
+    );
 }
 
 #[test]
@@ -485,12 +552,16 @@ fn plaso_id_map_parses_non_empty() {
     );
 }
 
-
 #[test]
 fn plaso_energy_usage_returns_empty() {
     let Some(p) = fixture(PLASO) else { return };
     let r = parse_energy_usage(p).expect("plaso: parse_energy_usage must not error");
-    assert_eq!(r.len(), 0, "plaso energy_usage must be empty (dissect: 0), got {}", r.len());
+    assert_eq!(
+        r.len(),
+        0,
+        "plaso energy_usage must be empty (dissect: 0), got {}",
+        r.len()
+    );
 }
 
 #[test]
@@ -498,68 +569,111 @@ fn plaso_app_timeline_returns_empty() {
     // AppTimeline table is absent from plaso SRUDB.dat; parser must return Ok([]).
     let Some(p) = fixture(PLASO) else { return };
     let r = parse_app_timeline(p).expect("plaso: parse_app_timeline must not error");
-    assert_eq!(r.len(), 0, "plaso app_timeline must be empty (ABSENT in catalog), got {}", r.len());
+    assert_eq!(
+        r.len(),
+        0,
+        "plaso app_timeline must be empty (ABSENT in catalog), got {}",
+        r.len()
+    );
 }
 
 // ── rathbunvm_win11 ───────────────────────────────────────────────────────────
 
 #[test]
 fn rathbunvm_win11_network_usage_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else {
+        return;
+    };
     let r = parse_network_usage(p);
     let records = r.expect("rathbunvm_win11: parse_network_usage must not error");
-    assert_eq!(records.len(), 143,
-        "rathbunvm_win11 network_usage count must match dissect exactly: expected 143, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        143,
+        "rathbunvm_win11 network_usage count must match dissect exactly: expected 143, got {}",
+        records.len()
+    );
 }
 
 #[test]
 fn rathbunvm_win11_network_connectivity_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else {
+        return;
+    };
     let r = parse_network_connectivity(p);
     let records = r.expect("rathbunvm_win11: parse_network_connectivity must not error");
-    assert_eq!(records.len(), 9,
-        "rathbunvm_win11 network_connectivity count must match dissect exactly: expected 9, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        9,
+        "rathbunvm_win11 network_connectivity count must match dissect exactly: expected 9, got {}",
+        records.len()
+    );
 }
 
 #[test]
 fn rathbunvm_win11_energy_usage_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else {
+        return;
+    };
     let r = parse_energy_usage(p);
     let records = r.expect("rathbunvm_win11: parse_energy_usage must not error");
-    assert_eq!(records.len(), 13,
-        "rathbunvm_win11 energy_usage count must match dissect exactly: expected 13, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        13,
+        "rathbunvm_win11 energy_usage count must match dissect exactly: expected 13, got {}",
+        records.len()
+    );
 }
 
 #[test]
 fn rathbunvm_win11_energy_lt_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else {
+        return;
+    };
     let r = parse_energy_lt(p);
     let records = r.expect("rathbunvm_win11: parse_energy_lt must not error");
-    assert_eq!(records.len(), 2,
-        "rathbunvm_win11 energy_lt count must match dissect exactly: expected 2, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        2,
+        "rathbunvm_win11 energy_lt count must match dissect exactly: expected 2, got {}",
+        records.len()
+    );
 }
 
 #[test]
 fn rathbunvm_win11_push_notifications_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else {
+        return;
+    };
     let r = parse_push_notifications(p);
     let records = r.expect("rathbunvm_win11: parse_push_notifications must not error");
-    assert_eq!(records.len(), 662,
-        "rathbunvm_win11 push_notifications count must match dissect exactly: expected 662, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        662,
+        "rathbunvm_win11 push_notifications count must match dissect exactly: expected 662, got {}",
+        records.len()
+    );
 }
 
 #[test]
 fn rathbunvm_win11_app_timeline_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else {
+        return;
+    };
     let r = parse_app_timeline(p);
     let records = r.expect("rathbunvm_win11: parse_app_timeline must not error");
-    assert_eq!(records.len(), 33,
-        "rathbunvm_win11 app_timeline count must match dissect exactly: expected 33, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        33,
+        "rathbunvm_win11 app_timeline count must match dissect exactly: expected 33, got {}",
+        records.len()
+    );
 }
 
 #[test]
 fn rathbunvm_win11_id_map_parses_non_empty() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else {
+        return;
+    };
     let entries = parse_id_map(p).expect("rathbunvm_win11: parse_id_map must not error");
     assert!(
         entries.len() == 1044,
@@ -572,84 +686,133 @@ fn rathbunvm_win11_id_map_parses_non_empty() {
 
 #[test]
 fn rathbunvm_win10_network_usage_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else {
+        return;
+    };
     let r = parse_network_usage(p);
     let records = r.expect("rathbunvm_win10: parse_network_usage must not error");
-    assert_eq!(records.len(), 23,
-        "rathbunvm_win10 network_usage count must match dissect exactly: expected 23, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        23,
+        "rathbunvm_win10 network_usage count must match dissect exactly: expected 23, got {}",
+        records.len()
+    );
 }
 
 #[test]
 fn rathbunvm_win10_network_connectivity_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else {
+        return;
+    };
     let r = parse_network_connectivity(p);
     let records = r.expect("rathbunvm_win10: parse_network_connectivity must not error");
-    assert_eq!(records.len(), 1,
-        "rathbunvm_win10 network_connectivity count must match dissect exactly: expected 1, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        1,
+        "rathbunvm_win10 network_connectivity count must match dissect exactly: expected 1, got {}",
+        records.len()
+    );
 }
 
 #[test]
 fn rathbunvm_win10_push_notifications_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else {
+        return;
+    };
     let r = parse_push_notifications(p);
     let records = r.expect("rathbunvm_win10: parse_push_notifications must not error");
-    assert_eq!(records.len(), 118,
-        "rathbunvm_win10 push_notifications count must match dissect exactly: expected 118, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        118,
+        "rathbunvm_win10 push_notifications count must match dissect exactly: expected 118, got {}",
+        records.len()
+    );
 }
-
 
 #[test]
 fn rathbunvm_win10_energy_usage_returns_empty() {
     // Energy table is absent from rathbunvm Win10 SRUDB.dat; parser must return Ok([]).
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else {
+        return;
+    };
     let r = parse_energy_usage(p).expect("rathbunvm_win10: parse_energy_usage must not error");
-    assert_eq!(r.len(), 0, "rathbunvm_win10 energy_usage must be empty (ABSENT in catalog), got {}", r.len());
+    assert_eq!(
+        r.len(),
+        0,
+        "rathbunvm_win10 energy_usage must be empty (ABSENT in catalog), got {}",
+        r.len()
+    );
 }
 
 #[test]
 fn rathbunvm_win10_energy_lt_returns_empty() {
     // EnergyLT table is absent from rathbunvm Win10 SRUDB.dat; parser must return Ok([]).
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else {
+        return;
+    };
     let r = parse_energy_lt(p).expect("rathbunvm_win10: parse_energy_lt must not error");
-    assert_eq!(r.len(), 0, "rathbunvm_win10 energy_lt must be empty (ABSENT in catalog), got {}", r.len());
+    assert_eq!(
+        r.len(),
+        0,
+        "rathbunvm_win10 energy_lt must be empty (ABSENT in catalog), got {}",
+        r.len()
+    );
 }
 
 // ── belkasoftctf_win10 ────────────────────────────────────────────────────────
 
 #[test]
 fn belkasoftctf_win10_opens_without_error() {
-    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else {
+        return;
+    };
     EseDatabase::open(p).expect("belkasoftctf_win10: EseDatabase::open must succeed");
 }
 
 #[test]
 fn belkasoftctf_win10_catalog_has_core_srum_tables() {
-    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else {
+        return;
+    };
     let db = EseDatabase::open(p).expect("open");
     assert_catalog_has_core_srum_tables(&db, "belkasoftctf_win10");
 }
 
 #[test]
 fn belkasoftctf_win10_network_usage_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else {
+        return;
+    };
     let r = parse_network_usage(p);
     let records = r.expect("belkasoftctf_win10: parse_network_usage must not error");
-    assert_eq!(records.len(), 465,
-        "belkasoftctf_win10 network_usage count must match dissect exactly: expected 465, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        465,
+        "belkasoftctf_win10 network_usage count must match dissect exactly: expected 465, got {}",
+        records.len()
+    );
 }
 
 #[test]
 fn belkasoftctf_win10_app_usage_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else {
+        return;
+    };
     let r = parse_app_usage(p);
     let records = r.expect("belkasoftctf_win10: parse_app_usage must not error");
-    assert_eq!(records.len(), 4107,
-        "belkasoftctf_win10 app_usage count must match dissect exactly: expected 4107, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        4107,
+        "belkasoftctf_win10 app_usage count must match dissect exactly: expected 4107, got {}",
+        records.len()
+    );
 }
 
 #[test]
 fn belkasoftctf_win10_network_connectivity_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else {
+        return;
+    };
     let r = parse_network_connectivity(p);
     let records = r.expect("belkasoftctf_win10: parse_network_connectivity must not error");
     assert_eq!(records.len(), 50,
@@ -658,23 +821,36 @@ fn belkasoftctf_win10_network_connectivity_parses_without_panic() {
 
 #[test]
 fn belkasoftctf_win10_energy_usage_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else {
+        return;
+    };
     let r = parse_energy_usage(p);
-    assert!(r.is_ok(), "belkasoftctf_win10: parse_energy_usage failed: {:?}", r);
+    assert!(
+        r.is_ok(),
+        "belkasoftctf_win10: parse_energy_usage failed: {r:?}"
+    );
 }
 
 #[test]
 fn belkasoftctf_win10_energy_lt_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else {
+        return;
+    };
     let r = parse_energy_lt(p);
     let records = r.expect("belkasoftctf_win10: parse_energy_lt must not error");
-    assert_eq!(records.len(), 1,
-        "belkasoftctf_win10 energy_lt count must match dissect exactly: expected 1, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        1,
+        "belkasoftctf_win10 energy_lt count must match dissect exactly: expected 1, got {}",
+        records.len()
+    );
 }
 
 #[test]
 fn belkasoftctf_win10_push_notifications_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else {
+        return;
+    };
     let r = parse_push_notifications(p);
     let records = r.expect("belkasoftctf_win10: parse_push_notifications must not error");
     assert_eq!(records.len(), 2087,
@@ -683,16 +859,24 @@ fn belkasoftctf_win10_push_notifications_parses_without_panic() {
 
 #[test]
 fn belkasoftctf_win10_app_timeline_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else {
+        return;
+    };
     let r = parse_app_timeline(p);
     let records = r.expect("belkasoftctf_win10: parse_app_timeline must not error");
-    assert_eq!(records.len(), 101,
-        "belkasoftctf_win10 app_timeline count must match dissect exactly: expected 101, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        101,
+        "belkasoftctf_win10 app_timeline count must match dissect exactly: expected 101, got {}",
+        records.len()
+    );
 }
 
 #[test]
 fn belkasoftctf_win10_id_map_parses_non_empty() {
-    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_BELKASOFTCTF_WIN10) else {
+        return;
+    };
     let entries = parse_id_map(p).expect("belkasoftctf_win10: parse_id_map must not error");
     assert!(
         entries.len() == 476,
@@ -707,33 +891,81 @@ fn belkasoftctf_win10_id_map_parses_non_empty() {
 
 #[test]
 fn aptvm_server2022_clean_opens_without_error() {
-    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_CLEAN) else { return };
+    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_CLEAN) else {
+        return;
+    };
     EseDatabase::open(p).expect("aptvm_clean: EseDatabase::open must succeed");
 }
 
 #[test]
 fn aptvm_server2022_clean_all_parsers_return_ok() {
-    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_CLEAN) else { return };
-    assert!(parse_network_usage(p).is_ok(),          "aptvm_clean: parse_network_usage failed");
-    assert!(parse_app_usage(p).is_ok(),               "aptvm_clean: parse_app_usage failed");
-    assert!(parse_network_connectivity(p).is_ok(),    "aptvm_clean: parse_network_connectivity failed");
-    assert!(parse_energy_usage(p).is_ok(),            "aptvm_clean: parse_energy_usage failed");
-    assert!(parse_energy_lt(p).is_ok(),               "aptvm_clean: parse_energy_lt failed");
-    assert!(parse_push_notifications(p).is_ok(),      "aptvm_clean: parse_push_notifications failed");
-    assert!(parse_app_timeline(p).is_ok(),            "aptvm_clean: parse_app_timeline failed");
-    assert!(parse_id_map(p).is_ok(),                  "aptvm_clean: parse_id_map failed");
+    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_CLEAN) else {
+        return;
+    };
+    assert!(
+        parse_network_usage(p).is_ok(),
+        "aptvm_clean: parse_network_usage failed"
+    );
+    assert!(
+        parse_app_usage(p).is_ok(),
+        "aptvm_clean: parse_app_usage failed"
+    );
+    assert!(
+        parse_network_connectivity(p).is_ok(),
+        "aptvm_clean: parse_network_connectivity failed"
+    );
+    assert!(
+        parse_energy_usage(p).is_ok(),
+        "aptvm_clean: parse_energy_usage failed"
+    );
+    assert!(
+        parse_energy_lt(p).is_ok(),
+        "aptvm_clean: parse_energy_lt failed"
+    );
+    assert!(
+        parse_push_notifications(p).is_ok(),
+        "aptvm_clean: parse_push_notifications failed"
+    );
+    assert!(
+        parse_app_timeline(p).is_ok(),
+        "aptvm_clean: parse_app_timeline failed"
+    );
+    assert!(parse_id_map(p).is_ok(), "aptvm_clean: parse_id_map failed");
 }
 
 #[test]
 fn aptvm_server2022_clean_absent_tables_return_empty() {
-    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_CLEAN) else { return };
-    assert!(parse_network_usage(p).unwrap().is_empty(),       "aptvm_clean: network_usage should be empty (ABSENT)");
-    assert!(parse_app_usage(p).unwrap().is_empty(),            "aptvm_clean: app_usage should be empty (ABSENT)");
-    assert!(parse_network_connectivity(p).unwrap().is_empty(), "aptvm_clean: network_connectivity should be empty (ABSENT)");
-    assert!(parse_energy_usage(p).unwrap().is_empty(),         "aptvm_clean: energy_usage should be empty (ABSENT)");
-    assert!(parse_energy_lt(p).unwrap().is_empty(),            "aptvm_clean: energy_lt should be empty (ABSENT)");
-    assert!(parse_push_notifications(p).unwrap().is_empty(),   "aptvm_clean: push_notifications should be empty (ABSENT)");
-    assert!(parse_app_timeline(p).unwrap().is_empty(),         "aptvm_clean: app_timeline should be empty (ABSENT)");
+    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_CLEAN) else {
+        return;
+    };
+    assert!(
+        parse_network_usage(p).unwrap().is_empty(),
+        "aptvm_clean: network_usage should be empty (ABSENT)"
+    );
+    assert!(
+        parse_app_usage(p).unwrap().is_empty(),
+        "aptvm_clean: app_usage should be empty (ABSENT)"
+    );
+    assert!(
+        parse_network_connectivity(p).unwrap().is_empty(),
+        "aptvm_clean: network_connectivity should be empty (ABSENT)"
+    );
+    assert!(
+        parse_energy_usage(p).unwrap().is_empty(),
+        "aptvm_clean: energy_usage should be empty (ABSENT)"
+    );
+    assert!(
+        parse_energy_lt(p).unwrap().is_empty(),
+        "aptvm_clean: energy_lt should be empty (ABSENT)"
+    );
+    assert!(
+        parse_push_notifications(p).unwrap().is_empty(),
+        "aptvm_clean: push_notifications should be empty (ABSENT)"
+    );
+    assert!(
+        parse_app_timeline(p).unwrap().is_empty(),
+        "aptvm_clean: app_timeline should be empty (ABSENT)"
+    );
 }
 
 // ── aptvm_server2022_1daylater ────────────────────────────────────────────────
@@ -741,44 +973,86 @@ fn aptvm_server2022_clean_absent_tables_return_empty() {
 
 #[test]
 fn aptvm_server2022_1daylater_opens_without_error() {
-    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else { return };
+    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else {
+        return;
+    };
     EseDatabase::open(p).expect("aptvm_1daylater: EseDatabase::open must succeed");
 }
 
 #[test]
 fn aptvm_server2022_1daylater_all_parsers_return_ok() {
-    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else { return };
-    assert!(parse_network_usage(p).is_ok(),          "aptvm_1daylater: parse_network_usage failed");
-    assert!(parse_app_usage(p).is_ok(),               "aptvm_1daylater: parse_app_usage failed");
-    assert!(parse_network_connectivity(p).is_ok(),    "aptvm_1daylater: parse_network_connectivity failed");
-    assert!(parse_energy_usage(p).is_ok(),            "aptvm_1daylater: parse_energy_usage failed");
-    assert!(parse_energy_lt(p).is_ok(),               "aptvm_1daylater: parse_energy_lt failed");
-    assert!(parse_push_notifications(p).is_ok(),      "aptvm_1daylater: parse_push_notifications failed");
-    assert!(parse_app_timeline(p).is_ok(),            "aptvm_1daylater: parse_app_timeline failed");
-    assert!(parse_id_map(p).is_ok(),                  "aptvm_1daylater: parse_id_map failed");
+    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else {
+        return;
+    };
+    assert!(
+        parse_network_usage(p).is_ok(),
+        "aptvm_1daylater: parse_network_usage failed"
+    );
+    assert!(
+        parse_app_usage(p).is_ok(),
+        "aptvm_1daylater: parse_app_usage failed"
+    );
+    assert!(
+        parse_network_connectivity(p).is_ok(),
+        "aptvm_1daylater: parse_network_connectivity failed"
+    );
+    assert!(
+        parse_energy_usage(p).is_ok(),
+        "aptvm_1daylater: parse_energy_usage failed"
+    );
+    assert!(
+        parse_energy_lt(p).is_ok(),
+        "aptvm_1daylater: parse_energy_lt failed"
+    );
+    assert!(
+        parse_push_notifications(p).is_ok(),
+        "aptvm_1daylater: parse_push_notifications failed"
+    );
+    assert!(
+        parse_app_timeline(p).is_ok(),
+        "aptvm_1daylater: parse_app_timeline failed"
+    );
+    assert!(
+        parse_id_map(p).is_ok(),
+        "aptvm_1daylater: parse_id_map failed"
+    );
 }
 
 #[test]
 fn aptvm_server2022_1daylater_network_connectivity_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else { return };
+    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else {
+        return;
+    };
     let r = parse_network_connectivity(p);
     let records = r.expect("aptvm_1daylater: parse_network_connectivity must not error");
-    assert_eq!(records.len(), 4,
-        "aptvm_1daylater network_connectivity count must match dissect exactly: expected 4, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        4,
+        "aptvm_1daylater network_connectivity count must match dissect exactly: expected 4, got {}",
+        records.len()
+    );
 }
 
 #[test]
 fn aptvm_server2022_1daylater_push_notifications_parses_without_panic() {
-    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else { return };
+    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else {
+        return;
+    };
     let r = parse_push_notifications(p);
     let records = r.expect("aptvm_1daylater: parse_push_notifications must not error");
-    assert_eq!(records.len(), 153,
-        "aptvm_1daylater push_notifications count must match dissect exactly: expected 153, got {}", records.len());
+    assert_eq!(
+        records.len(),
+        153,
+        "aptvm_1daylater push_notifications count must match dissect exactly: expected 153, got {}",
+        records.len()
+    );
 }
 
 #[test]
 fn aptvm_server2022_1daylater_id_map_parses_non_empty() {
-    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else { return };
+    let Some(p) = fixture(MUSEUM_APTVM_SERVER2022_1DAYLATER) else {
+        return;
+    };
     let entries = parse_id_map(p).expect("aptvm_1daylater: parse_id_map must not error");
     assert!(
         entries.len() == 96,
@@ -798,8 +1072,10 @@ fn diag_dump_chainsaw_catalog() {
         Ok(entries) => {
             eprintln!("catalog_entries: {} total", entries.len());
             for e in entries.iter().take(30) {
-                eprintln!("  type={} id={} parent={} tpage={} name={:?}",
-                    e.object_type, e.object_id, e.parent_object_id, e.table_page, e.object_name);
+                eprintln!(
+                    "  type={} id={} parent={} tpage={} name={:?}",
+                    e.object_type, e.object_id, e.parent_object_id, e.table_page, e.object_name
+                );
             }
         }
         Err(e) => eprintln!("catalog_entries ERROR: {e}"),
@@ -809,7 +1085,7 @@ fn diag_dump_chainsaw_catalog() {
 
 // ── detect_autoinc_gaps: real fixture integration ─────────────────────────────
 
-/// chainsaw APT-simulation dataset has 0 AutoIncId gaps in app_usage —
+/// chainsaw APT-simulation dataset has 0 `AutoIncId` gaps in `app_usage` —
 /// selective record deletion, a classic anti-forensics indicator.
 /// Verified 2026-05-20 against ese-integrity::detect_autoinc_gaps.
 #[test]
@@ -819,20 +1095,24 @@ fn chainsaw_app_usage_autoinc_has_no_gaps() {
     let records = parse_app_usage(p).expect("parse_app_usage");
     let ids: Vec<i32> = records.iter().map(|r| r.auto_inc_id as i32).collect();
     assert_eq!(
-        detect_autoinc_gaps(&ids).len(), 0,
+        detect_autoinc_gaps(&ids).len(),
+        0,
         "chainsaw app_usage must show no AutoIncId gaps (dissect confirms 1..1660 contiguous)"
     );
 }
 
-/// rathbunvm_win10 is a clean VM with no selective deletions.
+/// `rathbunvm_win10` is a clean VM with no selective deletions.
 #[test]
 fn rathbunvm_win10_app_usage_autoinc_has_no_gaps() {
     use ese_integrity::detect_autoinc_gaps;
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else {
+        return;
+    };
     let records = parse_app_usage(p).expect("parse_app_usage");
     let ids: Vec<i32> = records.iter().map(|r| r.auto_inc_id as i32).collect();
     assert_eq!(
-        detect_autoinc_gaps(&ids).len(), 0,
+        detect_autoinc_gaps(&ids).len(),
+        0,
         "rathbunvm_win10 app_usage must have no AutoIncId gaps"
     );
 }
@@ -841,56 +1121,80 @@ fn rathbunvm_win10_app_usage_autoinc_has_no_gaps() {
 
 // ── ID resolution accuracy ────────────────────────────────────────────────────
 
-/// app_id=154 in rathbunvm_win10 (seen in AppTimeline rec[0]) resolves to "C127"
-/// via IdMap. Verified 2026-05-20 against dissect.esedb 3.18 (IdType=0, blob_len=10).
+/// `app_id=154` in `rathbunvm_win10` (seen in `AppTimeline` rec[0]) resolves to "C127"
+/// via `IdMap`. Verified 2026-05-20 against dissect.esedb 3.18 (IdType=0, `blob_len=10`).
 #[test]
 fn rathbunvm_win10_app_id_154_resolves_to_c127() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else {
+        return;
+    };
     let id_map = parse_id_map(p).expect("parse_id_map");
-    let entry = id_map.iter().find(|e| e.id == 154)
+    let entry = id_map
+        .iter()
+        .find(|e| e.id == 154)
         .expect("app_id=154 must exist in rathbunvm_win10 IdMap");
-    assert_eq!(entry.name, "C127",
-        "app_id=154 must resolve to 'C127' (dissect-verified)");
+    assert_eq!(
+        entry.name, "C127",
+        "app_id=154 must resolve to 'C127' (dissect-verified)"
+    );
 }
 
-/// id=1 in rathbunvm_win10 IdMap is a system entry with no name blob (IdType=0, blob_len=0).
+/// id=1 in `rathbunvm_win10` `IdMap` is a system entry with no name blob (IdType=0, `blob_len=0`).
 #[test]
 fn rathbunvm_win10_system_id_1_has_empty_name() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN10) else {
+        return;
+    };
     let id_map = parse_id_map(p).expect("parse_id_map");
-    let entry = id_map.iter().find(|e| e.id == 1)
+    let entry = id_map
+        .iter()
+        .find(|e| e.id == 1)
         .expect("id=1 must exist in rathbunvm_win10 IdMap");
-    assert!(entry.name.is_empty(),
-        "id=1 system entry must have empty name blob (dissect-verified)");
+    assert!(
+        entry.name.is_empty(),
+        "id=1 system entry must have empty name blob (dissect-verified)"
+    );
 }
 
-/// Dissect ground truth (chainsaw, rec[0]): auto_inc_id=94, app_id=88, user_id=6.
-/// The current synthetic decoder reads data[8..12] as app_id — wrong for real ESE.
+/// Dissect ground truth (chainsaw, rec[0]): `auto_inc_id=94`, `app_id=88`, `user_id=6`.
+/// The current synthetic decoder reads data[8..12] as `app_id` — wrong for real ESE.
 #[test]
 fn chainsaw_app_usage_first_record_fields_match_dissect() {
     let Some(p) = fixture(CHAINSAW) else { return };
     let records = parse_app_usage(p).expect("parse_app_usage");
     assert!(!records.is_empty(), "chainsaw must have app_usage records");
     let r = &records[0];
-    assert_eq!(r.auto_inc_id, 94, "app_usage rec[0] auto_inc_id (dissect=94)");
+    assert_eq!(
+        r.auto_inc_id, 94,
+        "app_usage rec[0] auto_inc_id (dissect=94)"
+    );
     assert_eq!(r.app_id, 88, "app_usage rec[0] app_id (dissect=88)");
     assert_eq!(r.user_id, 6, "app_usage rec[0] user_id (dissect=6)");
 }
 
-/// Dissect ground truth (chainsaw, rec[0]): app_id=1, user_id=2, connected_time=66, profile_id=0.
+/// Dissect ground truth (chainsaw, rec[0]): `app_id=1`, `user_id=2`, `connected_time=66`, `profile_id=0`.
 #[test]
 fn chainsaw_connectivity_first_record_fields_match_dissect() {
     let Some(p) = fixture(CHAINSAW) else { return };
     let records = parse_network_connectivity(p).expect("parse_network_connectivity");
-    assert!(!records.is_empty(), "chainsaw must have connectivity records");
+    assert!(
+        !records.is_empty(),
+        "chainsaw must have connectivity records"
+    );
     let r = &records[0];
     assert_eq!(r.app_id, 1, "connectivity rec[0] app_id (dissect=1)");
     assert_eq!(r.user_id, 2, "connectivity rec[0] user_id (dissect=2)");
-    assert_eq!(r.connected_time, 66, "connectivity rec[0] connected_time (dissect=66)");
-    assert_eq!(r.profile_id, 0, "connectivity rec[0] profile_id (dissect=0)");
+    assert_eq!(
+        r.connected_time, 66,
+        "connectivity rec[0] connected_time (dissect=66)"
+    );
+    assert_eq!(
+        r.profile_id, 0,
+        "connectivity rec[0] profile_id (dissect=0)"
+    );
 }
 
-/// Dissect ground truth (chainsaw, rec[0]): app_id=96, user_id=306, fg_cycles=8046669904, bg_cycles=0.
+/// Dissect ground truth (chainsaw, rec[0]): `app_id=96`, `user_id=306`, `fg_cycles=8046669904`, `bg_cycles=0`.
 #[test]
 fn chainsaw_push_first_record_fields_match_dissect() {
     let Some(p) = fixture(CHAINSAW) else { return };
@@ -899,16 +1203,27 @@ fn chainsaw_push_first_record_fields_match_dissect() {
     let r = &records[0];
     assert_eq!(r.app_id, 96, "push rec[0] app_id (dissect=96)");
     assert_eq!(r.user_id, 306, "push rec[0] user_id (dissect=306)");
-    assert_eq!(r.foreground_cycle_time, 8_046_669_904, "push rec[0] foreground_cycle_time (dissect=8046669904)");
-    assert_eq!(r.background_cycle_time, 0, "push rec[0] background_cycle_time (dissect=0)");
+    assert_eq!(
+        r.foreground_cycle_time, 8_046_669_904,
+        "push rec[0] foreground_cycle_time (dissect=8046669904)"
+    );
+    assert_eq!(
+        r.background_cycle_time, 0,
+        "push rec[0] background_cycle_time (dissect=0)"
+    );
 }
 
-/// Dissect ground truth (rathbunvm_win11, rec[0]): auto_inc_id=3, app_id=1, user_id=2.
+/// Dissect ground truth (`rathbunvm_win11`, rec[0]): `auto_inc_id=3`, `app_id=1`, `user_id=2`.
 #[test]
 fn rathbunvm_win11_energy_first_record_fields_match_dissect() {
-    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else { return };
+    let Some(p) = fixture(MUSEUM_RATHBUNVM_WIN11) else {
+        return;
+    };
     let records = parse_energy_usage(p).expect("parse_energy_usage");
-    assert!(!records.is_empty(), "rathbunvm_win11 must have energy records");
+    assert!(
+        !records.is_empty(),
+        "rathbunvm_win11 must have energy records"
+    );
     let r = &records[0];
     assert_eq!(r.auto_inc_id, 3, "energy rec[0] auto_inc_id (dissect=3)");
     assert_eq!(r.app_id, 1, "energy rec[0] app_id (dissect=1)");

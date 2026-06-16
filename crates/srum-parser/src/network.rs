@@ -17,7 +17,7 @@ use srum_core::{ole_date_to_datetime, NetworkUsageRecord};
 
 use crate::SrumError;
 
-/// ESE network table total key length (verified across 96 records in chainsaw_SRUDB.dat).
+/// ESE network table total key length (verified across 96 records in `chainsaw_SRUDB.dat`).
 const ESE_KEY_LEN: usize = 16;
 
 pub fn decode_network_record(
@@ -52,25 +52,52 @@ pub fn decode_network_record(
     }
 
     let auto_inc_id = u32::from_le_bytes([
-        data[col_start + 4], data[col_start + 5], data[col_start + 6], data[col_start + 7],
+        data[col_start + 4],
+        data[col_start + 5],
+        data[col_start + 6],
+        data[col_start + 7],
     ]);
     let ole_date = f64::from_le_bytes([
-        data[col_start + 8],  data[col_start + 9],  data[col_start + 10], data[col_start + 11],
-        data[col_start + 12], data[col_start + 13], data[col_start + 14], data[col_start + 15],
+        data[col_start + 8],
+        data[col_start + 9],
+        data[col_start + 10],
+        data[col_start + 11],
+        data[col_start + 12],
+        data[col_start + 13],
+        data[col_start + 14],
+        data[col_start + 15],
     ]);
     let app_id = i32::from_le_bytes([
-        data[col_start + 16], data[col_start + 17], data[col_start + 18], data[col_start + 19],
+        data[col_start + 16],
+        data[col_start + 17],
+        data[col_start + 18],
+        data[col_start + 19],
     ]);
     let user_id = i32::from_le_bytes([
-        data[col_start + 20], data[col_start + 21], data[col_start + 22], data[col_start + 23],
+        data[col_start + 20],
+        data[col_start + 21],
+        data[col_start + 22],
+        data[col_start + 23],
     ]);
     let bytes_sent = u64::from_le_bytes([
-        data[col_start + 40], data[col_start + 41], data[col_start + 42], data[col_start + 43],
-        data[col_start + 44], data[col_start + 45], data[col_start + 46], data[col_start + 47],
+        data[col_start + 40],
+        data[col_start + 41],
+        data[col_start + 42],
+        data[col_start + 43],
+        data[col_start + 44],
+        data[col_start + 45],
+        data[col_start + 46],
+        data[col_start + 47],
     ]);
     let bytes_recv = u64::from_le_bytes([
-        data[col_start + 48], data[col_start + 49], data[col_start + 50], data[col_start + 51],
-        data[col_start + 52], data[col_start + 53], data[col_start + 54], data[col_start + 55],
+        data[col_start + 48],
+        data[col_start + 49],
+        data[col_start + 50],
+        data[col_start + 51],
+        data[col_start + 52],
+        data[col_start + 53],
+        data[col_start + 54],
+        data[col_start + 55],
     ]);
 
     Ok(NetworkUsageRecord {

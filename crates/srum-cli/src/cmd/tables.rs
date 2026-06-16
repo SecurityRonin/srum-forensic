@@ -1,12 +1,15 @@
 use std::path::Path;
 
-use crate::output::{OutputFormat, print_values};
+use crate::output::{print_values, OutputFormat};
 
 pub fn run_network(path: &Path, resolve: bool, format: &OutputFormat) -> anyhow::Result<()> {
     let records = srum_parser::parse_network_usage(path)?;
     let values: Vec<serde_json::Value> = if resolve {
         let id_map = srum_analysis::load_id_map(path);
-        records.into_iter().map(|r| srum_analysis::enrich(r, &id_map)).collect()
+        records
+            .into_iter()
+            .map(|r| srum_analysis::enrich(r, &id_map))
+            .collect()
     } else {
         srum_analysis::records_to_values(records)?
     };
@@ -17,17 +20,17 @@ pub fn run_apps(path: &Path, resolve: bool, format: &OutputFormat) -> anyhow::Re
     let records = srum_parser::parse_app_usage(path)?;
     let mut values: Vec<serde_json::Value> = if resolve {
         let id_map = srum_analysis::load_id_map(path);
-        records.into_iter().map(|r| srum_analysis::enrich(r, &id_map)).collect()
+        records
+            .into_iter()
+            .map(|r| srum_analysis::enrich(r, &id_map))
+            .collect()
     } else {
         srum_analysis::records_to_values(records)?
     };
     // Inject source_table before merging focus so pipeline can identify rows correctly.
     for v in &mut values {
         if let Some(obj) = v.as_object_mut() {
-            obj.insert(
-                srum_analysis::pipeline::TABLE_KEY.to_owned(),
-                "apps".into(),
-            );
+            obj.insert(srum_analysis::pipeline::TABLE_KEY.to_owned(), "apps".into());
         }
     }
     let focus_values: Vec<serde_json::Value> = srum_parser::parse_app_timeline(path)
@@ -63,7 +66,10 @@ pub fn run_energy(path: &Path, resolve: bool, format: &OutputFormat) -> anyhow::
     let mut values = srum_analysis::records_to_values(records)?;
     if resolve {
         let id_map = srum_analysis::load_id_map(path);
-        values = values.into_iter().map(|r| srum_analysis::enrich(r, &id_map)).collect();
+        values = values
+            .into_iter()
+            .map(|r| srum_analysis::enrich(r, &id_map))
+            .collect();
     }
     print_values(&values, format)
 }
@@ -73,7 +79,10 @@ pub fn run_energy_lt(path: &Path, resolve: bool, format: &OutputFormat) -> anyho
     let mut values = srum_analysis::records_to_values(records)?;
     if resolve {
         let id_map = srum_analysis::load_id_map(path);
-        values = values.into_iter().map(|r| srum_analysis::enrich(r, &id_map)).collect();
+        values = values
+            .into_iter()
+            .map(|r| srum_analysis::enrich(r, &id_map))
+            .collect();
     }
     print_values(&values, format)
 }
@@ -83,7 +92,10 @@ pub fn run_notifications(path: &Path, resolve: bool, format: &OutputFormat) -> a
     let mut values = srum_analysis::records_to_values(records)?;
     if resolve {
         let id_map = srum_analysis::load_id_map(path);
-        values = values.into_iter().map(|r| srum_analysis::enrich(r, &id_map)).collect();
+        values = values
+            .into_iter()
+            .map(|r| srum_analysis::enrich(r, &id_map))
+            .collect();
     }
     print_values(&values, format)
 }
@@ -92,7 +104,10 @@ pub fn run_app_timeline(path: &Path, resolve: bool, format: &OutputFormat) -> an
     let records = srum_parser::parse_app_timeline(path)?;
     let values: Vec<serde_json::Value> = if resolve {
         let id_map = srum_analysis::load_id_map(path);
-        records.into_iter().map(|r| srum_analysis::enrich(r, &id_map)).collect()
+        records
+            .into_iter()
+            .map(|r| srum_analysis::enrich(r, &id_map))
+            .collect()
     } else {
         srum_analysis::records_to_values(records)?
     };

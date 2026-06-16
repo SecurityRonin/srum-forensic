@@ -9,7 +9,7 @@
 
 **Did a human engage with that app — or did it run itself? SRUM has the answer.**
 
-Most forensic tools can tell you an app was running at a given time. `sr` tells you whether a human was actually at the keyboard using it.
+Most forensic tools can tell you an app was running at a given time. `srum4n6` tells you whether a human was actually at the keyboard using it.
 
 Windows records two fields that no other SRUM parser surfaces for forensic use: `InFocusDurationMS` — how long an app held keyboard and mouse focus — and `UserInputMS` — how long there was genuine user input while it was focused. Combined with CPU cycles and network bytes from the other SRUM tables, these fields draw a sharp line between:
 
@@ -18,17 +18,17 @@ Windows records two fields that no other SRUM parser surfaces for forensic use: 
 
 This distinction answers questions that raw process execution logs never can: Was the user present during the incident window? Was that browser session user-driven or automated? Did the suspect actually interact with that exfiltration tool, or did it run itself silently?
 
-`sr` is a single static Rust binary. It parses `SRUDB.dat` directly — no Windows, no Python, no COM interop — and applies 10 forensic heuristics in the parse path, including cross-table exfiltration signals and per-interval user presence annotation.
+`srum4n6` is a single static Rust binary. It parses `SRUDB.dat` directly — no Windows, no Python, no COM interop — and applies 10 forensic heuristics in the parse path, including cross-table exfiltration signals and per-interval user presence annotation.
 
 ```bash
 cargo install srum-forensic
 
 # Was anyone at the keyboard during this incident window?
-sr timeline --resolve SRUDB.dat \
+srum4n6 timeline --resolve SRUDB.dat \
   | jq '.[] | select(.timestamp | startswith("2024-11-14T02")) | {app_name, user_present, focus_time_ms, user_input_time_ms}'
 
 # Find processes that ran but no human ever interacted with them
-sr apps --resolve SRUDB.dat \
+srum4n6 apps --resolve SRUDB.dat \
   | jq '.[] | select(.no_focus_with_cpu == true) | {app_name, timestamp, background_cycles}'
 ```
 
@@ -48,16 +48,16 @@ cargo install srum-forensic
 git clone https://github.com/SecurityRonin/srum-forensic.git
 cd srum-forensic
 cargo build --release
-./target/release/sr --help
+./target/release/srum4n6 --help
 ```
 
 ---
 
 ## Human Engagement vs. Process Execution
 
-This is the forensically critical distinction `sr` makes that other SRUM tools do not.
+This is the forensically critical distinction `srum4n6` makes that other SRUM tools do not.
 
-Windows Application Timeline (`sr app-timeline`) records two fields per app per interval:
+Windows Application Timeline (`srum4n6 app-timeline`) records two fields per app per interval:
 
 | Field | What it measures |
 |---|---|
@@ -65,7 +65,7 @@ Windows Application Timeline (`sr app-timeline`) records two fields per app per 
 | `user_input_time_ms` | Milliseconds of actual keyboard/mouse input while focused |
 | `interactivity_ratio` | `user_input_time_ms / focus_time_ms` — near 1.0 = human; near 0.0 = automated |
 
-`sr apps` automatically merges these into every app resource record. The result is a record that tells you not just how much CPU a process burned — but whether a human was the one driving it.
+`srum4n6 apps` automatically merges these into every app resource record. The result is a record that tells you not just how much CPU a process burned — but whether a human was the one driving it.
 
 **Reading the signals:**
 
@@ -80,11 +80,11 @@ The `user_present` cross-table signal extends this to the entire interval: if an
 
 ```bash
 # Network traffic that moved while no human was at the keyboard
-sr timeline SRUDB.dat \
+srum4n6 timeline SRUDB.dat \
   | jq '.[] | select(.source_table == "network" and .user_present == null)'
 
 # Prove the user was active during the 14:00 hour
-sr timeline --resolve SRUDB.dat \
+srum4n6 timeline --resolve SRUDB.dat \
   | jq '[.[] | select(.timestamp | startswith("2024-06-15T14")) | select(.user_present == true)] | length'
 ```
 
@@ -92,18 +92,18 @@ sr timeline --resolve SRUDB.dat \
 
 ## What You Can Extract
 
-Each subcommand maps 1:1 to a single SRUM table. `sr timeline` merges all of them.
+Each subcommand maps 1:1 to a single SRUM table. `srum4n6 timeline` merges all of them.
 
 | Subcommand | SRUM Table | What It Shows |
 |---|---|---|
-| `sr network` | Network Data Usage | Per-process bytes sent/received per hour |
-| `sr apps` | Application Resource Usage | Per-process CPU cycles; focus and user input time merged in; all heuristic flags |
-| `sr connectivity` | Network Connectivity | Profile connection time per app |
-| `sr energy` | Energy Usage | Charge level and energy consumed per app |
-| `sr notifications` | Push Notifications | Notification type and count per app |
-| `sr app-timeline` | Application Timeline | Raw focus duration and user input time per app (Windows 10 1607+) |
-| `sr idmap` | SruDbIdMapTable | Integer ID → process name / SID mapping |
-| `sr timeline` | All of the above | Unified chronological view, all tables merged, all heuristics applied |
+| `srum4n6 network` | Network Data Usage | Per-process bytes sent/received per hour |
+| `srum4n6 apps` | Application Resource Usage | Per-process CPU cycles; focus and user input time merged in; all heuristic flags |
+| `srum4n6 connectivity` | Network Connectivity | Profile connection time per app |
+| `srum4n6 energy` | Energy Usage | Charge level and energy consumed per app |
+| `srum4n6 notifications` | Push Notifications | Notification type and count per app |
+| `srum4n6 app-timeline` | Application Timeline | Raw focus duration and user input time per app (Windows 10 1607+) |
+| `srum4n6 idmap` | SruDbIdMapTable | Integer ID → process name / SID mapping |
+| `srum4n6 timeline` | All of the above | Unified chronological view, all tables merged, all heuristics applied |
 
 All subcommands accept `--format json` (default) or `--format csv`.
 `network`, `apps`, `connectivity`, `notifications`, and `app-timeline` accept `--resolve` to inline names from the ID map.
@@ -112,7 +112,7 @@ All subcommands accept `--format json` (default) or `--format csv`.
 
 ## Forensic Heuristics
 
-`sr apps` and `sr timeline` automatically apply heuristics from [forensicnomicon](https://github.com/SecurityRonin/forensicnomicon). Flags are injected as extra boolean fields on records that meet their condition — nothing is emitted when the condition is false. Numeric signals (`interactivity_ratio`) are always injected when the required data is present.
+`srum4n6 apps` and `srum4n6 timeline` automatically apply heuristics from [forensicnomicon](https://github.com/SecurityRonin/forensicnomicon). Flags are injected as extra boolean fields on records that meet their condition — nothing is emitted when the condition is false. Numeric signals (`interactivity_ratio`) are always injected when the required data is present.
 
 ### Engagement and execution signals (apps records)
 
@@ -152,7 +152,7 @@ These heuristics answer the "was a human there?" question at the per-record leve
 
 ```bash
 # All activity during the 2 AM incident hour — did the user_present flag fire?
-sr timeline --resolve SRUDB.dat \
+srum4n6 timeline --resolve SRUDB.dat \
   | jq '.[] | select(.timestamp | startswith("2024-11-14T02")) | {source_table, app_name, user_present, focus_time_ms, user_input_time_ms}'
 ```
 
@@ -160,7 +160,7 @@ sr timeline --resolve SRUDB.dat \
 
 ```bash
 # Show every hour chrome.exe had active keyboard/mouse input
-sr apps --resolve SRUDB.dat \
+srum4n6 apps --resolve SRUDB.dat \
   | jq '.[] | select(.app_name | test("chrome"; "i")) | select(.user_input_time_ms > 0) | {timestamp, focus_time_ms, user_input_time_ms, interactivity_ratio}'
 ```
 
@@ -168,7 +168,7 @@ sr apps --resolve SRUDB.dat \
 
 ```bash
 # Potential background malware — CPU consumed, user never interacted
-sr apps --resolve SRUDB.dat \
+srum4n6 apps --resolve SRUDB.dat \
   | jq '.[] | select(.no_focus_with_cpu == true) | {app_name, timestamp, background_cycles}'
 ```
 
@@ -176,7 +176,7 @@ sr apps --resolve SRUDB.dat \
 
 ```bash
 # Held focus for over a minute, zero keyboard/mouse input — not a human
-sr apps --resolve SRUDB.dat \
+srum4n6 apps --resolve SRUDB.dat \
   | jq '.[] | select(.automated_execution == true) | {app_name, timestamp, focus_time_ms, user_input_time_ms}'
 ```
 
@@ -184,7 +184,7 @@ sr apps --resolve SRUDB.dat \
 
 ```bash
 # 10:1 background-to-foreground CPU ratio + false foreground claim
-sr apps SRUDB.dat \
+srum4n6 apps SRUDB.dat \
   | jq '.[] | select(.background_cpu_dominant == true and .phantom_foreground == true)'
 ```
 
@@ -192,7 +192,7 @@ sr apps SRUDB.dat \
 
 ```bash
 # Background-only process + significant outbound transfer in the same interval
-sr timeline --resolve SRUDB.dat \
+srum4n6 timeline --resolve SRUDB.dat \
   | jq '.[] | select(.exfil_signal == true) | {app_name, timestamp, bytes_sent, focus_time_ms}'
 ```
 
@@ -200,7 +200,7 @@ sr timeline --resolve SRUDB.dat \
 
 ```bash
 # Data moved while the user was away from the keyboard
-sr timeline SRUDB.dat \
+srum4n6 timeline SRUDB.dat \
   | jq '.[] | select(.source_table == "network" and .user_present == null)'
 ```
 
@@ -208,7 +208,7 @@ sr timeline SRUDB.dat \
 
 ```bash
 # Every process that sent data — resolved names, sorted by bytes, highest first
-sr network --resolve --format csv SRUDB.dat \
+srum4n6 network --resolve --format csv SRUDB.dat \
   | sort -t, -k5 -rn \
   | head -20
 ```
@@ -216,8 +216,8 @@ sr network --resolve --format csv SRUDB.dat \
 ### Feed your SIEM
 
 ```bash
-sr network SRUDB.dat --format csv >> srum_network.csv
-sr apps    SRUDB.dat              >> srum_apps.ndjson
+srum4n6 network SRUDB.dat --format csv >> srum_network.csv
+srum4n6 apps    SRUDB.dat              >> srum_apps.ndjson
 ```
 
 All subcommands output JSON arrays by default. Pass `--format csv` for flat CSV. Pipe JSON to `jq -c '.[]'` for NDJSON, redirect to files, or POST directly to Elasticsearch. The schema is stable and documented.
@@ -226,7 +226,7 @@ All subcommands output JSON arrays by default. Pass `--format csv` for flat CSV.
 
 ## What's Different
 
-Every alternative either requires Windows, needs a Python environment, or costs money. None of them surfaces Application Timeline engagement data in their forensic output. `sr` is a static binary you compile once and copy anywhere — and it applies heuristics in the parse path, including the engagement signals that answer whether a human was actually present.
+Every alternative either requires Windows, needs a Python environment, or costs money. None of them surfaces Application Timeline engagement data in their forensic output. `srum4n6` is a static binary you compile once and copy anywhere — and it applies heuristics in the parse path, including the engagement signals that answer whether a human was actually present.
 
 | | srum-forensic | KAPE + EZTools | python-libESE | Arsenal SRUM |
 |--|:-:|:-:|:-:|:-:|
@@ -269,7 +269,7 @@ Every alternative either requires Windows, needs a Python environment, or costs 
 
 ## Output Schema
 
-### `sr network <path>`
+### `srum4n6 network <path>`
 
 Records from the `{973F5D5C-1D90-4944-BE8E-24B22A728CF2}` SRUM table.
 
@@ -285,7 +285,7 @@ Records from the `{973F5D5C-1D90-4944-BE8E-24B22A728CF2}` SRUM table.
 ]
 ```
 
-### `sr apps <path>`
+### `srum4n6 apps <path>`
 
 Records from the `{5C8CF1C7-7257-4F13-B223-970EF5939312}` SRUM table. Application Timeline data (`focus_time_ms`, `user_input_time_ms`) is automatically merged in when available. Heuristic flags are injected on records that meet their conditions.
 
@@ -320,17 +320,17 @@ Records from the `{5C8CF1C7-7257-4F13-B223-970EF5939312}` SRUM table. Applicatio
 to inline the names directly into the output — no jq, no temp files:
 
 ```bash
-sr network        --resolve SRUDB.dat
-sr apps           --resolve SRUDB.dat
-sr connectivity   --resolve SRUDB.dat
-sr notifications  --resolve SRUDB.dat
-sr app-timeline   --resolve SRUDB.dat
+srum4n6 network        --resolve SRUDB.dat
+srum4n6 apps           --resolve SRUDB.dat
+srum4n6 connectivity   --resolve SRUDB.dat
+srum4n6 notifications  --resolve SRUDB.dat
+srum4n6 app-timeline   --resolve SRUDB.dat
 ```
 
 Resolution is best-effort: records whose IDs are absent from the map keep their
 raw integer values and no `app_name`/`user_name` field is injected.
 
-### `sr app-timeline <path>`
+### `srum4n6 app-timeline <path>`
 
 Records from the `{7ACBBAA3-D029-4BE4-9A7A-0885927F1D8F}` SRUM table (Application Timeline). Available since Windows 10 Anniversary Update (1607). Shows exactly how long each app held keyboard/mouse focus and received active user input per interval.
 
@@ -346,9 +346,9 @@ Records from the `{7ACBBAA3-D029-4BE4-9A7A-0885927F1D8F}` SRUM table (Applicatio
 ]
 ```
 
-`sr apps` automatically merges this data into app resource records — use `sr app-timeline` when you want the raw table directly.
+`srum4n6 apps` automatically merges this data into app resource records — use `srum4n6 app-timeline` when you want the raw table directly.
 
-### `sr connectivity <path>`
+### `srum4n6 connectivity <path>`
 
 Records from the `{DD6636C4-8929-4683-974E-22C046A43763}` SRUM table.
 
@@ -364,7 +364,7 @@ Records from the `{DD6636C4-8929-4683-974E-22C046A43763}` SRUM table.
 ]
 ```
 
-### `sr energy <path>`
+### `srum4n6 energy <path>`
 
 Records from the `{FEE4E14F-02A9-4550-B5CE-5FA2DA202E37}` SRUM table.
 
@@ -380,7 +380,7 @@ Records from the `{FEE4E14F-02A9-4550-B5CE-5FA2DA202E37}` SRUM table.
 ]
 ```
 
-### `sr notifications <path>`
+### `srum4n6 notifications <path>`
 
 Records from the `{D10CA2FE-6FCF-4F6D-848E-B2E99266FA89}` SRUM table.
 
@@ -396,7 +396,7 @@ Records from the `{D10CA2FE-6FCF-4F6D-848E-B2E99266FA89}` SRUM table.
 ]
 ```
 
-### `sr timeline <path>`
+### `srum4n6 timeline <path>`
 
 Merges all tables into a single chronological stream. Each record includes a `"source_table"` field identifying its source. Apps records receive merged focus data and all per-record heuristic flags. Cross-table signals (`exfil_signal`, `user_present`) are applied to the full merged set. Exits 0 even if individual tables fail (best-effort).
 
@@ -429,11 +429,11 @@ Merges all tables into a single chronological stream. Each record includes a `"s
 Pass `--format csv` to any subcommand for flat CSV output instead of JSON:
 
 ```bash
-sr network  --format csv SRUDB.dat > network.csv
-sr timeline --format csv SRUDB.dat > timeline.csv
+srum4n6 network  --format csv SRUDB.dat > network.csv
+srum4n6 timeline --format csv SRUDB.dat > timeline.csv
 ```
 
-### `sr idmap <path>`
+### `srum4n6 idmap <path>`
 
 ```json
 [
@@ -459,7 +459,7 @@ This is a Cargo workspace. Use the crates independently in your own tools:
 | [`srum-core`](crates/srum-core/) | SRUM record type definitions — `NetworkUsageRecord`, `AppUsageRecord`, `AppTimelineRecord`, `NetworkConnectivityRecord`, `EnergyUsageRecord`, `PushNotificationRecord`, `IdMapEntry` |
 | [`srum-parser`](crates/srum-parser/) | High-level API — `parse_network_usage`, `parse_app_usage`, `parse_app_timeline`, `parse_network_connectivity`, `parse_energy_usage`, `parse_push_notifications`, `parse_id_map` |
 | [`srum-analysis`](crates/srum-analysis/) | Forensic analysis pipeline — `build_timeline`, all 10 heuristics, cross-table signals, `compute_findings`, gap/session/stats/hunt/compare analysis |
-| [`sr-cli`](crates/sr-cli/) | `sr` binary — `network`, `apps`, `app-timeline`, `connectivity`, `energy`, `notifications`, `timeline`, `idmap` subcommands; `--format json/csv`; `--resolve` |
+| [`srum-cli`](crates/srum-cli/) | `srum4n6` binary — `network`, `apps`, `app-timeline`, `connectivity`, `energy`, `notifications`, `timeline`, `idmap` subcommands; `--format json/csv`; `--resolve` |
 | [`ese-test-fixtures`](crates/ese-test-fixtures/) | Shared test fixture builders — dev-dependency only, never ships |
 
 </details>
@@ -487,7 +487,7 @@ See [Parser Validation Report](docs/validation-report.md) for full accuracy resu
 
 `ese-core` memory-maps the database file once at open time (`memmap2`). All subsequent page reads — integrity checks, record iteration, carving — slice directly into the OS-managed mapping with no additional syscalls or heap allocation per page. The OS page cache handles read-ahead and eviction; the tool itself never touches the file descriptor again after `open()`.
 
-This matters in practice: a 200 MB `SRUDB.dat` is mapped in one `mmap(2)` call. A linear integrity scan over all pages costs zero `read(2)` syscalls. The focus-merge in `sr timeline` is a single O(n) pass over all records — no O(n²) re-scanning.
+This matters in practice: a 200 MB `SRUDB.dat` is mapped in one `mmap(2)` call. A linear integrity scan over all pages costs zero `read(2)` syscalls. The focus-merge in `srum4n6 timeline` is a single O(n) pass over all records — no O(n²) re-scanning.
 
 ---
 
@@ -499,13 +499,13 @@ On a live system the file is locked by `svchost.exe`. Forensic analysis always o
 
 The database contains multiple tables identified by GUID. This tool currently supports:
 
-- `{973F5D5C-1D90-4944-BE8E-24B22A728CF2}` — Network Data Usage (`sr network`)
-- `{5C8CF1C7-7257-4F13-B223-970EF5939312}` — Application Resource Usage (`sr apps`)
-- `{DD6636C4-8929-4683-974E-22C046A43763}` — Network Connectivity (`sr connectivity`)
-- `{FEE4E14F-02A9-4550-B5CE-5FA2DA202E37}` — Energy Usage (`sr energy`)
-- `{D10CA2FE-6FCF-4F6D-848E-B2E99266FA89}` — Push Notifications (`sr notifications`)
-- `{7ACBBAA3-D029-4BE4-9A7A-0885927F1D8F}` — Application Timeline (`sr app-timeline`); available since Windows 10 1607
-- `SruDbIdMapTable` — Integer ID → process name / SID mapping (`sr idmap`)
+- `{973F5D5C-1D90-4944-BE8E-24B22A728CF2}` — Network Data Usage (`srum4n6 network`)
+- `{5C8CF1C7-7257-4F13-B223-970EF5939312}` — Application Resource Usage (`srum4n6 apps`)
+- `{DD6636C4-8929-4683-974E-22C046A43763}` — Network Connectivity (`srum4n6 connectivity`)
+- `{FEE4E14F-02A9-4550-B5CE-5FA2DA202E37}` — Energy Usage (`srum4n6 energy`)
+- `{D10CA2FE-6FCF-4F6D-848E-B2E99266FA89}` — Push Notifications (`srum4n6 notifications`)
+- `{7ACBBAA3-D029-4BE4-9A7A-0885927F1D8F}` — Application Timeline (`srum4n6 app-timeline`); available since Windows 10 1607
+- `SruDbIdMapTable` — Integer ID → process name / SID mapping (`srum4n6 idmap`)
 
 The Application Timeline table records two fields that no other SRUM parser exposes for forensic use: `InFocusDurationMS` (how long each app held keyboard/mouse focus) and `UserInputMS` (how long there was actual user input while the app was focused). These fields are the foundation of the engagement-detection heuristics — `automated_execution`, `phantom_foreground`, `no_focus_with_cpu`, `interactivity_ratio` — and of the `user_present` cross-table annotation. No other open-source SRUM tool merges this data into the analysis output.
 

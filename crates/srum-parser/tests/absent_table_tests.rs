@@ -3,7 +3,7 @@
 //! omits the battery-energy, network-usage, app-resource, and app-timeline
 //! extensions entirely.
 //!
-//! All other SRUM implementations (srum-dump, SrumECmd) return empty results
+//! All other SRUM implementations (srum-dump, `SrumECmd`) return empty results
 //! for absent tables rather than propagating an error.
 
 mod fixtures;

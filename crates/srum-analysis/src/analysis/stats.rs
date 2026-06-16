@@ -21,7 +21,7 @@ pub fn build_stats(all: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
     let mut map: HashMap<i64, AppStats> = HashMap::new();
 
     for v in &all {
-        if let Some(app_id) = v.get("app_id").and_then(|x| x.as_i64()) {
+        if let Some(app_id) = v.get("app_id").and_then(serde_json::Value::as_i64) {
             let entry = map.entry(app_id).or_insert(AppStats {
                 app_id,
                 app_name: None,
@@ -37,31 +37,51 @@ pub fn build_stats(all: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
             entry.count += 1;
             // app_name (first resolved name wins)
             if entry.app_name.is_none() {
-                entry.app_name = v.get("app_name").and_then(|x| x.as_str()).map(str::to_owned);
+                entry.app_name = v
+                    .get("app_name")
+                    .and_then(|x| x.as_str())
+                    .map(str::to_owned);
             }
             // cycles
-            entry.bg_cycles += v.get("background_cycles").and_then(|x| x.as_u64()).unwrap_or(0);
-            entry.fg_cycles += v.get("foreground_cycles").and_then(|x| x.as_u64()).unwrap_or(0);
+            entry.bg_cycles += v
+                .get("background_cycles")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(0);
+            entry.fg_cycles += v
+                .get("foreground_cycles")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(0);
             // bytes
-            entry.bytes_sent += v.get("bytes_sent").and_then(|x| x.as_u64()).unwrap_or(0);
+            entry.bytes_sent += v
+                .get("bytes_sent")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(0);
             entry.bytes_recv += v
                 .get("bytes_received")
-                .and_then(|x| x.as_u64())
-                .or_else(|| v.get("bytes_recv").and_then(|x| x.as_u64()))
+                .and_then(serde_json::Value::as_u64)
+                .or_else(|| v.get("bytes_recv").and_then(serde_json::Value::as_u64))
                 .unwrap_or(0);
             // timestamps
             if let Some(ts) = v.get("timestamp").and_then(|x| x.as_str()) {
                 let ts = ts.to_owned();
-                if entry.first_seen.as_deref().map_or(true, |f: &str| ts.as_str() < f) {
+                if entry
+                    .first_seen
+                    .as_deref()
+                    .map_or(true, |f: &str| ts.as_str() < f)
+                {
                     entry.first_seen = Some(ts.clone());
                 }
-                if entry.last_seen.as_deref().map_or(true, |l: &str| ts.as_str() > l) {
+                if entry
+                    .last_seen
+                    .as_deref()
+                    .map_or(true, |l: &str| ts.as_str() > l)
+                {
                     entry.last_seen = Some(ts);
                 }
             }
             // heuristic flags (boolean true only)
             for &key in crate::pipeline::HEURISTIC_KEYS {
-                if v.get(key).and_then(|x| x.as_bool()) == Some(true) {
+                if v.get(key).and_then(serde_json::Value::as_bool) == Some(true) {
                     entry.flags.insert(key.to_owned());
                 }
             }
@@ -103,16 +123,22 @@ pub fn build_stats(all: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
 
     // Sort: flag_count desc, then total_background_cycles desc
     stats.sort_by(|a, b| {
-        let fa = a.get("flag_count").and_then(|x| x.as_u64()).unwrap_or(0);
-        let fb = b.get("flag_count").and_then(|x| x.as_u64()).unwrap_or(0);
+        let fa = a
+            .get("flag_count")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0);
+        let fb = b
+            .get("flag_count")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0);
         fb.cmp(&fa).then_with(|| {
             let ba = a
                 .get("total_background_cycles")
-                .and_then(|x| x.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0);
             let bb = b
                 .get("total_background_cycles")
-                .and_then(|x| x.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0);
             bb.cmp(&ba)
         })

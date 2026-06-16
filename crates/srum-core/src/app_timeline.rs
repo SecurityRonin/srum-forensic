@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 /// per ~1-hour interval.
 ///
 /// Forensic value: distinguishes passive background execution (high CPU in
-/// AppUsage, zero focus_time_ms here) from active user interaction. A
-/// shell spawned by malware shows CPU cycles in AppUsage but no focus or
+/// `AppUsage`, zero `focus_time_ms` here) from active user interaction. A
+/// shell spawned by malware shows CPU cycles in `AppUsage` but no focus or
 /// input time here.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppTimelineRecord {

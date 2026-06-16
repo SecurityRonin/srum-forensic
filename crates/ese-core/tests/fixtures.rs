@@ -92,7 +92,7 @@ pub fn make_ese_with_catalog(entries: &[CatalogEntry]) -> NamedTempFile {
         .add_page(padding.clone()) // page 1
         .add_page(padding.clone()) // page 2
         .add_page(padding.clone()) // page 3
-        .add_page(padding)         // page 4
-        .add_page(catalog_page)    // page 5 = catalog (matches CATALOG_ROOT=5)
+        .add_page(padding) // page 4
+        .add_page(catalog_page) // page 5 = catalog (matches CATALOG_ROOT=5)
         .write()
 }

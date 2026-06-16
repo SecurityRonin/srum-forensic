@@ -14,9 +14,14 @@ fn main() {
             for (i, r) in records.iter().take(4).enumerate() {
                 match r {
                     Ok((page, tag, data)) => {
-                        println!("rec[{i}] page={page} tag={tag} len={} bytes={}",
+                        println!(
+                            "rec[{i}] page={page} tag={tag} len={} bytes={}",
                             data.len(),
-                            data.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" "));
+                            data.iter()
+                                .map(|b| format!("{b:02x}"))
+                                .collect::<Vec<_>>()
+                                .join(" ")
+                        );
                     }
                     Err(e) => println!("rec[{i}] ERROR: {e}"),
                 }

@@ -3046,7 +3046,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "sr-cli"
+name = "srum-analysis"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "forensicnomicon",
+ "serde",
+ "serde_json",
+ "srum-core",
+ "srum-parser",
+]
+
+[[package]]
+name = "srum-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -3064,7 +3077,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "sr-gui"
+name = "srum-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "srum-gui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -3074,29 +3097,6 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
-]
-
-[[package]]
-name = "srum-analysis"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "chrono",
- "forensicnomicon",
- "serde",
- "serde_json",
- "srum-core",
- "srum-parser",
-]
-
-[[package]]
-name = "srum-core"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
 ]
 
 [[package]]

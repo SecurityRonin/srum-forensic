@@ -13,7 +13,7 @@ pub const PAGE_FLAG_LEAF: u32 = 0x0002;
 pub const PAGE_FLAG_PARENT: u32 = 0x0004;
 /// Page flag: empty page.
 pub const PAGE_FLAG_EMPTY: u32 = 0x0008;
-/// Page flag: space tree page (OWN_EXT / AVAIL_EXT).
+/// Page flag: space tree page (`OWN_EXT` / `AVAIL_EXT`).
 pub const PAGE_FLAG_SPACE_TREE: u32 = 0x0020;
 /// Page flag: long-value page (stores overflow data for LongBinary/LongText columns).
 pub const PAGE_FLAG_LONG_VALUE: u32 = 0x0400;
@@ -57,7 +57,7 @@ impl EsePage {
     /// Layout (all little-endian):
     /// - 0x00 (4): XOR checksum
     /// - 0x04 (4): ECC checksum (Vista+ addition)
-    /// - 0x08 (8): database time (JET_DBTIME)
+    /// - 0x08 (8): database time (`JET_DBTIME`)
     /// - 0x10 (4): previous page number
     /// - 0x14 (4): next page number
     /// - 0x18 (4): FDP object ID
@@ -142,9 +142,9 @@ impl EsePage {
             //   cb_ (SIZE)   = low  16 bits (bits  0-12 are value, bits 13-15 are flags)
             //   ib_ (OFFSET) = high 16 bits (bits 16-28 are value, bits 29-31 are flags)
             // Mask 0x1FFF strips the flag bits from each 13-bit field.
-            let value_size = (raw & 0x1FFF) as u16;           // cb_ = SIZE
+            let value_size = (raw & 0x1FFF) as u16; // cb_ = SIZE
             let value_offset = ((raw >> 16) & 0x1FFF) as u16; // ib_ = OFFSET
-            // Guard: absolute position = HEADER_SIZE + relative_offset + size must not exceed page.
+                                                              // Guard: absolute position = HEADER_SIZE + relative_offset + size must not exceed page.
             let end = Self::HEADER_SIZE + usize::from(value_offset) + usize::from(value_size);
             if end > self.data.len() {
                 return Err(EseError::RecordTooShort {
@@ -288,10 +288,15 @@ mod tests {
         // Writing 5 at 0x22 must be read back as 5; writing at 0x1E must NOT.
         let mut data = vec![0u8; 4096];
         data[0x22..0x24].copy_from_slice(&5u16.to_le_bytes());
-        let page = EsePage { page_number: 1, data };
+        let page = EsePage {
+            page_number: 1,
+            data,
+        };
         let hdr = page.parse_header().expect("parse header");
-        assert_eq!(hdr.available_page_tag_count, 5,
-            "tag count must be read from offset 0x22 per the Vista+ ESE format");
+        assert_eq!(
+            hdr.available_page_tag_count, 5,
+            "tag count must be read from offset 0x22 per the Vista+ ESE format"
+        );
     }
 
     #[test]
@@ -299,10 +304,15 @@ mod tests {
         // Vista+ page header: page_flags is at 0x24 (not 0x20).
         let mut data = vec![0u8; 4096];
         data[0x24..0x28].copy_from_slice(&PAGE_FLAG_LEAF.to_le_bytes());
-        let page = EsePage { page_number: 1, data };
+        let page = EsePage {
+            page_number: 1,
+            data,
+        };
         let hdr = page.parse_header().expect("parse header");
-        assert!(hdr.page_flags & PAGE_FLAG_LEAF != 0,
-            "LEAF flag must be read from offset 0x24 per the Vista+ ESE format");
+        assert!(
+            hdr.page_flags & PAGE_FLAG_LEAF != 0,
+            "LEAF flag must be read from offset 0x24 per the Vista+ ESE format"
+        );
     }
 
     #[test]
@@ -311,7 +321,10 @@ mod tests {
         let mut data = vec![0u8; 4096];
         data[0x10..0x14].copy_from_slice(&5u32.to_le_bytes());
         data[0x14..0x18].copy_from_slice(&9u32.to_le_bytes());
-        let page = EsePage { page_number: 1, data };
+        let page = EsePage {
+            page_number: 1,
+            data,
+        };
         let hdr = page.parse_header().expect("parse header");
         assert_eq!(hdr.prev_page, Some(5));
         assert_eq!(hdr.next_page, Some(9));
@@ -436,7 +449,10 @@ mod tests {
         // Tag 1: real ESE — size=4 in LOW, offset=0 in HIGH → 4u32
         data[4096 - 8..4096 - 4].copy_from_slice(&4u32.to_le_bytes());
 
-        let page = EsePage { page_number: 1, data };
+        let page = EsePage {
+            page_number: 1,
+            data,
+        };
         let (tag_offset, tag_size) = page.tags().expect("tags")[1];
         assert_eq!(tag_size, 4, "cb_ (size) must be read from LOW 13 bits");
         assert_eq!(tag_offset, 0, "ib_ (offset) must be read from HIGH 13 bits");
@@ -468,7 +484,10 @@ mod tests {
         // Tag 2: size=4, offset=8 → (8u32 << 16) | 4u32
         data[4096 - 12..4096 - 8].copy_from_slice(&((8u32 << 16) | 4u32).to_le_bytes());
 
-        let page = EsePage { page_number: 1, data };
+        let page = EsePage {
+            page_number: 1,
+            data,
+        };
         assert_eq!(
             page.record_data(1).expect("rec1"),
             &rec1,
@@ -513,11 +532,13 @@ mod tests {
         let tag1: u32 = 4u32 | (2u32 << 16);
         data[4096 - 8..4096 - 4].copy_from_slice(&tag1.to_le_bytes());
 
-        let page = EsePage { page_number: 1, data };
+        let page = EsePage {
+            page_number: 1,
+            data,
+        };
         let rec = page.record_data(1).expect("record_data(1)");
         assert_eq!(
-            rec,
-            &sentinel,
+            rec, &sentinel,
             "record_data must add HEADER_SIZE(40) to tag offset; \
              relative offset 2 must read from absolute byte 42, not byte 2"
         );

@@ -1,4 +1,4 @@
-//! Tests for EseDatabase::table_columns — Phase 1 stories 7–8.
+//! Tests for `EseDatabase::table_columns` — Phase 1 stories 7–8.
 
 mod fixtures;
 use ese_core::{coltyp, CatalogEntry, EseDatabase};
@@ -16,21 +16,21 @@ fn make_db_with_id_map_columns() -> (EseDatabase, tempfile::NamedTempFile) {
             object_type: 2,
             object_id: 1,
             parent_object_id: 5,
-            table_page: coltyp::LONG as u32,
+            table_page: u32::from(coltyp::LONG),
             object_name: "AutoIncId".to_owned(),
         },
         CatalogEntry {
             object_type: 2,
             object_id: 2,
             parent_object_id: 5,
-            table_page: coltyp::LONG as u32,
+            table_page: u32::from(coltyp::LONG),
             object_name: "IdType".to_owned(),
         },
         CatalogEntry {
             object_type: 2,
             object_id: 3,
             parent_object_id: 5,
-            table_page: coltyp::TEXT as u32,
+            table_page: u32::from(coltyp::TEXT),
             object_name: "IdBlob".to_owned(),
         },
     ];
@@ -68,5 +68,8 @@ fn table_columns_third_column_is_text() {
 fn table_columns_unknown_table_returns_not_found() {
     let (db, _tmp) = make_db_with_id_map_columns();
     let result = db.table_columns("NoSuchTable");
-    assert!(matches!(result, Err(ese_core::EseError::TableNotFound { .. })));
+    assert!(matches!(
+        result,
+        Err(ese_core::EseError::TableNotFound { .. })
+    ));
 }

@@ -1,13 +1,13 @@
 [package]
-name = "sr-cli"
+name = "srum-cli"
 version = "0.1.0"
-description = "sr — SRUM forensic analysis CLI"
+description = "srum4n6 — SRUM forensic analysis CLI"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "sr"
+name = "srum4n6"
 path = "src/main.rs"
 
 [dependencies]

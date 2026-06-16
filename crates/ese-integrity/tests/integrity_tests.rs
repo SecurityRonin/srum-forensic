@@ -310,7 +310,10 @@ fn find_deleted_records_detects_deleted_tag() {
     let found = anomalies
         .iter()
         .any(|a| matches!(a, EseStructuralAnomaly::DeletedRecordPresent { .. }));
-    assert!(found, "page with deleted tag must produce DeletedRecordPresent");
+    assert!(
+        found,
+        "page with deleted tag must produce DeletedRecordPresent"
+    );
 }
 
 #[test]
@@ -366,7 +369,10 @@ fn find_deleted_records_carries_correct_page_number() {
                 if *page_number == 1
         )
     });
-    assert!(found, "deleted record on page 1 must carry page_number == 1");
+    assert!(
+        found,
+        "deleted record on page 1 must carry page_number == 1"
+    );
 }
 
 #[test]
@@ -398,17 +404,17 @@ fn detect_autoinc_gaps_detects_single_gap() {
     let found = anomalies
         .iter()
         .any(|a| matches!(a, EseStructuralAnomaly::AutoIncIdGap { prev: 3, next: 5 }));
-    assert!(found, "gap between 3 and 5 must produce AutoIncIdGap {{ prev:3, next:5 }}");
+    assert!(
+        found,
+        "gap between 3 and 5 must produce AutoIncIdGap {{ prev:3, next:5 }}"
+    );
 }
 
 #[test]
 fn detect_autoinc_gaps_empty_for_single_element() {
     let ids = vec![42i32];
     let anomalies = detect_autoinc_gaps(&ids);
-    assert!(
-        anomalies.is_empty(),
-        "single element produces no gaps"
-    );
+    assert!(anomalies.is_empty(), "single element produces no gaps");
 }
 
 #[test]
@@ -437,9 +443,15 @@ fn detect_orphaned_catalog_reports_orphan_when_table_page_is_out_of_bounds() {
     let tmp = fixtures::make_ese_with_orphaned_catalog_entry();
     let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
     let anomalies = detect_orphaned_catalog(&db);
-    let found = anomalies
-        .iter()
-        .any(|a| matches!(a, EseStructuralAnomaly::OrphanedCatalogEntry { declared_page: 100, .. }));
+    let found = anomalies.iter().any(|a| {
+        matches!(
+            a,
+            EseStructuralAnomaly::OrphanedCatalogEntry {
+                declared_page: 100,
+                ..
+            }
+        )
+    });
     assert!(
         found,
         "catalog entry with table_page=100 beyond file size must produce OrphanedCatalogEntry"
@@ -508,68 +520,110 @@ const PLASO: &str = concat!(
 
 fn open_real(path: &str) -> Option<ese_core::EseDatabase> {
     let p = std::path::Path::new(path);
-    if !p.exists() { return None; }
+    if !p.exists() {
+        return None;
+    }
     Some(ese_core::EseDatabase::open(p).expect("open real SRUDB"))
 }
 
 /// Fresh Server 2022 (no anti-forensics): zero deleted record tags.
 #[test]
 fn aptvm_clean_has_zero_deleted_records() {
-    let Some(db) = open_real(APTVM_CLEAN) else { return };
-    assert_eq!(find_deleted_records(&db).len(), 0,
-        "aptvm_clean: fresh install must have no deleted tags");
+    let Some(db) = open_real(APTVM_CLEAN) else {
+        return;
+    };
+    assert_eq!(
+        find_deleted_records(&db).len(),
+        0,
+        "aptvm_clean: fresh install must have no deleted tags"
+    );
 }
 
 #[test]
 fn aptvm_1day_has_zero_deleted_records() {
-    let Some(db) = open_real(APTVM_1DAY) else { return };
-    assert_eq!(find_deleted_records(&db).len(), 0,
-        "aptvm_1day: one-day-old server must have no deleted tags");
+    let Some(db) = open_real(APTVM_1DAY) else {
+        return;
+    };
+    assert_eq!(
+        find_deleted_records(&db).len(),
+        0,
+        "aptvm_1day: one-day-old server must have no deleted tags"
+    );
 }
 
 /// Active SRUM databases accumulate deleted records from Windows housekeeping.
-/// Counts verified against independent scan (probe_real_fixture_counts, 2026-05-20).
+/// Counts verified against independent scan (`probe_real_fixture_counts`, 2026-05-20).
 #[test]
 fn chainsaw_deleted_record_count_matches_baseline() {
-    let Some(db) = open_real(CHAINSAW) else { return };
-    assert_eq!(find_deleted_records(&db).len(), 54,
-        "chainsaw: deleted tag count must match baseline");
+    let Some(db) = open_real(CHAINSAW) else {
+        return;
+    };
+    assert_eq!(
+        find_deleted_records(&db).len(),
+        54,
+        "chainsaw: deleted tag count must match baseline"
+    );
 }
 
 #[test]
 fn rathbunvm_win10_deleted_record_count_matches_baseline() {
-    let Some(db) = open_real(RATHBUNVM_WIN10) else { return };
-    assert_eq!(find_deleted_records(&db).len(), 15,
-        "rathbunvm_win10: deleted tag count must match baseline");
+    let Some(db) = open_real(RATHBUNVM_WIN10) else {
+        return;
+    };
+    assert_eq!(
+        find_deleted_records(&db).len(),
+        15,
+        "rathbunvm_win10: deleted tag count must match baseline"
+    );
 }
 
 #[test]
 fn rathbunvm_win11_deleted_record_count_matches_baseline() {
-    let Some(db) = open_real(RATHBUNVM_WIN11) else { return };
-    assert_eq!(find_deleted_records(&db).len(), 91,
-        "rathbunvm_win11: deleted tag count must match baseline");
+    let Some(db) = open_real(RATHBUNVM_WIN11) else {
+        return;
+    };
+    assert_eq!(
+        find_deleted_records(&db).len(),
+        91,
+        "rathbunvm_win11: deleted tag count must match baseline"
+    );
 }
 
 #[test]
 fn belkasoft_deleted_record_count_matches_baseline() {
-    let Some(db) = open_real(BELKASOFT) else { return };
-    assert_eq!(find_deleted_records(&db).len(), 58,
-        "belkasoft: deleted tag count must match baseline");
+    let Some(db) = open_real(BELKASOFT) else {
+        return;
+    };
+    assert_eq!(
+        find_deleted_records(&db).len(),
+        58,
+        "belkasoft: deleted tag count must match baseline"
+    );
 }
 
 #[test]
 fn plaso_deleted_record_count_matches_baseline() {
     let Some(db) = open_real(PLASO) else { return };
-    assert_eq!(find_deleted_records(&db).len(), 143,
-        "plaso: deleted tag count must match baseline");
+    assert_eq!(
+        find_deleted_records(&db).len(),
+        143,
+        "plaso: deleted tag count must match baseline"
+    );
 }
 
 // ── check_dirty_state: all known-good files show clean shutdown ───────────────
 
 #[test]
 fn all_real_fixtures_show_clean_shutdown() {
-    let paths = [CHAINSAW, RATHBUNVM_WIN10, RATHBUNVM_WIN11, APTVM_CLEAN,
-                 APTVM_1DAY, BELKASOFT, PLASO];
+    let paths = [
+        CHAINSAW,
+        RATHBUNVM_WIN10,
+        RATHBUNVM_WIN11,
+        APTVM_CLEAN,
+        APTVM_1DAY,
+        BELKASOFT,
+        PLASO,
+    ];
     for path in &paths {
         let Some(db) = open_real(path) else { continue };
         assert!(
@@ -583,14 +637,21 @@ fn all_real_fixtures_show_clean_shutdown() {
 
 #[test]
 fn chainsaw_page_checksum_count_matches_baseline() {
-    let Some(db) = open_real(CHAINSAW) else { return };
-    assert_eq!(verify_page_checksums(&db).len(), 0,
-        "chainsaw: correct ECC-32 algorithm must report zero checksum anomalies on known-good file");
+    let Some(db) = open_real(CHAINSAW) else {
+        return;
+    };
+    assert_eq!(
+        verify_page_checksums(&db).len(),
+        0,
+        "chainsaw: correct ECC-32 algorithm must report zero checksum anomalies on known-good file"
+    );
 }
 
 #[test]
 fn rathbunvm_win10_page_checksum_count_matches_baseline() {
-    let Some(db) = open_real(RATHBUNVM_WIN10) else { return };
+    let Some(db) = open_real(RATHBUNVM_WIN10) else {
+        return;
+    };
     assert_eq!(verify_page_checksums(&db).len(), 0,
         "rathbunvm_win10: correct ECC-32 algorithm must report zero checksum anomalies on known-good file");
 }

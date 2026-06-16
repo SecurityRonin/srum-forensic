@@ -4,7 +4,7 @@ use std::process::Command;
 
 fn sr_bin() -> Command {
     let mut bin = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    bin.push("../../target/debug/sr");
+    bin.push("../../target/debug/srum4n6");
     Command::new(bin)
 }
 
@@ -445,14 +445,20 @@ fn sr_timeline_format_ndjson_nonexistent_exits_zero() {
         .args(["timeline", "--format", "ndjson", "/nonexistent/SRUDB.dat"])
         .output()
         .expect("run");
-    assert!(out.status.success(), "timeline ndjson must exit 0 (best-effort)");
+    assert!(
+        out.status.success(),
+        "timeline ndjson must exit 0 (best-effort)"
+    );
 }
 
 #[test]
 fn sr_network_help_shows_ndjson_format() {
     let out = sr_bin().args(["network", "--help"]).output().expect("run");
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("ndjson"), "sr network --help must document ndjson format");
+    assert!(
+        stdout.contains("ndjson"),
+        "sr network --help must document ndjson format"
+    );
 }
 
 // ── sr process ───────────────────────────────────────────────────────────────
@@ -472,23 +478,35 @@ fn sr_process_nonexistent_exits_zero_best_effort() {
         .args(["process", "svchost", "/nonexistent/SRUDB.dat"])
         .output()
         .expect("run sr process");
-    assert!(out.status.success(), "sr process must exit 0 (best-effort like timeline)");
+    assert!(
+        out.status.success(),
+        "sr process must exit 0 (best-effort like timeline)"
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains('['), "must output JSON array even when empty: {stdout}");
+    assert!(
+        stdout.contains('['),
+        "must output JSON array even when empty: {stdout}"
+    );
 }
 
 #[test]
 fn sr_process_format_flag_exists() {
     let out = sr_bin().args(["process", "--help"]).output().expect("run");
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("format"), "sr process --help must document --format");
+    assert!(
+        stdout.contains("format"),
+        "sr process --help must document --format"
+    );
 }
 
 #[test]
 fn sr_process_resolve_flag_exists() {
     let out = sr_bin().args(["process", "--help"]).output().expect("run");
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("resolve"), "sr process --help must document --resolve");
+    assert!(
+        stdout.contains("resolve"),
+        "sr process --help must document --resolve"
+    );
 }
 
 // ── sr stats ─────────────────────────────────────────────────────────────────
@@ -644,10 +662,18 @@ fn sr_compare_help_exits_success() {
 fn sr_compare_both_nonexistent_exits_zero_best_effort() {
     // Both files missing → both timelines empty → valid diff with all empty sections
     let out = sr_bin()
-        .args(["compare", "/nonexistent/baseline.dat", "/nonexistent/suspect.dat"])
+        .args([
+            "compare",
+            "/nonexistent/baseline.dat",
+            "/nonexistent/suspect.dat",
+        ])
         .output()
         .expect("run");
-    assert!(out.status.success(), "compare must exit 0 (best-effort): {:?}", out.status);
+    assert!(
+        out.status.success(),
+        "compare must exit 0 (best-effort): {:?}",
+        out.status
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
         stdout.contains("new_processes"),
@@ -677,7 +703,10 @@ fn sr_metadata_nonexistent_exits_nonzero() {
         .args(["metadata", "/nonexistent/SRUDB.dat"])
         .status()
         .expect("run");
-    assert!(!status.success(), "sr metadata must exit nonzero for missing file");
+    assert!(
+        !status.success(),
+        "sr metadata must exit nonzero for missing file"
+    );
 }
 
 #[test]
@@ -705,19 +734,29 @@ fn sr_metadata_format_flag_exists() {
 #[test]
 fn timeline_json_has_source_table_field() {
     // This test verifies the field name standardisation from "table" → "source_table"
-    let db_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/SRUDB.dat");
-    if !db_path.exists() { return; } // skip if no fixture
+    let db_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/SRUDB.dat");
+    if !db_path.exists() {
+        return;
+    } // skip if no fixture
 
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_sr"))
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_srum4n6"))
         .args(["timeline", db_path.to_str().unwrap(), "--format", "ndjson"])
         .output()
         .expect("failed to run sr");
 
     let stdout = String::from_utf8(output.stdout).unwrap();
-    if stdout.is_empty() { return; } // skip if fixture is empty
+    if stdout.is_empty() {
+        return;
+    } // skip if fixture is empty
 
-    let first_line: serde_json::Value = serde_json::from_str(stdout.lines().next().unwrap()).unwrap();
-    assert!(first_line.get("source_table").is_some(), "timeline output must have source_table field");
-    assert!(first_line.get("table").is_none(), "timeline output must not have old 'table' field");
+    let first_line: serde_json::Value =
+        serde_json::from_str(stdout.lines().next().unwrap()).unwrap();
+    assert!(
+        first_line.get("source_table").is_some(),
+        "timeline output must have source_table field"
+    );
+    assert!(
+        first_line.get("table").is_none(),
+        "timeline output must not have old 'table' field"
+    );
 }

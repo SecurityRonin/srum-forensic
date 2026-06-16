@@ -4,7 +4,7 @@ use std::path::Path;
 fn main() {
     let path = Path::new("tests/data/srudb/chainsaw_SRUDB.dat");
     let db = EseDatabase::open(path).expect("open");
-    
+
     for name in &[
         "SruDbIdMapTable",
         "{973F5D5C-1D90-4944-BE8E-24B94231A174}",
@@ -22,8 +22,11 @@ fn main() {
                         }
                     }
                 }
-                println!("{name}: root={root} leaves={} total_tags={total_tags} pages={:?}", 
-                    leaves.len(), &leaves[..leaves.len().min(8)]);
+                println!(
+                    "{name}: root={root} leaves={} total_tags={total_tags} pages={:?}",
+                    leaves.len(),
+                    &leaves[..leaves.len().min(8)]
+                );
             }
             Err(e) => println!("{name}: ERR {e}"),
         }

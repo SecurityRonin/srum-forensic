@@ -1,10 +1,10 @@
-//! Tests for verify_page_checksum — Phase 1 stories 13–16.
+//! Tests for `verify_page_checksum` — Phase 1 stories 13–16.
 
 use ese_core::{verify_page_checksum, ChecksumResult, PAGE_SIZE};
 
 /// Build a page buffer with the legacy XOR checksum correctly stored at offset 0.
 ///
-/// Seed = 0x89AB_CDEF; checksum XORs all 4-byte words from offset 4 onward.
+/// Seed = `0x89AB_CDEF`; checksum XORs all 4-byte words from offset 4 onward.
 /// Payload is placed at offset 8+ so bytes 4-7 remain zero — this is required
 /// for the format-detection heuristic (zero bytes 4-7 ⟹ legacy, non-zero ⟹ ECC).
 fn make_page_with_correct_xor(payload: &[u8]) -> Vec<u8> {

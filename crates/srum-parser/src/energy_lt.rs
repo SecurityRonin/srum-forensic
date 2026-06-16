@@ -11,4 +11,3 @@ pub fn decode_energy_lt_record(
 ) -> Result<EnergyLtRecord, SrumError> {
     super::energy::decode_energy_record(data, page, tag)
 }
-

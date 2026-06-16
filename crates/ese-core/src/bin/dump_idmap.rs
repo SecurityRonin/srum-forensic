@@ -9,8 +9,10 @@ fn main() {
     let entries = db.catalog_entries().expect("catalog");
     for e in &entries {
         if e.object_name.contains("SruDbId") || e.object_name.contains("IdMap") {
-            println!("catalog: name={:?} type={} page={} obj_id={} parent_id={}",
-                e.object_name, e.object_type, e.table_page, e.object_id, e.parent_object_id);
+            println!(
+                "catalog: name={:?} type={} page={} obj_id={} parent_id={}",
+                e.object_name, e.object_type, e.table_page, e.object_id, e.parent_object_id
+            );
         }
     }
 
@@ -23,8 +25,14 @@ fn main() {
             for (i, r) in records.iter().take(5).enumerate() {
                 match r {
                     Ok((page, tag, data)) => {
-                        println!("rec[{i}] page={page} tag={tag} len={} bytes={}",
-                            data.len(), data.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" "));
+                        println!(
+                            "rec[{i}] page={page} tag={tag} len={} bytes={}",
+                            data.len(),
+                            data.iter()
+                                .map(|b| format!("{b:02x}"))
+                                .collect::<Vec<_>>()
+                                .join(" ")
+                        );
                     }
                     Err(e) => println!("rec[{i}] ERROR: {e}"),
                 }

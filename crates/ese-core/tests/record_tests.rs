@@ -33,14 +33,17 @@ fn fixed_col_size_guid_is_16() {
 /// Build a minimal Vista+ ESE record with fixed columns only.
 ///
 /// Header (4 bytes):
-///   [0]: last_fixed_col_id = number of fixed columns
-///   [1]: last_var_col_idx  = 0 (no variable columns)
-///   [2..4]: var_data_offset = 4 + total_fixed_bytes (points past fixed area)
+///   [0]: `last_fixed_col_id` = number of fixed columns
+///   [1]: `last_var_col_idx`  = 0 (no variable columns)
+///   [2..4]: `var_data_offset` = 4 + `total_fixed_bytes` (points past fixed area)
 ///
 /// Fixed data follows immediately at byte 4.
 fn make_fixed_record(columns: &[(u8, &[u8])]) -> Vec<u8> {
     let last_fixed = columns.len() as u8;
-    let fixed_bytes: Vec<u8> = columns.iter().flat_map(|(_, data)| data.iter().copied()).collect();
+    let fixed_bytes: Vec<u8> = columns
+        .iter()
+        .flat_map(|(_, data)| data.iter().copied())
+        .collect();
     let fixed_len = fixed_bytes.len();
     let var_data_offset = (4 + fixed_len) as u16;
     let mut rec = vec![last_fixed, 0u8];
@@ -54,7 +57,11 @@ fn decode_record_single_i32_column() {
     let value: i32 = 42;
     let bytes = value.to_le_bytes();
     let rec = make_fixed_record(&[(coltyp::LONG, bytes.as_slice())]);
-    let defs = vec![ColumnDef { column_id: 1, name: "auto_inc_id".into(), coltyp: coltyp::LONG }];
+    let defs = vec![ColumnDef {
+        column_id: 1,
+        name: "auto_inc_id".into(),
+        coltyp: coltyp::LONG,
+    }];
     let result = decode_record(&rec, &defs).expect("decode");
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].0, "auto_inc_id");
@@ -73,8 +80,16 @@ fn decode_record_two_fixed_columns() {
     rec.extend_from_slice(&fixed);
 
     let defs = vec![
-        ColumnDef { column_id: 1, name: "auto_inc_id".into(), coltyp: coltyp::LONG },
-        ColumnDef { column_id: 2, name: "bytes_sent".into(), coltyp: coltyp::LONG_LONG },
+        ColumnDef {
+            column_id: 1,
+            name: "auto_inc_id".into(),
+            coltyp: coltyp::LONG,
+        },
+        ColumnDef {
+            column_id: 2,
+            name: "bytes_sent".into(),
+            coltyp: coltyp::LONG_LONG,
+        },
     ];
     let result = decode_record(&rec, &defs).expect("decode");
     assert_eq!(result.len(), 2);
@@ -96,9 +111,21 @@ fn decode_record_three_fixed_columns() {
     rec.extend_from_slice(&fixed);
 
     let defs = vec![
-        ColumnDef { column_id: 1, name: "auto_inc_id".into(), coltyp: coltyp::LONG },
-        ColumnDef { column_id: 2, name: "app_id".into(), coltyp: coltyp::LONG },
-        ColumnDef { column_id: 3, name: "user_id".into(), coltyp: coltyp::LONG },
+        ColumnDef {
+            column_id: 1,
+            name: "auto_inc_id".into(),
+            coltyp: coltyp::LONG,
+        },
+        ColumnDef {
+            column_id: 2,
+            name: "app_id".into(),
+            coltyp: coltyp::LONG,
+        },
+        ColumnDef {
+            column_id: 3,
+            name: "user_id".into(),
+            coltyp: coltyp::LONG,
+        },
     ];
     let result = decode_record(&rec, &defs).expect("decode");
     assert_eq!(result.len(), 3);
@@ -117,8 +144,16 @@ fn decode_record_columns_beyond_last_fixed_col_are_absent() {
     rec.extend_from_slice(&auto_inc.to_le_bytes());
 
     let defs = vec![
-        ColumnDef { column_id: 1, name: "auto_inc_id".into(), coltyp: coltyp::LONG },
-        ColumnDef { column_id: 2, name: "app_id".into(), coltyp: coltyp::LONG },
+        ColumnDef {
+            column_id: 1,
+            name: "auto_inc_id".into(),
+            coltyp: coltyp::LONG,
+        },
+        ColumnDef {
+            column_id: 2,
+            name: "app_id".into(),
+            coltyp: coltyp::LONG,
+        },
     ];
     let result = decode_record(&rec, &defs).expect("decode");
     // Only the column that fits within last_fixed_col should appear.
@@ -132,27 +167,27 @@ fn decode_record_columns_beyond_last_fixed_col_are_absent() {
 ///
 /// Variable column layout:
 ///   - After the 4-byte header and fixed data comes the variable offset array.
-///   - Each variable column has a 2-byte end-offset (relative to var_data_offset).
+///   - Each variable column has a 2-byte end-offset (relative to `var_data_offset`).
 ///   - Immediately after the offset array is the variable data itself.
 ///
 /// With 1 fixed col (4 bytes) and 1 variable col:
-///   header (4) | fixed_data (4) | var_end_offsets (2) | var_data (N)
-///   var_data_offset = 4 + 4 = 8   (points to start of var offset array)
-///   var_data starts at var_data_offset + num_var_cols * 2 = 8 + 2 = 10
-///   end_offset for col 1 = len(text)
+///   header (4) | `fixed_data` (4) | `var_end_offsets` (2) | `var_data` (N)
+///   `var_data_offset` = 4 + 4 = 8   (points to start of var offset array)
+///   `var_data` starts at `var_data_offset` + `num_var_cols` * 2 = 8 + 2 = 10
+///   `end_offset` for col 1 = len(text)
 fn make_record_with_text(fixed_val: i32, text: &str) -> Vec<u8> {
     let text_bytes = text.as_bytes();
     let var_data_offset: u16 = 8; // 4 header + 4 fixed
     let end_offset = text_bytes.len() as u16;
 
     let mut rec = vec![
-        1u8,  // last_fixed_col_id = 1
-        1u8,  // last_var_col_idx = 1 (one variable column)
+        1u8, // last_fixed_col_id = 1
+        1u8, // last_var_col_idx = 1 (one variable column)
     ];
     rec.extend_from_slice(&var_data_offset.to_le_bytes()); // bytes 2..4
-    rec.extend_from_slice(&fixed_val.to_le_bytes());        // bytes 4..8 (fixed col 1)
-    rec.extend_from_slice(&end_offset.to_le_bytes());       // bytes 8..10 (var end offset)
-    rec.extend_from_slice(text_bytes);                      // bytes 10.. (var data)
+    rec.extend_from_slice(&fixed_val.to_le_bytes()); // bytes 4..8 (fixed col 1)
+    rec.extend_from_slice(&end_offset.to_le_bytes()); // bytes 8..10 (var end offset)
+    rec.extend_from_slice(text_bytes); // bytes 10.. (var data)
     rec
 }
 
@@ -160,8 +195,16 @@ fn make_record_with_text(fixed_val: i32, text: &str) -> Vec<u8> {
 fn decode_record_variable_text_column() {
     let rec = make_record_with_text(99, "svchost.exe");
     let defs = vec![
-        ColumnDef { column_id: 1, name: "auto_inc_id".into(), coltyp: coltyp::LONG },
-        ColumnDef { column_id: 129, name: "id_blob".into(), coltyp: coltyp::TEXT },
+        ColumnDef {
+            column_id: 1,
+            name: "auto_inc_id".into(),
+            coltyp: coltyp::LONG,
+        },
+        ColumnDef {
+            column_id: 129,
+            name: "id_blob".into(),
+            coltyp: coltyp::TEXT,
+        },
     ];
     let result = decode_record(&rec, &defs).expect("decode");
     let text_col = result.iter().find(|(n, _)| n == "id_blob");
@@ -171,7 +214,11 @@ fn decode_record_variable_text_column() {
 
 #[test]
 fn decode_record_empty_buffer_returns_empty() {
-    let defs = vec![ColumnDef { column_id: 1, name: "x".into(), coltyp: coltyp::LONG }];
+    let defs = vec![ColumnDef {
+        column_id: 1,
+        name: "x".into(),
+        coltyp: coltyp::LONG,
+    }];
     let result = decode_record(&[], &defs).expect("decode");
     assert!(result.is_empty());
 }

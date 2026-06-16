@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use std::path::Path;
 use anyhow::Result;
 use serde::Serialize;
+use std::collections::HashMap;
+use std::path::Path;
 
 /// Classify a SID string into a well-known account type, or return `None`.
 pub fn classify_sid(sid: &str) -> Option<&'static str> {
@@ -9,17 +9,17 @@ pub fn classify_sid(sid: &str) -> Option<&'static str> {
         "S-1-5-18" => Some("system"),
         "S-1-5-19" => Some("local_service"),
         "S-1-5-20" => Some("network_service"),
-        "S-1-1-0"  => Some("everyone"),
+        "S-1-1-0" => Some("everyone"),
         _ if sid.starts_with("S-1-5-21-") && sid.ends_with("-500") => Some("local_admin"),
         _ if sid.starts_with("S-1-5-21-") => Some("domain_user"),
         _ => None,
     }
 }
 
-/// Split a Windows (or Unix) path into (directory, binary_name) at the last
+/// Split a Windows (or Unix) path into (directory, `binary_name`) at the last
 /// path separator.  Returns `("", path)` when no separator is present.
 pub fn split_windows_path(path: &str) -> (&str, &str) {
-    match path.rfind(|c| c == '\\' || c == '/') {
+    match path.rfind(['\\', '/']) {
         Some(idx) => (&path[..idx], &path[idx + 1..]),
         None => ("", path),
     }
@@ -81,7 +81,7 @@ pub fn enrich_connectivity(
     v
 }
 
-/// Enrich a pre-serialised JSON value in-place with app_name / user_name / path signals.
+/// Enrich a pre-serialised JSON value in-place with `app_name` / `user_name` / path signals.
 pub fn enrich_value(mut v: serde_json::Value, id_map: &HashMap<i32, String>) -> serde_json::Value {
     if let Some(obj) = v.as_object_mut() {
         if let Some(name) = obj
@@ -90,15 +90,23 @@ pub fn enrich_value(mut v: serde_json::Value, id_map: &HashMap<i32, String>) -> 
             .and_then(|id| i32::try_from(id).ok())
             .and_then(|id| id_map.get(&id))
         {
-            obj.insert("app_name".to_owned(), serde_json::Value::String(name.clone()));
+            obj.insert(
+                "app_name".to_owned(),
+                serde_json::Value::String(name.clone()),
+            );
             if name.contains('\\') || name.contains('/') {
-                use forensicnomicon::heuristics::srum::{is_process_masquerade, is_suspicious_path};
+                use forensicnomicon::heuristics::srum::{
+                    is_process_masquerade, is_suspicious_path,
+                };
                 if is_suspicious_path(name) {
                     obj.insert("suspicious_path".to_owned(), serde_json::Value::Bool(true));
                 }
                 let (dir, bin) = split_windows_path(name);
                 if is_process_masquerade(bin, dir) {
-                    obj.insert("masquerade_candidate".to_owned(), serde_json::Value::Bool(true));
+                    obj.insert(
+                        "masquerade_candidate".to_owned(),
+                        serde_json::Value::Bool(true),
+                    );
                 }
             }
         }
@@ -108,10 +116,16 @@ pub fn enrich_value(mut v: serde_json::Value, id_map: &HashMap<i32, String>) -> 
             .and_then(|id| i32::try_from(id).ok())
             .and_then(|id| id_map.get(&id))
         {
-            obj.insert("user_name".to_owned(), serde_json::Value::String(name.clone()));
+            obj.insert(
+                "user_name".to_owned(),
+                serde_json::Value::String(name.clone()),
+            );
             if name.starts_with("S-") {
                 if let Some(acct_type) = classify_sid(name) {
-                    obj.insert("account_type".to_owned(), serde_json::Value::String(acct_type.to_owned()));
+                    obj.insert(
+                        "account_type".to_owned(),
+                        serde_json::Value::String(acct_type.to_owned()),
+                    );
                 }
             }
         }
@@ -152,7 +166,9 @@ mod tests {
     #[test]
     fn records_to_values_serialises_each_record() {
         #[derive(Serialize)]
-        struct R { x: u32 }
+        struct R {
+            x: u32,
+        }
         let records = vec![R { x: 1 }, R { x: 2 }];
         let values = records_to_values(records).unwrap();
         assert_eq!(values.len(), 2);
@@ -162,7 +178,9 @@ mod tests {
     #[test]
     fn enrich_injects_app_name() {
         #[derive(Serialize)]
-        struct R { app_id: i32 }
+        struct R {
+            app_id: i32,
+        }
         let mut id_map = std::collections::HashMap::new();
         id_map.insert(42, "chrome.exe".to_owned());
         let v = enrich(R { app_id: 42 }, &id_map);
@@ -172,9 +190,14 @@ mod tests {
     #[test]
     fn enrich_injects_suspicious_path_flag() {
         #[derive(Serialize)]
-        struct R { app_id: i32 }
+        struct R {
+            app_id: i32,
+        }
         let mut id_map = std::collections::HashMap::new();
-        id_map.insert(1, r"C:\Users\user\AppData\Local\Temp\malware.exe".to_owned());
+        id_map.insert(
+            1,
+            r"C:\Users\user\AppData\Local\Temp\malware.exe".to_owned(),
+        );
         let v = enrich(R { app_id: 1 }, &id_map);
         assert_eq!(v["suspicious_path"], json!(true));
     }
@@ -182,9 +205,11 @@ mod tests {
     #[test]
     fn enrich_injects_account_type_for_known_sid() {
         #[derive(Serialize)]
-        struct R { user_id: i32 }
+        struct R {
+            user_id: i32,
+        }
         let mut id_map = std::collections::HashMap::new();
-        id_map.insert(5, "S-1-5-18".to_owned());  // SYSTEM
+        id_map.insert(5, "S-1-5-18".to_owned()); // SYSTEM
         let v = enrich(R { user_id: 5 }, &id_map);
         assert_eq!(v["user_name"], json!("S-1-5-18"));
         assert_eq!(v["account_type"], json!("system"));
@@ -193,7 +218,9 @@ mod tests {
     #[test]
     fn enrich_injects_masquerade_candidate_flag() {
         #[derive(Serialize)]
-        struct R { app_id: i32 }
+        struct R {
+            app_id: i32,
+        }
         let mut id_map = std::collections::HashMap::new();
         id_map.insert(7, r"C:\Users\User\AppData\Local\svch0st.exe".to_owned());
         let v = enrich(R { app_id: 7 }, &id_map);

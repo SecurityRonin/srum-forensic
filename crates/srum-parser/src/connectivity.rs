@@ -2,7 +2,7 @@
 //!
 //! **Real ESE raw-tag layout** (`cbCommonKeyPrefix | key_suffix | col_data`):
 //! - `[0..2]`:           `cbCommonKeyPrefix` (u16 LE)
-//! - `[2..2+(28-pfx)]`:  key suffix (KEY_LEN=28 for `{DD6636C4-…}`)
+//! - `[2..2+(28-pfx)]`:  key suffix (`KEY_LEN=28` for `{DD6636C4-…}`)
 //! - `col_start = 2 + (28 - cb_pfx)`:
 //!   - `[col_start+4..+8]`:  `AutoIncId` (u32 LE)
 //!   - `[col_start+8..+16]`: `TimeStamp` as OLE Automation Date (f64 LE) → `timestamp`
@@ -58,30 +58,48 @@ pub fn decode_connectivity_record(
 
     let ts_off = col_start + COL_TIMESTAMP_OFF;
     let timestamp_raw = f64::from_le_bytes([
-        data[ts_off], data[ts_off + 1], data[ts_off + 2], data[ts_off + 3],
-        data[ts_off + 4], data[ts_off + 5], data[ts_off + 6], data[ts_off + 7],
+        data[ts_off],
+        data[ts_off + 1],
+        data[ts_off + 2],
+        data[ts_off + 3],
+        data[ts_off + 4],
+        data[ts_off + 5],
+        data[ts_off + 6],
+        data[ts_off + 7],
     ]);
     let timestamp = ole_date_to_datetime(timestamp_raw);
 
     let app_off = col_start + COL_APP_ID_OFF;
     let app_id = i32::from_le_bytes([
-        data[app_off], data[app_off + 1], data[app_off + 2], data[app_off + 3],
+        data[app_off],
+        data[app_off + 1],
+        data[app_off + 2],
+        data[app_off + 3],
     ]);
 
     let usr_off = col_start + COL_USER_ID_OFF;
     let user_id = i32::from_le_bytes([
-        data[usr_off], data[usr_off + 1], data[usr_off + 2], data[usr_off + 3],
+        data[usr_off],
+        data[usr_off + 1],
+        data[usr_off + 2],
+        data[usr_off + 3],
     ]);
 
     let prof_off = col_start + COL_L2_PROFILE_ID_OFF;
     let profile_id = i32::from_le_bytes([
-        data[prof_off], data[prof_off + 1], data[prof_off + 2], data[prof_off + 3],
+        data[prof_off],
+        data[prof_off + 1],
+        data[prof_off + 2],
+        data[prof_off + 3],
     ]);
 
     let conn_off = col_start + COL_CONNECTED_TIME_OFF;
-    let connected_time = u32::from_le_bytes([
-        data[conn_off], data[conn_off + 1], data[conn_off + 2], data[conn_off + 3],
-    ]) as u64;
+    let connected_time = u64::from(u32::from_le_bytes([
+        data[conn_off],
+        data[conn_off + 1],
+        data[conn_off + 2],
+        data[conn_off + 3],
+    ]));
 
     Ok(NetworkConnectivityRecord {
         timestamp,
