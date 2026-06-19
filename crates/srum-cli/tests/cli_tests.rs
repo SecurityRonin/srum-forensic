@@ -871,3 +871,63 @@ fn sr_top_help_lists_dump() {
         "top-level --help must list the new `dump` command, got: {stdout}"
     );
 }
+
+// ── Stage 2: --format is a global option ─────────────────────────────────────
+
+/// A committed SRUDB fixture under the repo-root `tests/data/srudb/` that has
+/// resolvable app IDs, or `None` when the (gitignored) corpus is absent.
+fn resolvable_fixture() -> Option<std::path::PathBuf> {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/data/srudb/chainsaw_SRUDB.dat");
+    p.exists().then_some(p)
+}
+
+/// Every non-empty line of `text` parses as a standalone JSON value (NDJSON).
+fn is_ndjson(text: &str) -> bool {
+    let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
+    !lines.is_empty()
+        && lines
+            .iter()
+            .all(|l| serde_json::from_str::<serde_json::Value>(l).is_ok())
+}
+
+#[test]
+fn sr_format_global_before_subcommand_yields_ndjson() {
+    let Some(fixture) = resolvable_fixture() else {
+        return; // skip if corpus absent
+    };
+    let out = sr_bin()
+        .args(["--format", "ndjson", "dump", "apps"])
+        .arg(&fixture)
+        .output()
+        .expect("run sr --format ndjson dump apps");
+    assert_ne!(
+        out.status.code(),
+        Some(2),
+        "global --format before subcommand must parse (not a clap usage error)"
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        is_ndjson(&stdout),
+        "global --format ndjson must reach output as one JSON object per line, got: {stdout}"
+    );
+}
+
+#[test]
+fn sr_format_after_subcommand_still_yields_ndjson() {
+    let Some(fixture) = resolvable_fixture() else {
+        return; // skip if corpus absent
+    };
+    let out = sr_bin()
+        .args(["dump", "apps"])
+        .arg(&fixture)
+        .args(["--format", "ndjson"])
+        .output()
+        .expect("run sr dump apps <path> --format ndjson");
+    assert_ne!(out.status.code(), Some(2), "trailing --format must parse");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        is_ndjson(&stdout),
+        "trailing --format ndjson must reach output, got: {stdout}"
+    );
+}
