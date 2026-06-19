@@ -2,6 +2,24 @@ use std::path::Path;
 
 use crate::output::{print_values, OutputFormat};
 
+/// Bootstrap gate for the best-effort analysis commands.
+///
+/// `build_timeline` (and the `*_autoinc_gaps` parsers) deliberately absorb
+/// per-table parse failures so a partially-corrupt SRUDB still yields whatever
+/// records survive. That absorption is correct for a *single table miss* but
+/// wrong for the *prerequisite*: if the database cannot even be opened/parsed,
+/// returning an empty result is indistinguishable from a genuinely empty DB and
+/// hides the failure from any automation caller (the "always exits 0" smell).
+///
+/// Opening the ESE database here is the validated bootstrap: success means the
+/// downstream best-effort timeline is trustworthy (empty -> exit 0); failure is
+/// a loud, propagated error (non-zero exit). This mirrors `collect_metadata`,
+/// which already opens via `ese_core::EseDatabase::open` before reporting.
+fn ensure_db_openable(path: &Path) -> anyhow::Result<()> {
+    ese_core::EseDatabase::open(path)?;
+    Ok(())
+}
+
 /// Named forensic hunt signature for `sr hunt`.
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum HuntSignature {
@@ -69,6 +87,7 @@ pub fn run_process(
 }
 
 pub fn run_stats(path: &Path, resolve: bool, format: &OutputFormat) -> anyhow::Result<()> {
+    ensure_db_openable(path)?;
     let id_map = resolve.then(|| srum_analysis::load_id_map(path));
     let all = srum_analysis::build_timeline(path, id_map.as_ref());
     crate::cmd::warn_if_resolution_degraded(id_map.as_ref(), !all.is_empty());
@@ -77,12 +96,14 @@ pub fn run_stats(path: &Path, resolve: bool, format: &OutputFormat) -> anyhow::R
 }
 
 pub fn run_sessions(path: &Path, format: &OutputFormat) -> anyhow::Result<()> {
+    ensure_db_openable(path)?;
     let all = srum_analysis::build_timeline(path, None);
     let sessions = srum_analysis::analysis::build_sessions(&all);
     print_values(&sessions, format)
 }
 
 pub fn run_gaps(path: &Path, threshold_hours: u64, format: &OutputFormat) -> anyhow::Result<()> {
+    ensure_db_openable(path)?;
     let all = srum_analysis::build_timeline(path, None);
     let mut gaps = srum_analysis::analysis::detect_gaps(&all, threshold_hours);
 
@@ -110,6 +131,7 @@ pub fn run_hunt(
     resolve: bool,
     format: &OutputFormat,
 ) -> anyhow::Result<()> {
+    ensure_db_openable(path)?;
     let id_map = resolve.then(|| srum_analysis::load_id_map(path));
     let all = srum_analysis::build_timeline(path, id_map.as_ref());
     crate::cmd::warn_if_resolution_degraded(id_map.as_ref(), !all.is_empty());
