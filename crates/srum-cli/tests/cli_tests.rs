@@ -760,3 +760,105 @@ fn timeline_json_has_source_table_field() {
         "timeline output must not have old 'table' field"
     );
 }
+
+// ── Stage 1: `dump <table>` command + hidden per-table aliases ────────────────
+
+#[test]
+fn sr_dump_help_exits_success() {
+    let status = sr_bin()
+        .args(["dump", "--help"])
+        .status()
+        .expect("run sr dump --help");
+    assert!(status.success(), "sr dump --help should exit 0");
+}
+
+#[test]
+fn sr_dump_list_lists_eight_tables() {
+    let out = sr_bin()
+        .args(["dump", "--list"])
+        .output()
+        .expect("run sr dump --list");
+    assert!(out.status.success(), "sr dump --list should exit 0");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    for table in [
+        "network",
+        "apps",
+        "connectivity",
+        "energy",
+        "energy-lt",
+        "notifications",
+        "app-timeline",
+        "idmap",
+    ] {
+        assert!(
+            stdout.lines().any(|l| l.trim() == table),
+            "sr dump --list must list `{table}` on its own line, got: {stdout}"
+        );
+    }
+}
+
+#[test]
+fn sr_dump_apps_missing_file_parses_not_usage_error() {
+    // The command must PARSE (reach the handler) for a missing file, then fail at
+    // runtime — i.e. NOT a clap usage error (exit code 2).
+    let out = sr_bin()
+        .args(["dump", "apps", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run sr dump apps");
+    assert_ne!(
+        out.status.code(),
+        Some(2),
+        "sr dump apps <missing> must parse, not be a clap usage error (exit 2)"
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("error:"),
+        "stderr must contain 'error:' from the runtime failure, got: {stderr}"
+    );
+}
+
+#[test]
+fn sr_dump_idmap_missing_file_parses_not_usage_error() {
+    let out = sr_bin()
+        .args(["dump", "idmap", "/nonexistent/SRUDB.dat"])
+        .output()
+        .expect("run sr dump idmap");
+    assert_ne!(
+        out.status.code(),
+        Some(2),
+        "sr dump idmap <missing> must parse, not be a clap usage error (exit 2)"
+    );
+}
+
+#[test]
+fn sr_hidden_network_alias_still_works() {
+    // The per-table commands are hidden but functional for existing scripts.
+    let status = sr_bin()
+        .args(["network", "--help"])
+        .status()
+        .expect("run sr network --help");
+    assert!(
+        status.success(),
+        "hidden `network` alias must still exit 0 on --help"
+    );
+}
+
+#[test]
+fn sr_top_help_hides_network() {
+    let out = sr_bin().arg("--help").output().expect("run sr --help");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        !stdout.contains("network"),
+        "top-level --help must NOT list hidden `network` command, got: {stdout}"
+    );
+}
+
+#[test]
+fn sr_top_help_lists_dump() {
+    let out = sr_bin().arg("--help").output().expect("run sr --help");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("dump"),
+        "top-level --help must list the new `dump` command, got: {stdout}"
+    );
+}
