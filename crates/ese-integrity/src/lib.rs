@@ -102,6 +102,14 @@ pub enum EseStructuralAnomaly {
         /// 0-based tag index within the page's tag array.
         tag_index: usize,
     },
+    /// The ESE catalog metadata (page 5 / table-of-tables) could not be read,
+    /// so catalog-based checks could not run — itself a corruption/tampering
+    /// signal, since a missing or malformed catalog page is the bootstrap
+    /// structure every catalog check depends on.
+    CatalogUnreadable {
+        /// The underlying `EseError` display string (the offending value).
+        detail: String,
+    },
 }
 
 impl EseStructuralAnomaly {
@@ -123,6 +131,7 @@ impl EseStructuralAnomaly {
             Self::DeletedRecordPresent { .. } => Severity::Medium,
             Self::AutoIncIdGap { .. } => Severity::Medium,
             Self::OrphanedCatalogEntry { .. } => Severity::High,
+            Self::CatalogUnreadable { .. } => Severity::Critical,
         }
     }
 
@@ -606,6 +615,7 @@ impl EseStructuralAnomaly {
             Self::OrphanedCatalogEntry { .. } => "SRUM-ESE-ORPHANED-CATALOG-ENTRY",
             Self::AutoIncIdGap { .. } => "SRUM-ESE-AUTO-INC-ID-GAP",
             Self::DeletedRecordPresent { .. } => "SRUM-ESE-DELETED-RECORD-PRESENT",
+            Self::CatalogUnreadable { .. } => "SRUM-ESE-CATALOG-UNREADABLE",
         }
     }
 }

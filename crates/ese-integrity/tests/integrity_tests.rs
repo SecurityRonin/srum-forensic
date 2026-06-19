@@ -458,6 +458,25 @@ fn detect_orphaned_catalog_reports_orphan_when_table_page_is_out_of_bounds() {
     );
 }
 
+#[test]
+fn detect_orphaned_catalog_surfaces_unreadable_catalog_as_anomaly() {
+    // The catalog (page 5) is the bootstrap structure this detector depends on.
+    // A database with no catalog page makes catalog_entries() fail — an itself
+    // suspicious / tamper-consistent condition. The detector MUST surface a loud
+    // CatalogUnreadable anomaly, never an empty Vec indistinguishable from a
+    // clean catalog (the silent-inversion failure class).
+    let tmp = fixtures::make_ese_with_db_state(DB_STATE_CLEAN_SHUTDOWN);
+    let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
+    let anomalies = detect_orphaned_catalog(&db);
+    let found = anomalies
+        .iter()
+        .any(|a| matches!(a, EseStructuralAnomaly::CatalogUnreadable { .. }));
+    assert!(
+        found,
+        "unreadable catalog must surface as CatalogUnreadable, not silent-empty; got {anomalies:?}"
+    );
+}
+
 // ── full_scan (Phase 4, stories 19-20) ───────────────────────────────────────
 
 #[test]
