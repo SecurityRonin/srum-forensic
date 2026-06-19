@@ -183,17 +183,18 @@ enum Cmd {
     },
     /// Show all SRUM activity for a single process across all tables.
     ///
-    /// Accepts an integer `app_id` or a substring of the resolved process name
-    /// (requires --resolve for name matching).
+    /// Accepts an integer `app_id` or a substring of the process name. Names are
+    /// resolved from `SruDbIdMapTable` by default (so name matching works out of
+    /// the box); pass `--raw` to skip resolution and emit raw integer IDs.
     #[command(name = "process")]
     Process {
         /// App ID (integer) or name substring to filter by.
         app: String,
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
-        /// Resolve `app_id` and `user_id` to names from `SruDbIdMapTable`.
+        /// Emit raw integer IDs instead of resolving names from `SruDbIdMapTable`.
         #[arg(long)]
-        resolve: bool,
+        raw: bool,
     },
     /// Aggregate per-process statistics across all SRUM tables.
     ///
@@ -203,9 +204,9 @@ enum Cmd {
     Stats {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
-        /// Resolve `app_id` to names from `SruDbIdMapTable`.
+        /// Emit raw integer IDs instead of resolving names from `SruDbIdMapTable`.
         #[arg(long)]
-        resolve: bool,
+        raw: bool,
     },
     /// Derive user keyboard sessions from the SRUM timeline.
     ///
@@ -241,8 +242,9 @@ enum Cmd {
         signature: HuntSignature,
         /// Path to SRUDB.dat.
         path: PathBuf,
+        /// Emit raw integer IDs instead of resolving names from `SruDbIdMapTable`.
         #[arg(long)]
-        resolve: bool,
+        raw: bool,
     },
     /// Compare two SRUDB.dat files and surface what changed between them.
     ///
@@ -253,9 +255,9 @@ enum Cmd {
         baseline: PathBuf,
         /// Suspect SRUDB.dat (after the incident).
         suspect: PathBuf,
-        /// Resolve `app_id/user_id` to names for process matching.
+        /// Emit raw integer IDs instead of resolving names for process matching.
         #[arg(long)]
-        resolve: bool,
+        raw: bool,
     },
     /// Merge all SRUM tables into a single chronological timeline.
     ///
@@ -266,12 +268,12 @@ enum Cmd {
     Timeline {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
-        /// Resolve `app_id` and `user_id` to names from `SruDbIdMapTable`.
+        /// Emit raw integer IDs instead of resolving names from `SruDbIdMapTable`.
         ///
-        /// Adds `app_name` and `user_name` fields to all records that carry
-        /// those integer IDs.
+        /// By default `app_name` and `user_name` are added to every record that
+        /// carries those integer IDs; `--raw` suppresses that resolution.
         #[arg(long)]
-        resolve: bool,
+        raw: bool,
     },
     /// Extract metadata from a SRUDB.dat file: SHA-256 hash, table enumeration,
     /// record counts, temporal span, and Windows version hint.
@@ -330,12 +332,10 @@ fn run() -> anyhow::Result<()> {
         Cmd::AppTimeline { path, resolve } => {
             cmd::tables::run_app_timeline(&path, resolve, &format)
         }
-        Cmd::Stats { path, resolve } => cmd::analysis::run_stats(&path, resolve, &format),
+        Cmd::Stats { path, raw } => cmd::analysis::run_stats(&path, !raw, &format),
         Cmd::Sessions { path } => cmd::analysis::run_sessions(&path, &format),
-        Cmd::Timeline { path, resolve } => cmd::analysis::run_timeline(&path, resolve, &format),
-        Cmd::Process { app, path, resolve } => {
-            cmd::analysis::run_process(&app, &path, resolve, &format)
-        }
+        Cmd::Timeline { path, raw } => cmd::analysis::run_timeline(&path, !raw, &format),
+        Cmd::Process { app, path, raw } => cmd::analysis::run_process(&app, &path, !raw, &format),
         Cmd::Gaps {
             path,
             threshold_hours,
@@ -343,13 +343,13 @@ fn run() -> anyhow::Result<()> {
         Cmd::Hunt {
             signature,
             path,
-            resolve,
-        } => cmd::analysis::run_hunt(&signature, &path, resolve, &format),
+            raw,
+        } => cmd::analysis::run_hunt(&signature, &path, !raw, &format),
         Cmd::Compare {
             baseline,
             suspect,
-            resolve,
-        } => cmd::forensics::run_compare(&baseline, &suspect, resolve, &format),
+            raw,
+        } => cmd::forensics::run_compare(&baseline, &suspect, !raw, &format),
         Cmd::Metadata { path } => cmd::forensics::run_metadata(&path, &format),
     }
 }

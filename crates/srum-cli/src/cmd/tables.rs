@@ -5,7 +5,7 @@ use crate::output::{print_values, OutputFormat};
 pub fn run_network(path: &Path, resolve: bool, format: &OutputFormat) -> anyhow::Result<()> {
     let records = srum_parser::parse_network_usage(path)?;
     let values: Vec<serde_json::Value> = if resolve {
-        let id_map = srum_analysis::load_id_map(path);
+        let id_map = crate::cmd::load_id_map_or_warn(path, !records.is_empty());
         records
             .into_iter()
             .map(|r| srum_analysis::enrich(r, &id_map))
@@ -19,7 +19,7 @@ pub fn run_network(path: &Path, resolve: bool, format: &OutputFormat) -> anyhow:
 pub fn run_apps(path: &Path, resolve: bool, format: &OutputFormat) -> anyhow::Result<()> {
     let records = srum_parser::parse_app_usage(path)?;
     let mut values: Vec<serde_json::Value> = if resolve {
-        let id_map = srum_analysis::load_id_map(path);
+        let id_map = crate::cmd::load_id_map_or_warn(path, !records.is_empty());
         records
             .into_iter()
             .map(|r| srum_analysis::enrich(r, &id_map))
@@ -52,7 +52,7 @@ pub fn run_connectivity(path: &Path, resolve: bool, format: &OutputFormat) -> an
     let records = srum_parser::parse_network_connectivity(path)?;
     let mut values = srum_analysis::records_to_values(records)?;
     if resolve {
-        let id_map = srum_analysis::load_id_map(path);
+        let id_map = crate::cmd::load_id_map_or_warn(path, !values.is_empty());
         values = values
             .into_iter()
             .map(|r| srum_analysis::enrich_connectivity(r, &id_map))
@@ -65,7 +65,7 @@ pub fn run_energy(path: &Path, resolve: bool, format: &OutputFormat) -> anyhow::
     let records = srum_parser::parse_energy_usage(path)?;
     let mut values = srum_analysis::records_to_values(records)?;
     if resolve {
-        let id_map = srum_analysis::load_id_map(path);
+        let id_map = crate::cmd::load_id_map_or_warn(path, !values.is_empty());
         values = values
             .into_iter()
             .map(|r| srum_analysis::enrich(r, &id_map))
@@ -78,7 +78,7 @@ pub fn run_energy_lt(path: &Path, resolve: bool, format: &OutputFormat) -> anyho
     let records = srum_parser::parse_energy_lt(path)?;
     let mut values = srum_analysis::records_to_values(records)?;
     if resolve {
-        let id_map = srum_analysis::load_id_map(path);
+        let id_map = crate::cmd::load_id_map_or_warn(path, !values.is_empty());
         values = values
             .into_iter()
             .map(|r| srum_analysis::enrich(r, &id_map))
@@ -91,7 +91,7 @@ pub fn run_notifications(path: &Path, resolve: bool, format: &OutputFormat) -> a
     let records = srum_parser::parse_push_notifications(path)?;
     let mut values = srum_analysis::records_to_values(records)?;
     if resolve {
-        let id_map = srum_analysis::load_id_map(path);
+        let id_map = crate::cmd::load_id_map_or_warn(path, !values.is_empty());
         values = values
             .into_iter()
             .map(|r| srum_analysis::enrich(r, &id_map))
@@ -103,7 +103,7 @@ pub fn run_notifications(path: &Path, resolve: bool, format: &OutputFormat) -> a
 pub fn run_app_timeline(path: &Path, resolve: bool, format: &OutputFormat) -> anyhow::Result<()> {
     let records = srum_parser::parse_app_timeline(path)?;
     let values: Vec<serde_json::Value> = if resolve {
-        let id_map = srum_analysis::load_id_map(path);
+        let id_map = crate::cmd::load_id_map_or_warn(path, !records.is_empty());
         records
             .into_iter()
             .map(|r| srum_analysis::enrich(r, &id_map))

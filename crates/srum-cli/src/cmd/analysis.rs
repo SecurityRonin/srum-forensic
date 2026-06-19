@@ -51,6 +51,7 @@ pub fn to_analysis_sig(s: &HuntSignature) -> srum_analysis::analysis::HuntSignat
 pub fn run_timeline(path: &Path, resolve: bool, format: &OutputFormat) -> anyhow::Result<()> {
     let id_map = resolve.then(|| srum_analysis::load_id_map(path));
     let all = srum_analysis::build_timeline(path, id_map.as_ref());
+    crate::cmd::warn_if_resolution_degraded(id_map.as_ref(), !all.is_empty());
     print_values(&all, format)
 }
 
@@ -62,6 +63,7 @@ pub fn run_process(
 ) -> anyhow::Result<()> {
     let id_map = resolve.then(|| srum_analysis::load_id_map(path));
     let all = srum_analysis::build_timeline(path, id_map.as_ref());
+    crate::cmd::warn_if_resolution_degraded(id_map.as_ref(), !all.is_empty());
     let filtered = srum_analysis::analysis::filter_by_app(all, app);
     print_values(&filtered, format)
 }
@@ -69,6 +71,7 @@ pub fn run_process(
 pub fn run_stats(path: &Path, resolve: bool, format: &OutputFormat) -> anyhow::Result<()> {
     let id_map = resolve.then(|| srum_analysis::load_id_map(path));
     let all = srum_analysis::build_timeline(path, id_map.as_ref());
+    crate::cmd::warn_if_resolution_degraded(id_map.as_ref(), !all.is_empty());
     let stats = srum_analysis::analysis::build_stats(all);
     print_values(&stats, format)
 }
@@ -109,6 +112,7 @@ pub fn run_hunt(
 ) -> anyhow::Result<()> {
     let id_map = resolve.then(|| srum_analysis::load_id_map(path));
     let all = srum_analysis::build_timeline(path, id_map.as_ref());
+    crate::cmd::warn_if_resolution_degraded(id_map.as_ref(), !all.is_empty());
     let filtered = srum_analysis::analysis::hunt_filter(all, &to_analysis_sig(signature));
     print_values(&filtered, format)
 }

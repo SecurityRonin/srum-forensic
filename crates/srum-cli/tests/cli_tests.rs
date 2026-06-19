@@ -682,10 +682,14 @@ fn sr_compare_both_nonexistent_exits_zero_best_effort() {
 }
 
 #[test]
-fn sr_compare_resolve_flag_exists() {
+fn sr_compare_raw_flag_exists() {
+    // compare resolves by default; `--raw` is the opt-out (replaces old --resolve).
     let out = sr_bin().args(["compare", "--help"]).output().expect("run");
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("resolve"));
+    assert!(
+        stdout.contains("--raw"),
+        "compare --help must document --raw, got: {stdout}"
+    );
 }
 
 // ── sr metadata ───────────────────────────────────────────────────────────────
@@ -1061,5 +1065,23 @@ fn sr_process_help_documents_raw() {
     assert!(
         stdout.contains("--raw"),
         "process --help must document --raw, got: {stdout}"
+    );
+}
+
+#[test]
+fn sr_dump_apps_resolved_does_not_warn_degraded() {
+    // When the idmap resolves cleanly, the degrade-to-raw warning must NOT fire.
+    let Some(fixture) = resolvable_fixture() else {
+        return;
+    };
+    let out = sr_bin()
+        .args(["dump", "apps"])
+        .arg(&fixture)
+        .output()
+        .expect("run sr dump apps");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        !stderr.contains("could not resolve names from SruDbIdMapTable"),
+        "must not warn when resolution succeeds, got stderr: {stderr}"
     );
 }

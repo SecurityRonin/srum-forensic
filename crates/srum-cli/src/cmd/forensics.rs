@@ -123,6 +123,11 @@ pub fn run_compare(
     let id_map_suspect = resolve.then(|| srum_analysis::load_id_map(suspect));
     let baseline_timeline = srum_analysis::build_timeline(baseline, id_map_baseline.as_ref());
     let suspect_timeline = srum_analysis::build_timeline(suspect, id_map_suspect.as_ref());
+    crate::cmd::warn_if_resolution_degraded(
+        id_map_baseline.as_ref(),
+        !baseline_timeline.is_empty(),
+    );
+    crate::cmd::warn_if_resolution_degraded(id_map_suspect.as_ref(), !suspect_timeline.is_empty());
     let baseline_stats = srum_analysis::analysis::build_stats(baseline_timeline);
     let suspect_stats = srum_analysis::analysis::build_stats(suspect_timeline);
     let result = srum_analysis::analysis::compare_databases(baseline_stats, suspect_stats);
