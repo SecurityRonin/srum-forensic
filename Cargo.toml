@@ -52,7 +52,7 @@ tempfile = "3"
 ese-core          = { path = "crates/ese-core", version = "0.1.0" }
 ese-integrity     = { path = "crates/ese-integrity" }
 ese-test-fixtures = { path = "crates/ese-test-fixtures" }
-forensicnomicon   = "0.5.0"
+forensicnomicon   = "0.5.8"
 srum-core         = { path = "crates/srum-core", version = "0.1.0" }
 srum-parser       = { path = "crates/srum-parser", version = "0.1.0" }
 srum-schema       = { path = "crates/srum-schema" }

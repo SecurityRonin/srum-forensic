@@ -447,9 +447,6 @@ fn belkasoft_idmap_has_no_apt_tools() {
 }
 
 #[test]
-#[ignore = "needs forensicnomicon >= 0.5.8: is_suspicious_path must flag \\documents\\ \
-            (user-profile exec dir, same class as the existing \\downloads\\ rule). \
-            Un-ignore once srum-forensic's forensicnomicon dep is bumped."]
 fn belkasoft_suspicious_path_fires_on_vscodium_in_documents() {
     // VSCodium running from the user's Documents folder is a non-standard path.
     // suspicious_path must fire — independently verified by reading the fixture.
