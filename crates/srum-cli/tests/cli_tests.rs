@@ -518,14 +518,34 @@ fn sr_stats_help_exits_success() {
 }
 
 #[test]
-fn sr_stats_nonexistent_exits_zero_best_effort() {
+fn sr_stats_nonexistent_exits_nonzero() {
+    // New contract: a database that cannot be OPENED is a bootstrap failure and
+    // must exit non-zero — an automation caller has to tell "couldn't open the
+    // SRUDB" apart from "opened it, found nothing".
     let out = sr_bin()
         .args(["stats", "/nonexistent/SRUDB.dat"])
         .output()
         .expect("run");
-    assert!(out.status.success(), "stats must exit 0 (best-effort)");
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains('['), "must output JSON array: {stdout}");
+    assert!(
+        !out.status.success(),
+        "stats must exit nonzero when the database cannot be opened"
+    );
+}
+
+#[test]
+fn sr_stats_valid_empty_db_exits_zero() {
+    // A successfully-opened SRUDB that simply has no records is a legitimate
+    // empty result → exit 0.
+    let db = ese_test_fixtures::EseFileBuilder::new()
+        .with_db_state(ese_core::DB_STATE_CLEAN_SHUTDOWN)
+        .write();
+    let out = sr_bin().arg("stats").arg(db.path()).output().expect("run");
+    assert!(
+        out.status.success(),
+        "stats must exit 0 on a valid-but-empty database, got: {:?} stderr: {}",
+        out.status,
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 
 #[test]
@@ -544,14 +564,33 @@ fn sr_sessions_help_exits_success() {
 }
 
 #[test]
-fn sr_sessions_nonexistent_exits_zero_best_effort() {
+fn sr_sessions_nonexistent_exits_nonzero() {
     let out = sr_bin()
         .args(["sessions", "/nonexistent/SRUDB.dat"])
         .output()
         .expect("run");
-    assert!(out.status.success(), "sessions must exit 0 (best-effort)");
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains('['), "must output JSON array: {stdout}");
+    assert!(
+        !out.status.success(),
+        "sessions must exit nonzero when the database cannot be opened"
+    );
+}
+
+#[test]
+fn sr_sessions_valid_empty_db_exits_zero() {
+    let db = ese_test_fixtures::EseFileBuilder::new()
+        .with_db_state(ese_core::DB_STATE_CLEAN_SHUTDOWN)
+        .write();
+    let out = sr_bin()
+        .arg("sessions")
+        .arg(db.path())
+        .output()
+        .expect("run");
+    assert!(
+        out.status.success(),
+        "sessions must exit 0 on a valid-but-empty database, got: {:?} stderr: {}",
+        out.status,
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 
 // ── sr gaps ──────────────────────────────────────────────────────────────────
@@ -563,14 +602,29 @@ fn sr_gaps_help_exits_success() {
 }
 
 #[test]
-fn sr_gaps_nonexistent_exits_zero_best_effort() {
+fn sr_gaps_nonexistent_exits_nonzero() {
     let out = sr_bin()
         .args(["gaps", "/nonexistent/SRUDB.dat"])
         .output()
         .expect("run");
-    assert!(out.status.success(), "gaps must exit 0 (best-effort)");
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains('['), "must output JSON array: {stdout}");
+    assert!(
+        !out.status.success(),
+        "gaps must exit nonzero when the database cannot be opened"
+    );
+}
+
+#[test]
+fn sr_gaps_valid_empty_db_exits_zero() {
+    let db = ese_test_fixtures::EseFileBuilder::new()
+        .with_db_state(ese_core::DB_STATE_CLEAN_SHUTDOWN)
+        .write();
+    let out = sr_bin().arg("gaps").arg(db.path()).output().expect("run");
+    assert!(
+        out.status.success(),
+        "gaps must exit 0 on a valid-but-empty database, got: {:?} stderr: {}",
+        out.status,
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 
 #[test]
@@ -622,32 +676,51 @@ fn sr_hunt_help_exits_success() {
 }
 
 #[test]
-fn sr_hunt_exfil_nonexistent_exits_zero_best_effort() {
+fn sr_hunt_exfil_nonexistent_exits_nonzero() {
     let out = sr_bin()
         .args(["hunt", "exfil", "/nonexistent/SRUDB.dat"])
         .output()
         .expect("run");
-    assert!(out.status.success(), "hunt must exit 0 (best-effort)");
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains('['), "must output JSON array: {stdout}");
+    assert!(
+        !out.status.success(),
+        "hunt must exit nonzero when the database cannot be opened"
+    );
 }
 
 #[test]
-fn sr_hunt_miner_nonexistent_exits_zero_best_effort() {
+fn sr_hunt_miner_nonexistent_exits_nonzero() {
     let out = sr_bin()
         .args(["hunt", "miner", "/nonexistent/SRUDB.dat"])
         .output()
         .expect("run");
-    assert!(out.status.success());
+    assert!(!out.status.success());
 }
 
 #[test]
-fn sr_hunt_all_nonexistent_exits_zero_best_effort() {
+fn sr_hunt_all_nonexistent_exits_nonzero() {
     let out = sr_bin()
         .args(["hunt", "all", "/nonexistent/SRUDB.dat"])
         .output()
         .expect("run");
-    assert!(out.status.success());
+    assert!(!out.status.success());
+}
+
+#[test]
+fn sr_hunt_valid_empty_db_exits_zero() {
+    let db = ese_test_fixtures::EseFileBuilder::new()
+        .with_db_state(ese_core::DB_STATE_CLEAN_SHUTDOWN)
+        .write();
+    let out = sr_bin()
+        .args(["hunt", "all"])
+        .arg(db.path())
+        .output()
+        .expect("run");
+    assert!(
+        out.status.success(),
+        "hunt must exit 0 on a valid-but-empty database, got: {:?} stderr: {}",
+        out.status,
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 
 // ── sr compare ───────────────────────────────────────────────────────────────
