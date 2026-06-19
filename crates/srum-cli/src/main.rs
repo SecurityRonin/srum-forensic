@@ -24,6 +24,10 @@ use output::OutputFormat;
 struct Cli {
     #[command(subcommand)]
     command: Cmd,
+    /// Output format (json, csv, or ndjson). May appear before or after the
+    /// subcommand.
+    #[arg(long, value_enum, global = true, default_value_t)]
+    format: OutputFormat,
 }
 
 /// Raw SRUM table selector for `dump <table>`.
@@ -90,9 +94,6 @@ enum Cmd {
         /// Adds `app_name` and `user_name` fields to each record.
         #[arg(long)]
         resolve: bool,
-        /// Output format (json or csv).
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
     },
     /// Parse application usage records from SRUDB.dat and print as JSON.
     ///
@@ -106,9 +107,6 @@ enum Cmd {
         /// Adds `app_name` and `user_name` fields to each record.
         #[arg(long)]
         resolve: bool,
-        /// Output format (json or csv).
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
     },
     /// Dump the `SruDbIdMapTable` as JSON — resolves `app_id` / `user_id` integers
     /// to process paths and SIDs.
@@ -116,9 +114,6 @@ enum Cmd {
     Idmap {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
-        /// Output format (json or csv).
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
     },
     /// Parse network connectivity records — L2 connection sessions per process.
     ///
@@ -132,9 +127,6 @@ enum Cmd {
         /// Adds `app_name`, `user_name`, and `profile_name` fields to each record.
         #[arg(long)]
         resolve: bool,
-        /// Output format (json or csv).
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
     },
     /// Parse energy usage records — battery drain and power consumption per process.
     ///
@@ -148,9 +140,6 @@ enum Cmd {
         /// Adds `app_name` and `user_name` fields to each record.
         #[arg(long)]
         resolve: bool,
-        /// Output format (json or csv).
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
     },
     /// Parse energy usage long-term records — same schema, longer accumulation window.
     ///
@@ -164,9 +153,6 @@ enum Cmd {
         /// Adds `app_name` and `user_name` fields to each record.
         #[arg(long)]
         resolve: bool,
-        /// Output format (json or csv).
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
     },
     /// Parse push notification records — app notification activity per interval.
     ///
@@ -180,9 +166,6 @@ enum Cmd {
         /// Adds `app_name` and `user_name` fields to each record.
         #[arg(long)]
         resolve: bool,
-        /// Output format (json or csv).
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
     },
     /// Parse Application Timeline records — in-focus and user-input duration per app.
     ///
@@ -197,9 +180,6 @@ enum Cmd {
         /// Adds `app_name` and `user_name` fields to each record.
         #[arg(long)]
         resolve: bool,
-        /// Output format (json or csv).
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
     },
     /// Show all SRUM activity for a single process across all tables.
     ///
@@ -214,9 +194,6 @@ enum Cmd {
         /// Resolve `app_id` and `user_id` to names from `SruDbIdMapTable`.
         #[arg(long)]
         resolve: bool,
-        /// Output format (json, csv, or ndjson).
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
     },
     /// Aggregate per-process statistics across all SRUM tables.
     ///
@@ -229,9 +206,6 @@ enum Cmd {
         /// Resolve `app_id` to names from `SruDbIdMapTable`.
         #[arg(long)]
         resolve: bool,
-        /// Output format (json, csv, or ndjson).
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
     },
     /// Derive user keyboard sessions from the SRUM timeline.
     ///
@@ -241,9 +215,6 @@ enum Cmd {
     Sessions {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
-        /// Output format (json, csv, or ndjson).
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
     },
     /// Detect temporal gaps in SRUM records — identifies system-off periods and
     /// potential targeted record deletion.
@@ -260,9 +231,6 @@ enum Cmd {
         /// Minimum gap size in hours to report (default: 2).
         #[arg(long, default_value_t = 2u64)]
         threshold_hours: u64,
-        /// Output format (json, csv, or ndjson).
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
     },
     /// Hunt for specific forensic patterns across all SRUM tables.
     ///
@@ -275,8 +243,6 @@ enum Cmd {
         path: PathBuf,
         #[arg(long)]
         resolve: bool,
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
     },
     /// Compare two SRUDB.dat files and surface what changed between them.
     ///
@@ -290,8 +256,6 @@ enum Cmd {
         /// Resolve `app_id/user_id` to names for process matching.
         #[arg(long)]
         resolve: bool,
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
     },
     /// Merge all SRUM tables into a single chronological timeline.
     ///
@@ -308,21 +272,15 @@ enum Cmd {
         /// those integer IDs.
         #[arg(long)]
         resolve: bool,
-        /// Output format (json or csv).
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
     },
     /// Extract metadata from a SRUDB.dat file: SHA-256 hash, table enumeration,
     /// record counts, temporal span, and Windows version hint.
-    Metadata {
-        path: PathBuf,
-        #[arg(long, value_enum, default_value_t)]
-        format: OutputFormat,
-    },
+    Metadata { path: PathBuf },
 }
 
 fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
+    let format = cli.format;
     match cli.command {
         Cmd::Dump {
             table,
@@ -345,7 +303,6 @@ fn run() -> anyhow::Result<()> {
             let Some(path) = path else {
                 anyhow::bail!("a path to SRUDB.dat is required");
             };
-            let format = OutputFormat::default();
             let resolve = !raw;
             match table {
                 DumpTable::Network => cmd::tables::run_network(&path, resolve, &format),
@@ -359,77 +316,41 @@ fn run() -> anyhow::Result<()> {
                 DumpTable::Idmap => cmd::tables::run_idmap(&path, &format),
             }
         }
-        Cmd::Network {
-            path,
-            resolve,
-            format,
-        } => cmd::tables::run_network(&path, resolve, &format),
-        Cmd::Apps {
-            path,
-            resolve,
-            format,
-        } => cmd::tables::run_apps(&path, resolve, &format),
-        Cmd::Idmap { path, format } => cmd::tables::run_idmap(&path, &format),
-        Cmd::Connectivity {
-            path,
-            resolve,
-            format,
-        } => cmd::tables::run_connectivity(&path, resolve, &format),
-        Cmd::Energy {
-            path,
-            resolve,
-            format,
-        } => cmd::tables::run_energy(&path, resolve, &format),
-        Cmd::EnergyLt {
-            path,
-            resolve,
-            format,
-        } => cmd::tables::run_energy_lt(&path, resolve, &format),
-        Cmd::Notifications {
-            path,
-            resolve,
-            format,
-        } => cmd::tables::run_notifications(&path, resolve, &format),
-        Cmd::AppTimeline {
-            path,
-            resolve,
-            format,
-        } => cmd::tables::run_app_timeline(&path, resolve, &format),
-        Cmd::Stats {
-            path,
-            resolve,
-            format,
-        } => cmd::analysis::run_stats(&path, resolve, &format),
-        Cmd::Sessions { path, format } => cmd::analysis::run_sessions(&path, &format),
-        Cmd::Timeline {
-            path,
-            resolve,
-            format,
-        } => cmd::analysis::run_timeline(&path, resolve, &format),
-        Cmd::Process {
-            app,
-            path,
-            resolve,
-            format,
-        } => cmd::analysis::run_process(&app, &path, resolve, &format),
+        Cmd::Network { path, resolve } => cmd::tables::run_network(&path, resolve, &format),
+        Cmd::Apps { path, resolve } => cmd::tables::run_apps(&path, resolve, &format),
+        Cmd::Idmap { path } => cmd::tables::run_idmap(&path, &format),
+        Cmd::Connectivity { path, resolve } => {
+            cmd::tables::run_connectivity(&path, resolve, &format)
+        }
+        Cmd::Energy { path, resolve } => cmd::tables::run_energy(&path, resolve, &format),
+        Cmd::EnergyLt { path, resolve } => cmd::tables::run_energy_lt(&path, resolve, &format),
+        Cmd::Notifications { path, resolve } => {
+            cmd::tables::run_notifications(&path, resolve, &format)
+        }
+        Cmd::AppTimeline { path, resolve } => {
+            cmd::tables::run_app_timeline(&path, resolve, &format)
+        }
+        Cmd::Stats { path, resolve } => cmd::analysis::run_stats(&path, resolve, &format),
+        Cmd::Sessions { path } => cmd::analysis::run_sessions(&path, &format),
+        Cmd::Timeline { path, resolve } => cmd::analysis::run_timeline(&path, resolve, &format),
+        Cmd::Process { app, path, resolve } => {
+            cmd::analysis::run_process(&app, &path, resolve, &format)
+        }
         Cmd::Gaps {
             path,
             threshold_hours,
-            format,
         } => cmd::analysis::run_gaps(&path, threshold_hours, &format),
         Cmd::Hunt {
             signature,
             path,
             resolve,
-            format,
         } => cmd::analysis::run_hunt(&signature, &path, resolve, &format),
         Cmd::Compare {
             baseline,
             suspect,
             resolve,
-            format,
         } => cmd::forensics::run_compare(&baseline, &suspect, resolve, &format),
-        Cmd::Metadata { path, format } => cmd::forensics::run_metadata(&path, &format),
+        Cmd::Metadata { path } => cmd::forensics::run_metadata(&path, &format),
     }
 }
 
