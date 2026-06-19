@@ -931,3 +931,135 @@ fn sr_format_after_subcommand_still_yields_ndjson() {
         "trailing --format ndjson must reach output, got: {stdout}"
     );
 }
+
+// ── Stage 3: resolve by default, --raw opt-out (resolving commands only) ──────
+
+#[test]
+fn sr_dump_apps_resolves_by_default() {
+    let Some(fixture) = resolvable_fixture() else {
+        return;
+    };
+    let out = sr_bin()
+        .args(["dump", "apps"])
+        .arg(&fixture)
+        .output()
+        .expect("run sr dump apps");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("app_name"),
+        "dump apps must resolve names by default (contain app_name), got first 200: {}",
+        &stdout.chars().take(200).collect::<String>()
+    );
+}
+
+#[test]
+fn sr_dump_apps_raw_emits_raw_ids() {
+    let Some(fixture) = resolvable_fixture() else {
+        return;
+    };
+    let out = sr_bin()
+        .args(["dump", "apps"])
+        .arg(&fixture)
+        .arg("--raw")
+        .output()
+        .expect("run sr dump apps --raw");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        !stdout.contains("app_name"),
+        "dump apps --raw must NOT contain app_name (raw IDs only)"
+    );
+}
+
+#[test]
+fn sr_timeline_resolves_by_default() {
+    let Some(fixture) = resolvable_fixture() else {
+        return;
+    };
+    let out = sr_bin()
+        .arg("timeline")
+        .arg(&fixture)
+        .output()
+        .expect("run sr timeline");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("app_name"),
+        "timeline must resolve names by default"
+    );
+}
+
+#[test]
+fn sr_timeline_raw_emits_raw_ids() {
+    let Some(fixture) = resolvable_fixture() else {
+        return;
+    };
+    let out = sr_bin()
+        .arg("timeline")
+        .arg(&fixture)
+        .arg("--raw")
+        .output()
+        .expect("run sr timeline --raw");
+    assert_ne!(out.status.code(), Some(2), "--raw must parse on timeline");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        !stdout.contains("app_name"),
+        "timeline --raw must NOT contain app_name"
+    );
+}
+
+#[test]
+fn sr_stats_resolves_by_default() {
+    let Some(fixture) = resolvable_fixture() else {
+        return;
+    };
+    let out = sr_bin()
+        .arg("stats")
+        .arg(&fixture)
+        .output()
+        .expect("run sr stats");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("app_name"),
+        "stats must resolve names by default"
+    );
+}
+
+#[test]
+fn sr_process_resolves_by_default() {
+    let Some(fixture) = resolvable_fixture() else {
+        return;
+    };
+    let out = sr_bin()
+        .args(["process", "svchost"])
+        .arg(&fixture)
+        .output()
+        .expect("run sr process");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("app_name"),
+        "process must resolve names by default"
+    );
+}
+
+#[test]
+fn sr_process_raw_flag_parses() {
+    let Some(fixture) = resolvable_fixture() else {
+        return;
+    };
+    let out = sr_bin()
+        .args(["process", "svchost"])
+        .arg(&fixture)
+        .arg("--raw")
+        .output()
+        .expect("run sr process --raw");
+    assert_ne!(out.status.code(), Some(2), "--raw must parse on process");
+}
+
+#[test]
+fn sr_process_help_documents_raw() {
+    let out = sr_bin().args(["process", "--help"]).output().expect("run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("--raw"),
+        "process --help must document --raw, got: {stdout}"
+    );
+}
