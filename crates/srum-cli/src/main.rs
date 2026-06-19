@@ -26,11 +26,62 @@ struct Cli {
     command: Cmd,
 }
 
+/// Raw SRUM table selector for `dump <table>`.
+#[derive(clap::ValueEnum, Clone)]
+enum DumpTable {
+    Network,
+    Apps,
+    Connectivity,
+    Energy,
+    #[value(name = "energy-lt")]
+    EnergyLt,
+    Notifications,
+    #[value(name = "app-timeline")]
+    AppTimeline,
+    Idmap,
+}
+
+impl DumpTable {
+    /// All table names, in declaration order, for `dump --list`.
+    fn all_names() -> [&'static str; 8] {
+        [
+            "network",
+            "apps",
+            "connectivity",
+            "energy",
+            "energy-lt",
+            "notifications",
+            "app-timeline",
+            "idmap",
+        ]
+    }
+}
+
 #[derive(Subcommand)]
 enum Cmd {
+    /// Dump a single raw SRUM table.
+    ///
+    /// Names are resolved from `SruDbIdMapTable` by default; pass `--raw` to emit
+    /// raw integer IDs. `--raw` is a no-op for the `idmap` table (it has no IDs to
+    /// resolve). Run `dump --list` to see the available table names.
+    Dump {
+        /// Table to dump (omit when using `--list`).
+        #[arg(value_enum)]
+        table: Option<DumpTable>,
+        /// Path to SRUDB.dat (or a forensic copy of it).
+        #[arg(required_unless_present = "list")]
+        path: Option<PathBuf>,
+        /// Emit raw integer IDs instead of resolving names. No-op for `idmap`.
+        #[arg(long)]
+        raw: bool,
+        /// List the available table names and exit.
+        #[arg(long)]
+        list: bool,
+    },
     /// Parse network usage records from SRUDB.dat and print as JSON.
     ///
     /// Records come from the {973F5D5C-1D90-4944-BE8E-24B22A728CF2} table.
+    #[command(hide = true)]
     Network {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
@@ -46,6 +97,7 @@ enum Cmd {
     /// Parse application usage records from SRUDB.dat and print as JSON.
     ///
     /// Records come from the {5C8CF1C7-7257-4F13-B223-970EF5939312} table.
+    #[command(hide = true)]
     Apps {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
@@ -60,6 +112,7 @@ enum Cmd {
     },
     /// Dump the `SruDbIdMapTable` as JSON — resolves `app_id` / `user_id` integers
     /// to process paths and SIDs.
+    #[command(hide = true)]
     Idmap {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
@@ -70,6 +123,7 @@ enum Cmd {
     /// Parse network connectivity records — L2 connection sessions per process.
     ///
     /// Records come from the {DD6636C4-8929-4683-974E-22C046A43763} table.
+    #[command(hide = true)]
     Connectivity {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
@@ -85,6 +139,7 @@ enum Cmd {
     /// Parse energy usage records — battery drain and power consumption per process.
     ///
     /// Records come from the {FEE4E14F-02A9-4550-B5CE-5FA2DA202E37} table.
+    #[command(hide = true)]
     Energy {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
@@ -100,7 +155,7 @@ enum Cmd {
     /// Parse energy usage long-term records — same schema, longer accumulation window.
     ///
     /// Records come from the {FEE4E14F-02A9-4550-B5CE-5FA2DA202E37}LT table.
-    #[command(name = "energy-lt")]
+    #[command(name = "energy-lt", hide = true)]
     EnergyLt {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
@@ -116,6 +171,7 @@ enum Cmd {
     /// Parse push notification records — app notification activity per interval.
     ///
     /// Records come from the {D10CA2FE-6FCF-4F6D-848E-B2E99266FA89} table.
+    #[command(hide = true)]
     Notifications {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
@@ -132,7 +188,7 @@ enum Cmd {
     ///
     /// Records come from the {7ACBBAA3-D029-4BE4-9A7A-0885927F1D8F} table.
     /// Available since Windows 10 Anniversary Update (1607).
-    #[command(name = "app-timeline")]
+    #[command(name = "app-timeline", hide = true)]
     AppTimeline {
         /// Path to SRUDB.dat (or a forensic copy of it).
         path: PathBuf,
@@ -268,6 +324,41 @@ enum Cmd {
 fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
+        Cmd::Dump {
+            table,
+            path,
+            raw,
+            list,
+        } => {
+            if list {
+                for name in DumpTable::all_names() {
+                    println!("{name}");
+                }
+                return Ok(());
+            }
+            // `path` is `required_unless_present = "list"`, and a `table` is required
+            // for any non-list invocation; clap rejects a bare `dump` before reaching
+            // here, so these guards are defence-in-depth.
+            let Some(table) = table else {
+                anyhow::bail!("a table is required; run `dump --list` to see the options");
+            };
+            let Some(path) = path else {
+                anyhow::bail!("a path to SRUDB.dat is required");
+            };
+            let format = OutputFormat::default();
+            let resolve = !raw;
+            match table {
+                DumpTable::Network => cmd::tables::run_network(&path, resolve, &format),
+                DumpTable::Apps => cmd::tables::run_apps(&path, resolve, &format),
+                DumpTable::Connectivity => cmd::tables::run_connectivity(&path, resolve, &format),
+                DumpTable::Energy => cmd::tables::run_energy(&path, resolve, &format),
+                DumpTable::EnergyLt => cmd::tables::run_energy_lt(&path, resolve, &format),
+                DumpTable::Notifications => cmd::tables::run_notifications(&path, resolve, &format),
+                DumpTable::AppTimeline => cmd::tables::run_app_timeline(&path, resolve, &format),
+                // idmap has no IDs to resolve; `--raw` is a no-op (documented in help).
+                DumpTable::Idmap => cmd::tables::run_idmap(&path, &format),
+            }
+        }
         Cmd::Network {
             path,
             resolve,

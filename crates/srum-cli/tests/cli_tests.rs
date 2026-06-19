@@ -843,12 +843,21 @@ fn sr_hidden_network_alias_still_works() {
     );
 }
 
+/// True when `--help` output lists `name` as a subcommand (a 2-space-indented
+/// line whose first token is exactly `name`) — distinct from `name` merely
+/// appearing inside prose.
+fn help_lists_command(stdout: &str, name: &str) -> bool {
+    stdout
+        .lines()
+        .any(|l| l.starts_with("  ") && l.split_whitespace().next().is_some_and(|tok| tok == name))
+}
+
 #[test]
 fn sr_top_help_hides_network() {
     let out = sr_bin().arg("--help").output().expect("run sr --help");
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
-        !stdout.contains("network"),
+        !help_lists_command(&stdout, "network"),
         "top-level --help must NOT list hidden `network` command, got: {stdout}"
     );
 }
@@ -858,7 +867,7 @@ fn sr_top_help_lists_dump() {
     let out = sr_bin().arg("--help").output().expect("run sr --help");
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
-        stdout.contains("dump"),
+        help_lists_command(&stdout, "dump"),
         "top-level --help must list the new `dump` command, got: {stdout}"
     );
 }
