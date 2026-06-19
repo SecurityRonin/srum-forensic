@@ -3067,6 +3067,7 @@ dependencies = [
  "clap",
  "csv",
  "ese-core",
+ "ese-test-fixtures",
  "hex",
  "serde",
  "serde_json",

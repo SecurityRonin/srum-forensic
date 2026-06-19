@@ -39,7 +39,15 @@ fn collect_metadata(path: &Path) -> anyhow::Result<serde_json::Value> {
 
     // Open ESE to enumerate tables
     let db = ese_core::EseDatabase::open(path)?;
-    let catalog = db.catalog_entries().unwrap_or_default();
+    // The catalog (table-of-tables) is the bootstrap for table enumeration; a
+    // failed read is itself a corruption/tampering signal and must surface, never
+    // be absorbed into a zero-table report indistinguishable from an empty DB.
+    let catalog = db.catalog_entries().map_err(|e| {
+        anyhow::anyhow!(
+            "failed to read ESE catalog (table-of-tables) from {}: {e}",
+            path.display()
+        )
+    })?;
 
     // object_type == 1 means table
     let mut known_tables: Vec<String> = Vec::new();
