@@ -409,11 +409,21 @@ pub fn full_scan(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
 /// `table_page >= page_count`. A hit means the catalog was updated but the
 /// corresponding data pages were never written — either truncation or tampering.
 ///
-/// If `db.catalog_entries()` fails (e.g. page 4 is missing), returns an
-/// empty `Vec` rather than propagating the error.
+/// If `db.catalog_entries()` fails (e.g. the catalog root page is missing or
+/// malformed), the catalog — the bootstrap structure this detector depends on —
+/// is unreadable. Rather than silently returning an empty `Vec` (which would be
+/// indistinguishable from a clean catalog), this surfaces a single loud
+/// [`EseStructuralAnomaly::CatalogUnreadable`] carrying the underlying error
+/// string, because an unreadable catalog is itself a corruption / tampering
+/// signal.
 pub fn detect_orphaned_catalog(db: &EseDatabase) -> Vec<EseStructuralAnomaly> {
-    let Ok(entries) = db.catalog_entries() else {
-        return Vec::new();
+    let entries = match db.catalog_entries() {
+        Ok(entries) => entries,
+        Err(e) => {
+            return vec![EseStructuralAnomaly::CatalogUnreadable {
+                detail: e.to_string(),
+            }]
+        }
     };
     let last_valid = db.page_count().saturating_sub(1) as u32;
     entries

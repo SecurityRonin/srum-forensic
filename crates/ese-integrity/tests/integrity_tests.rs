@@ -426,14 +426,18 @@ fn autoinc_id_gap_severity_is_warning() {
 // ── detect_orphaned_catalog (Phase 4, stories 17-18) ─────────────────────────
 
 #[test]
-fn detect_orphaned_catalog_empty_for_database_with_no_catalog_entries() {
-    // A minimal fixture has no page 4 → catalog_entries() fails → empty result.
+fn detect_orphaned_catalog_surfaces_unreadable_catalog_for_database_with_no_catalog() {
+    // A minimal fixture has no catalog root page → catalog_entries() fails. The
+    // unreadable catalog is the bootstrap structure this detector depends on, so
+    // it must surface as a loud CatalogUnreadable anomaly, never silent-empty.
     let tmp = fixtures::make_ese_with_db_state(DB_STATE_CLEAN_SHUTDOWN);
     let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
     let anomalies = detect_orphaned_catalog(&db);
     assert!(
-        anomalies.is_empty(),
-        "database with inaccessible catalog must produce no anomaly"
+        anomalies
+            .iter()
+            .any(|a| matches!(a, EseStructuralAnomaly::CatalogUnreadable { .. })),
+        "database with inaccessible catalog must produce a CatalogUnreadable anomaly"
     );
 }
 
@@ -480,14 +484,18 @@ fn detect_orphaned_catalog_surfaces_unreadable_catalog_as_anomaly() {
 // ── full_scan (Phase 4, stories 19-20) ───────────────────────────────────────
 
 #[test]
-fn full_scan_empty_for_clean_database() {
-    // A clean minimal database should produce no anomalies via full_scan.
+fn full_scan_surfaces_unreadable_catalog_via_detect_orphaned_catalog() {
+    // The minimal fixture has no catalog root page, so detect_orphaned_catalog —
+    // which full_scan aggregates — reports CatalogUnreadable. full_scan must
+    // propagate that loud anomaly rather than swallow it into an empty result.
     let tmp = fixtures::make_ese_with_db_state(DB_STATE_CLEAN_SHUTDOWN);
     let db = ese_core::EseDatabase::open(tmp.path()).expect("open");
     let anomalies = full_scan(&db);
     assert!(
-        anomalies.is_empty(),
-        "clean database must produce no anomalies from full_scan"
+        anomalies
+            .iter()
+            .any(|a| matches!(a, EseStructuralAnomaly::CatalogUnreadable { .. })),
+        "full_scan must surface CatalogUnreadable for a database with no catalog page"
     );
 }
 
