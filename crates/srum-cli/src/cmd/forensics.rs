@@ -168,3 +168,25 @@ pub fn run_metadata(path: &Path, format: &OutputFormat) -> anyhow::Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Bootstrap-masking guard: an ESE database whose catalog (the table-of-tables)
+    /// cannot be read must surface as an ERROR, not a metadata report claiming the
+    /// database has zero tables — a corrupt/missing catalog and a genuinely empty
+    /// database are forensically opposite states and must not look identical.
+    #[test]
+    fn collect_metadata_errors_when_catalog_is_unreadable() {
+        // Minimal ESE file: valid header pages so `EseDatabase::open` succeeds, but
+        // no catalog root page, so `catalog_entries()` fails.
+        let tmp = ese_test_fixtures::EseFileBuilder::new()
+            .with_db_state(ese_core::DB_STATE_CLEAN_SHUTDOWN)
+            .write();
+        assert!(
+            collect_metadata(tmp.path()).is_err(),
+            "unreadable ESE catalog must error, not yield a zero-table metadata report"
+        );
+    }
+}
