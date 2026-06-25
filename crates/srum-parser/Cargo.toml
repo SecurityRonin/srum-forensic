@@ -1,6 +1,6 @@
 [package]
 name = "srum-parser"
-version = "0.1.0"
+version = "0.1.1"
 description = "SRUDB.dat parser — reads SRUM records from ESE database files"
 edition.workspace = true
 rust-version.workspace = true

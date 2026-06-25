@@ -1,6 +1,6 @@
 [package]
 name = "srum-analysis"
-version = "0.2.0"
+version = "0.2.1"
 description = "SRUM forensic analysis pipeline — shared between srum-cli and srum-gui"
 edition.workspace = true
 rust-version.workspace = true
