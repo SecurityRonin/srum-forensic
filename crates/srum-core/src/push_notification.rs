@@ -2,7 +2,7 @@
 //!
 //! Source table: `{D10CA2FE-6FCF-4F6D-848E-B2E99266FA89}` in SRUDB.dat.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 /// One SRUM push notification record: app notification delivery per interval.
@@ -17,7 +17,7 @@ pub struct PushNotificationRecord {
     /// Integer ID of the user account (look up in [`crate::IdMapEntry`]).
     pub user_id: i32,
     /// UTC timestamp of the measurement interval start.
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     /// Notification category (0=toast, 1=badge, 2=tile, 3=raw).
     pub notification_type: u32,
     /// Number of notifications delivered in this interval.

@@ -2,7 +2,7 @@
 //!
 //! Source table: `{FEE4E14F-02A9-4550-B5CE-5FA2DA202E37}` in SRUDB.dat.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 /// One SRUM energy usage record: battery state and energy consumed per process.
@@ -16,7 +16,7 @@ pub struct EnergyUsageRecord {
     /// Integer ID of the user account (look up in [`crate::IdMapEntry`]).
     pub user_id: i32,
     /// UTC timestamp of the measurement interval start.
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     /// Remaining battery charge at interval end (mWh).
     pub charge_level: u64,
     /// Energy consumed by this process in the interval (mWh).

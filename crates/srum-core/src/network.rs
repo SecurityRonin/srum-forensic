@@ -2,7 +2,7 @@
 //!
 //! Source table: `{973F5D5C-1D90-4944-BE8E-24B94231A174}` in SRUDB.dat.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 /// One SRUM network usage record: the bytes a process sent/received in a
@@ -16,7 +16,7 @@ pub struct NetworkUsageRecord {
     /// Integer ID of the user account (look up in [`crate::IdMapEntry`]).
     pub user_id: i32,
     /// UTC timestamp of the measurement interval start.
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     /// Bytes sent by the process in this interval.
     pub bytes_sent: u64,
     /// Bytes received by the process in this interval.

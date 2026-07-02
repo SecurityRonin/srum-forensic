@@ -2,7 +2,7 @@
 //!
 //! Source table: `{5C8CF1C7-7257-4F13-B223-970EF5939312}` in SRUDB.dat.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 /// One SRUM application resource usage record: CPU cycle counts for
@@ -14,7 +14,7 @@ pub struct AppUsageRecord {
     /// Integer ID of the user account.
     pub user_id: i32,
     /// UTC timestamp of the measurement interval start.
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     /// CPU cycles consumed while the application was in the foreground.
     pub foreground_cycles: u64,
     /// CPU cycles consumed while the application was in the background.

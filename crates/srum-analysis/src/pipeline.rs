@@ -294,9 +294,9 @@ pub fn apply_beaconing_signals(all: &mut [serde_json::Value]) {
         let secs: Vec<i64> = timestamps
             .iter()
             .filter_map(|ts| {
-                chrono::DateTime::parse_from_rfc3339(ts)
+                ts.parse::<jiff::Timestamp>()
                     .ok()
-                    .map(|dt| dt.timestamp())
+                    .map(jiff::Timestamp::as_second)
             })
             .collect();
         if is_beaconing(&secs) {

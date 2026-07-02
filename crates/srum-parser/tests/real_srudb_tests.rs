@@ -256,9 +256,7 @@ fn chainsaw_srudb_timestamps_are_after_windows8_launch() {
     let Some(p) = fixture(CHAINSAW) else { return };
     // SRUM was introduced in Windows 8.1 (Oct 2013). Any timestamp before that
     // indicates a parsing bug — we're decoding the field with the wrong offset or type.
-    let windows81_launch = chrono::DateTime::parse_from_rfc3339("2013-10-17T00:00:00Z")
-        .unwrap()
-        .with_timezone(&chrono::Utc);
+    let windows81_launch: jiff::Timestamp = "2013-10-17T00:00:00Z".parse().unwrap();
     let records = parse_network_usage(p).expect("parse ok");
     for r in &records {
         assert!(

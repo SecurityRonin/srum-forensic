@@ -14,9 +14,9 @@ pub use stats::build_stats;
 /// Returns 0 if either string fails to parse.
 pub(crate) fn iso_diff_secs(a: &str, b: &str) -> i64 {
     let parse = |s: &str| {
-        chrono::DateTime::parse_from_rfc3339(s)
+        s.parse::<jiff::Timestamp>()
             .ok()
-            .map(|dt| dt.timestamp())
+            .map(jiff::Timestamp::as_second)
     };
     match (parse(a), parse(b)) {
         (Some(ta), Some(tb)) => (tb - ta).abs(),

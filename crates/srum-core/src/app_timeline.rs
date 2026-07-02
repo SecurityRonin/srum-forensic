@@ -4,7 +4,7 @@
 //!
 //! Available since Windows 10 Anniversary Update (1607).
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 /// One SRUM Application Timeline record: active engagement time per app
@@ -21,7 +21,7 @@ pub struct AppTimelineRecord {
     /// Integer ID of the user account (look up in [`crate::IdMapEntry`]).
     pub user_id: i32,
     /// UTC timestamp of the measurement interval start.
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     /// Milliseconds the application window had foreground focus.
     pub focus_time_ms: u64,
     /// Milliseconds the user actively provided input to the application.
