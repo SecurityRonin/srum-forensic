@@ -3,11 +3,11 @@ targets = []
 
 [advisories]
 version = 2
-# All entries below are `unmaintained` advisories (not vulnerabilities) on
-# transitive dependencies pulled in by the optional `srum-gui` Tauri front end.
-# None has a safe upgrade path — they ship inside Tauri 2's GTK3/wry stack and
-# its url-pattern parser. The forensic libraries (ese-*, srum-* CLI/parser) do
-# not depend on any of them.
+# All entries below are advisories on transitive dependencies pulled in by the
+# optional `srum-gui` Tauri front end (publish = false). Most are `unmaintained`;
+# one (RUSTSEC-2026-0194) is a `vulnerability` with no upgrade path. None ships in
+# the published forensic libraries (ese-*, srum-* CLI/parser) — they do not depend
+# on any of these crates.
 ignore = [
     # gtk-rs GTK3 bindings — archived/unmaintained, reached via tauri → wry/gtk.
     "RUSTSEC-2024-0411", # gdkwayland-sys
@@ -28,6 +28,12 @@ ignore = [
     "RUSTSEC-2025-0081", # unic-char-property
     "RUSTSEC-2025-0098", # unic-ucd-version
     "RUSTSEC-2025-0100", # unic-ucd-ident
+    # quick-xml quadratic-runtime DoS on duplicate attribute names — a *vulnerability*,
+    # reached ONLY via plist -> tauri -> srum-gui (publish = false). No safe upgrade:
+    # quick-xml 0.39.4 is pinned by Tauri 2's plist. The published forensic crates do
+    # not depend on quick-xml.
+    "RUSTSEC-2026-0194", # quick-xml 0.39.4 (srum-gui Tauri stack only) — quadratic DoS
+    "RUSTSEC-2026-0195", # quick-xml 0.39.4 (srum-gui Tauri stack only) — NsReader alloc DoS
 ]
 
 [licenses]
