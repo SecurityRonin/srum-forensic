@@ -68,3 +68,6 @@ wildcards = "allow"
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# Dev-only ESE fixture builders (ese-test-fixtures, publish = false) sourced by
+# git rev-pin from the fleet ESE repo; never ships in a published/release binary.
+allow-git = ["https://github.com/SecurityRonin/ese-forensic"]

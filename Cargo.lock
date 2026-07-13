@@ -878,43 +878,44 @@ dependencies = [
 ]
 
 [[package]]
-name = "ese-carver"
-version = "0.1.0"
+name = "ese-core"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f09f383a3f89ee8b9a6eded2707ef71d2e90e9612cb75ae7f0ac2691abbd60e"
 dependencies = [
- "ese-core",
- "ese-test-fixtures",
- "tempfile",
+ "memmap2",
+ "serde",
  "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "ese-core"
-version = "0.1.0"
+version = "0.2.1"
+source = "git+https://github.com/SecurityRonin/ese-forensic.git?rev=856758d#856758d1e9899a36684f4d67050b31ee554f87f4"
 dependencies = [
- "ese-test-fixtures",
  "memmap2",
  "serde",
- "tempfile",
  "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "ese-integrity"
-version = "0.3.0"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df0905c886b68f573b1d42991b252f603205b1d6676cedcfb5a99d9fb6bc8e6c"
 dependencies = [
- "ese-core",
- "ese-test-fixtures",
+ "ese-core 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "forensicnomicon",
  "serde",
- "tempfile",
  "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "ese-test-fixtures"
 version = "0.1.0"
+source = "git+https://github.com/SecurityRonin/ese-forensic.git?rev=856758d#856758d1e9899a36684f4d67050b31ee554f87f4"
 dependencies = [
- "ese-core",
+ "ese-core 0.2.1 (git+https://github.com/SecurityRonin/ese-forensic.git?rev=856758d)",
  "tempfile",
 ]
 
@@ -3164,7 +3165,7 @@ dependencies = [
  "anyhow",
  "clap",
  "csv",
- "ese-core",
+ "ese-core 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "ese-test-fixtures",
  "hex",
  "serde",
@@ -3203,7 +3204,7 @@ name = "srum-parser"
 version = "0.3.0"
 dependencies = [
  "anyhow",
- "ese-core",
+ "ese-core 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "ese-integrity",
  "ese-test-fixtures",
  "forensicnomicon",
