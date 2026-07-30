@@ -22,19 +22,19 @@ url = "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml"
 audit-as-crates-io = true
 
 [policy.srum-analysis]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [policy.srum-cli]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [policy.srum-core]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [policy.srum-parser]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [policy.srum-schema]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [[exemptions.aho-corasick]]
 version = "1.1.4"
