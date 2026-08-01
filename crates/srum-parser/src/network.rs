@@ -100,8 +100,20 @@ pub fn decode_network_record(
         data[col_start + 55],
     ]);
 
+    let Some(timestamp) = ole_date_to_datetime(ole_date) else {
+        return Err(SrumError::DecodeError {
+            page,
+            tag,
+            detail: format!(
+                "network OLE timestamp not representable: raw={ole_date} (bits {:#018x}) at offset {}",
+                ole_date.to_bits(),
+                col_start + 8
+            ),
+        });
+    };
+
     Ok(NetworkUsageRecord {
-        timestamp: ole_date_to_datetime(ole_date),
+        timestamp,
         app_id,
         user_id,
         bytes_sent,

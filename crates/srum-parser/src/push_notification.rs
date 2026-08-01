@@ -67,7 +67,16 @@ pub fn decode_push_notification_record(
         data[ts_off + 6],
         data[ts_off + 7],
     ]);
-    let timestamp = ole_date_to_datetime(timestamp_raw);
+    let Some(timestamp) = ole_date_to_datetime(timestamp_raw) else {
+        return Err(SrumError::DecodeError {
+            page,
+            tag,
+            detail: format!(
+                "push notification OLE timestamp not representable: raw={timestamp_raw} (bits {:#018x}) at offset {ts_off}",
+                timestamp_raw.to_bits()
+            ),
+        });
+    };
 
     let app_off = col_start + COL_APP_ID_OFF;
     let app_id = i32::from_le_bytes([

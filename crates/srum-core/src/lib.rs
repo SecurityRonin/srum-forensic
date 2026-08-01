@@ -50,27 +50,38 @@ pub const ID_MAP_MIN_SIZE: usize = 6;
 
 /// Convert a Windows FILETIME value to a UTC [`Timestamp`].
 ///
-/// FILETIME counts 100-nanosecond ticks since 1601-01-01. Values before the
-/// Unix epoch are clamped to `Timestamp::UNIX_EPOCH`.
-pub fn filetime_to_datetime(filetime: u64) -> Timestamp {
-    let unix_100ns = filetime.saturating_sub(FILETIME_EPOCH_OFFSET);
-    let unix_nanos = i128::from(unix_100ns) * 100;
-    Timestamp::from_nanosecond(unix_nanos).unwrap_or(Timestamp::UNIX_EPOCH)
+/// FILETIME counts 100-nanosecond ticks since 1601-01-01.
+///
+/// Returns `None` if `filetime` is zero, predates the Unix epoch, or lands
+/// outside the range representable by a `Timestamp`. Absence is reported
+/// rather than clamped, so an unconvertible value can never masquerade as a
+/// genuine `1970-01-01T00:00:00Z` record.
+pub fn filetime_to_datetime(filetime: u64) -> Option<Timestamp> {
+    if filetime == 0 || filetime < FILETIME_EPOCH_OFFSET {
+        return None;
+    }
+    let unix_100ns = i128::from(filetime - FILETIME_EPOCH_OFFSET);
+    Timestamp::from_nanosecond(unix_100ns * 100).ok()
 }
 
 /// Convert an OLE Automation Date (f64) to a UTC [`Timestamp`].
 ///
 /// OLE date counts days since 1899-12-30. The Unix epoch is 25569 days after
-/// the OLE epoch. Infinite or NaN values are clamped to `Timestamp::UNIX_EPOCH`.
-pub fn ole_date_to_datetime(v: f64) -> Timestamp {
+/// the OLE epoch.
+///
+/// Returns `None` if `v` is infinite or NaN, or if the resulting instant falls
+/// outside the range representable by a `Timestamp`. Absence is reported
+/// rather than clamped, so an unconvertible value can never masquerade as a
+/// genuine `1970-01-01T00:00:00Z` record.
+pub fn ole_date_to_datetime(v: f64) -> Option<Timestamp> {
     const OLE_TO_UNIX_DAYS: f64 = 25569.0;
     if !v.is_finite() {
-        return Timestamp::UNIX_EPOCH;
+        return None;
     }
     let unix_secs_f64 = (v - OLE_TO_UNIX_DAYS) * 86400.0;
     let unix_secs = unix_secs_f64 as i64;
     let nanos = ((unix_secs_f64 - unix_secs as f64).abs() * 1_000_000_000.0) as u32;
-    Timestamp::new(unix_secs, nanos as i32).unwrap_or(Timestamp::UNIX_EPOCH)
+    Timestamp::new(unix_secs, nanos as i32).ok()
 }
 
 #[cfg(test)]
@@ -79,7 +90,7 @@ mod tests {
 
     #[test]
     fn filetime_to_datetime_unix_epoch() {
-        let dt = filetime_to_datetime(FILETIME_EPOCH_OFFSET);
+        let dt = filetime_to_datetime(FILETIME_EPOCH_OFFSET).unwrap();
         assert_eq!(dt.as_second(), 0, "must map to Unix epoch");
     }
 
@@ -87,7 +98,7 @@ mod tests {
     fn filetime_to_datetime_known_date() {
         // 2024-06-15T08:00:00Z = Unix 1718438400
         let filetime = FILETIME_EPOCH_OFFSET + 1_718_438_400u64 * 10_000_000;
-        let dt = filetime_to_datetime(filetime);
+        let dt = filetime_to_datetime(filetime).unwrap();
         assert_eq!(dt.as_second(), 1_718_438_400);
     }
 
@@ -96,7 +107,7 @@ mod tests {
         // OFFSET + 12345 ticks (100ns each) = 1970-01-01T00:00:00.001234500Z.
         // Ground truth derived from the documented FILETIME math:
         // 12345 * 100 ns = 1_234_500 ns after the Unix epoch.
-        let dt = filetime_to_datetime(FILETIME_EPOCH_OFFSET + 12_345);
+        let dt = filetime_to_datetime(FILETIME_EPOCH_OFFSET + 12_345).unwrap();
         assert_eq!(dt.as_second(), 0);
         assert_eq!(dt.as_nanosecond(), 1_234_500_i128);
     }
@@ -104,7 +115,7 @@ mod tests {
     #[test]
     fn ole_date_to_datetime_unix_epoch() {
         // OLE epoch is 1899-12-30; the Unix epoch is 25569 days later.
-        let dt = ole_date_to_datetime(25569.0);
+        let dt = ole_date_to_datetime(25569.0).unwrap();
         assert_eq!(dt.as_second(), 0, "OLE day 25569 == Unix epoch");
     }
 
@@ -114,14 +125,30 @@ mod tests {
         // truncation artifacts) == 2023-03-15T00:00:00Z == Unix 1678838400.
         // Ground truth derived from the documented OLE conversion:
         // (45000 - 25569) * 86400 = 19431 * 86400 = 1678838400.
-        let dt = ole_date_to_datetime(45000.0);
+        let dt = ole_date_to_datetime(45000.0).unwrap();
         assert_eq!(dt.as_second(), 1_678_838_400);
     }
 
     #[test]
-    fn ole_date_to_datetime_non_finite_clamps_to_epoch() {
-        assert_eq!(ole_date_to_datetime(f64::NAN).as_second(), 0);
-        assert_eq!(ole_date_to_datetime(f64::INFINITY).as_second(), 0);
+    fn ole_date_to_datetime_non_finite_is_absent() {
+        assert!(ole_date_to_datetime(f64::NAN).is_none());
+        assert!(ole_date_to_datetime(f64::INFINITY).is_none());
+        assert!(ole_date_to_datetime(f64::NEG_INFINITY).is_none());
+    }
+
+    #[test]
+    fn filetime_to_datetime_pre_epoch_is_absent() {
+        assert!(filetime_to_datetime(0).is_none(), "unset FILETIME");
+        assert!(
+            filetime_to_datetime(FILETIME_EPOCH_OFFSET - 1).is_none(),
+            "one tick before the Unix epoch"
+        );
+    }
+
+    #[test]
+    fn ole_date_to_datetime_out_of_range_is_absent() {
+        assert!(ole_date_to_datetime(1e18).is_none());
+        assert!(ole_date_to_datetime(-1e18).is_none());
     }
 
     // Fail-loud: an unconvertible input must never masquerade as a real
