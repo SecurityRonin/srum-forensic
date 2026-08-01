@@ -124,6 +124,55 @@ mod tests {
         assert_eq!(ole_date_to_datetime(f64::INFINITY).as_second(), 0);
     }
 
+    // Fail-loud: an unconvertible input must never masquerade as a real
+    // instant. Each test compares the garbage input against the *genuine*
+    // 1970-01-01T00:00:00Z a legitimate input produces, so it asserts
+    // distinguishability rather than any particular sentinel.
+
+    #[test]
+    fn pre_epoch_filetime_is_distinguishable_from_genuine_epoch() {
+        let genuine_epoch = filetime_to_datetime(FILETIME_EPOCH_OFFSET);
+        assert_ne!(
+            filetime_to_datetime(0),
+            genuine_epoch,
+            "FILETIME 0 (unset) must be distinguishable from a genuine 1970-01-01 record"
+        );
+        assert_ne!(
+            filetime_to_datetime(FILETIME_EPOCH_OFFSET - 1),
+            genuine_epoch,
+            "a pre-epoch FILETIME must be distinguishable from a genuine 1970-01-01 record"
+        );
+    }
+
+    #[test]
+    fn non_finite_ole_date_is_distinguishable_from_genuine_epoch() {
+        let genuine_epoch = ole_date_to_datetime(25569.0);
+        for garbage in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_ne!(
+                ole_date_to_datetime(garbage),
+                genuine_epoch,
+                "non-finite OLE date {garbage} must be distinguishable from a genuine 1970-01-01 record"
+            );
+        }
+    }
+
+    #[test]
+    fn out_of_range_ole_date_is_distinguishable_from_genuine_epoch() {
+        // Far outside the representable Timestamp range: the seconds cast
+        // saturates and the Timestamp construction fails.
+        let genuine_epoch = ole_date_to_datetime(25569.0);
+        assert_ne!(
+            ole_date_to_datetime(1e18),
+            genuine_epoch,
+            "an out-of-range OLE date must be distinguishable from a genuine 1970-01-01 record"
+        );
+        assert_ne!(
+            ole_date_to_datetime(-1e18),
+            genuine_epoch,
+            "an out-of-range negative OLE date must be distinguishable from a genuine 1970-01-01 record"
+        );
+    }
+
     #[test]
     fn record_size_constants_are_32() {
         assert_eq!(NETWORK_RECORD_SIZE, 32usize);
