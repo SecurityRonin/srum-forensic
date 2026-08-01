@@ -35,7 +35,10 @@ pub fn build_sessions(all: &[serde_json::Value]) -> Vec<serde_json::Value> {
 
     let mut sessions: Vec<serde_json::Value> = Vec::new();
     let mut iter = present_ts.iter();
-    let first = iter.next().unwrap();
+    // let-else instead of the is_empty() guard above proving next() is Some.
+    let Some(first) = iter.next() else {
+        return vec![];
+    };
     let mut session_start = first.clone();
     let mut session_end = first.clone();
     let mut session_input: u64 = input_by_ts.get(first).copied().unwrap_or(0);

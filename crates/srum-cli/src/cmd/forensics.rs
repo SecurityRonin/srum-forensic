@@ -140,27 +140,27 @@ pub fn run_compare(
             if let Some(arr) = result.get("new_processes").and_then(|v| v.as_array()) {
                 for r in arr {
                     let mut r = r.clone();
-                    r.as_object_mut()
-                        .unwrap()
-                        .insert("diff_type".into(), "new".into());
+                    if let Some(map) = r.as_object_mut() {
+                        map.insert("diff_type".into(), "new".into());
+                    }
                     flat.push(r);
                 }
             }
             if let Some(arr) = result.get("changed").and_then(|v| v.as_array()) {
                 for r in arr {
                     let mut r = r.clone();
-                    r.as_object_mut()
-                        .unwrap()
-                        .insert("diff_type".into(), "changed".into());
+                    if let Some(map) = r.as_object_mut() {
+                        map.insert("diff_type".into(), "changed".into());
+                    }
                     flat.push(r);
                 }
             }
             if let Some(arr) = result.get("departed_processes").and_then(|v| v.as_array()) {
                 for r in arr {
                     let mut r = r.clone();
-                    r.as_object_mut()
-                        .unwrap()
-                        .insert("diff_type".into(), "departed".into());
+                    if let Some(map) = r.as_object_mut() {
+                        map.insert("diff_type".into(), "departed".into());
+                    }
                     flat.push(r);
                 }
             }

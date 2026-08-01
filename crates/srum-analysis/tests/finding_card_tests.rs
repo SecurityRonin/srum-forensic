@@ -2,6 +2,8 @@
 //! model, mapping the triage vocabulary (Clean/Informational/Suspicious/Critical)
 //! onto the 5-level scale.
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use forensicnomicon::report::{Severity as Canon, Source};
 use srum_analysis::record::{FindingCard, Severity};
 

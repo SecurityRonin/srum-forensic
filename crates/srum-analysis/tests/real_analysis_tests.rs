@@ -1,5 +1,7 @@
 //! Integration tests for srum-analysis against real SRUDB.dat fixtures.
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use srum_analysis::{
     analysis::{build_stats, compare_databases},
     pipeline::build_timeline,

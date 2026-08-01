@@ -60,20 +60,28 @@ tauri               = { version = "2" }
 tauri-build         = { version = "2" }
 tauri-plugin-dialog = "2"
 
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
 [workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
-must_use_candidate = "allow"
-missing_errors_doc = "allow"
-missing_panics_doc = "allow"
-module_name_repetitions = "allow"
-cast_possible_truncation = "allow"
-cast_possible_wrap = "allow"
-cast_sign_loss = "allow"
-cast_precision_loss = "allow"
-too_many_lines = "allow"
-needless_pass_by_value = "allow"
-map_unwrap_or = "allow"
-items_after_statements = "allow"
-implicit_hasher = "allow"
-similar_names = "allow"
-return_self_not_must_use = "allow"
+correctness = "deny"
+suspicious = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+must_use_candidate = { level = "allow", priority = 1 }
+missing_errors_doc = { level = "allow", priority = 1 }
+missing_panics_doc = { level = "allow", priority = 1 }
+module_name_repetitions = { level = "allow", priority = 1 }
+cast_possible_truncation = { level = "allow", priority = 1 }
+cast_possible_wrap = { level = "allow", priority = 1 }
+cast_sign_loss = { level = "allow", priority = 1 }
+cast_precision_loss = { level = "allow", priority = 1 }
+too_many_lines = { level = "allow", priority = 1 }
+needless_pass_by_value = { level = "allow", priority = 1 }
+map_unwrap_or = { level = "allow", priority = 1 }
+items_after_statements = { level = "allow", priority = 1 }
+implicit_hasher = { level = "allow", priority = 1 }
+similar_names = { level = "allow", priority = 1 }
+return_self_not_must_use = { level = "allow", priority = 1 }

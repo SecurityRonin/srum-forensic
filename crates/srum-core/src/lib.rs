@@ -3,6 +3,8 @@
 //! These are pure data types with no parsing logic.
 //! Parsing is handled by the `srum-parser` crate.
 
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+
 pub mod app_timeline;
 pub mod app_usage;
 pub mod connectivity;

@@ -42,20 +42,15 @@ pub fn compare_databases(
     // Departed: in baseline but not in suspect.
     for (key, bv) in &baseline_map {
         if !suspect_map.contains_key(key) {
-            let mut entry = serde_json::json!({});
+            // Built as a Map, so there is no Value to re-prove is an object.
+            let mut entry = serde_json::Map::new();
             if let Some(id) = bv.get("app_id") {
-                entry
-                    .as_object_mut()
-                    .unwrap()
-                    .insert("app_id".into(), id.clone());
+                entry.insert("app_id".into(), id.clone());
             }
             if let Some(name) = bv.get("app_name") {
-                entry
-                    .as_object_mut()
-                    .unwrap()
-                    .insert("app_name".into(), name.clone());
+                entry.insert("app_name".into(), name.clone());
             }
-            departed_processes.push(entry);
+            departed_processes.push(serde_json::Value::Object(entry));
         }
     }
 
@@ -108,24 +103,17 @@ pub fn compare_databases(
             let delta_bg = s_bg - b_bg;
 
             if !new_flags.is_empty() || delta_bytes != 0 || delta_bg != 0 {
-                let mut entry = serde_json::json!({
-                    "new_flags": new_flags,
-                    "delta_bytes_sent": delta_bytes,
-                    "delta_background_cycles": delta_bg,
-                });
+                let mut entry = serde_json::Map::new();
+                entry.insert("new_flags".into(), serde_json::json!(new_flags));
+                entry.insert("delta_bytes_sent".into(), delta_bytes.into());
+                entry.insert("delta_background_cycles".into(), delta_bg.into());
                 if let Some(id) = sv.get("app_id") {
-                    entry
-                        .as_object_mut()
-                        .unwrap()
-                        .insert("app_id".into(), id.clone());
+                    entry.insert("app_id".into(), id.clone());
                 }
                 if let Some(name) = sv.get("app_name") {
-                    entry
-                        .as_object_mut()
-                        .unwrap()
-                        .insert("app_name".into(), name.clone());
+                    entry.insert("app_name".into(), name.clone());
                 }
-                changed.push(entry);
+                changed.push(serde_json::Value::Object(entry));
             }
         }
     }

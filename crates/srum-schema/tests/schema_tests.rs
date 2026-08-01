@@ -2,6 +2,8 @@
 //!
 //! GUIDs match forensicnomicon constants and the existing srum-cli/srum-parser codebase.
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use srum_schema::{all_srum_tables, srum_column_defs, srum_table_name};
 
 // ── story 1/2: srum_table_name ────────────────────────────────────────────────

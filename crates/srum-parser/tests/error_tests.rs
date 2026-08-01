@@ -1,4 +1,7 @@
 //! Tests for `SrumError`.
+
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use srum_parser::SrumError;
 
 #[test]
