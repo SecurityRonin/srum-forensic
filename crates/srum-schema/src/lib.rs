@@ -4,6 +4,8 @@
 //! column definitions. All data is baked in at compile time — zero allocations
 //! at lookup time.
 
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+
 mod columns;
 mod tables;
 

@@ -104,18 +104,14 @@ pub fn build_stats(all: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
                 "heuristic_flags": flags,
                 "flag_count": flag_count,
             });
-            if let (Some(f), Some(l)) = (s.first_seen, s.last_seen) {
-                obj.as_object_mut()
-                    .unwrap()
-                    .insert("first_seen".into(), f.into());
-                obj.as_object_mut()
-                    .unwrap()
-                    .insert("last_seen".into(), l.into());
-            }
-            if let Some(name) = s.app_name {
-                obj.as_object_mut()
-                    .unwrap()
-                    .insert("app_name".into(), name.into());
+            if let Some(map) = obj.as_object_mut() {
+                if let (Some(f), Some(l)) = (s.first_seen, s.last_seen) {
+                    map.insert("first_seen".into(), f.into());
+                    map.insert("last_seen".into(), l.into());
+                }
+                if let Some(name) = s.app_name {
+                    map.insert("app_name".into(), name.into());
+                }
             }
             obj
         })

@@ -1,4 +1,6 @@
 //! SRUDB.dat fixture builder for srum-parser integration tests.
+
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 #![allow(dead_code)]
 
 use ese_core::{CatalogEntry, DB_STATE_CLEAN_SHUTDOWN};

@@ -12,6 +12,8 @@
 //!   - `chainsaw_SRUDB.dat` — `WithSecure` Labs / Chainsaw test suite (Apache-2.0)
 //!   - `plaso_SRUDB.dat`   — log2timeline / Plaso regression test   (Apache-2.0)
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use std::path::Path;
 
 use ese_core::EseDatabase;

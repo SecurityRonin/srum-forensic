@@ -4,6 +4,8 @@
 //! `C:\Windows\System32\sru\SRUDB.dat`. On a live system it is locked;
 //! forensic analysis always operates on a copy.
 
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+
 mod app_timeline;
 mod app_usage;
 mod connectivity;

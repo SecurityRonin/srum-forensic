@@ -1,5 +1,7 @@
 //! Integration tests for srum-network-parsing story.
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use srum_parser::parse_network_usage;
 
 #[test]

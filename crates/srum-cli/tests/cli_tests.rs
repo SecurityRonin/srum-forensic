@@ -1,5 +1,7 @@
 //! Integration tests for the `sr` CLI binary.
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use std::process::Command;
 
 fn sr_bin() -> Command {

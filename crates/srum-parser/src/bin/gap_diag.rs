@@ -18,7 +18,13 @@ fn main() {
             println!("{name}: MISSING");
             continue;
         }
-        let db = EseDatabase::open(path).expect("open");
+        let db = match EseDatabase::open(path) {
+            Ok(db) => db,
+            Err(e) => {
+                println!("{name}: open failed: {e}");
+                continue;
+            }
+        };
         let Ok(cursor) = db.table_records(TABLE_APP_RESOURCE_USAGE) else {
             println!("{name}: table missing");
             continue;

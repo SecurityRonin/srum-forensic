@@ -6,6 +6,8 @@
 //! All other SRUM implementations (srum-dump, `SrumECmd`) return empty results
 //! for absent tables rather than propagating an error.
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 mod fixtures;
 
 use fixtures::make_srudb_with_network_records;
