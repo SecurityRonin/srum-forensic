@@ -50,3 +50,31 @@ pub fn print_values(values: &[serde_json::Value], format: &OutputFormat) -> anyh
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// SRUM cells carry values SRUM recorded from the system, not values the
+    /// examiner typed: an `AppId` is an executable path or package name, an
+    /// interface entry carries an SSID. A cell beginning `=`, `+`, `-` or `@`
+    /// executes as a formula the moment the examiner opens the CSV.
+    #[test]
+    fn csv_neutralizes_formula_lead_ins() {
+        for lead in ['=', '+', '-', '@'] {
+            let payload = format!("{lead}cmd|'/c calc'!A1");
+            let values = vec![serde_json::json!({
+                "app_id": payload.clone(),
+                "user_sid": payload.clone(),
+            })];
+            let csv = values_to_csv(&values).unwrap();
+            let row = csv.lines().nth(1).unwrap();
+            for cell in row.split(',') {
+                assert!(
+                    !cell.trim_matches('"').starts_with(lead),
+                    "unguarded formula cell {cell:?} in row: {row}"
+                );
+            }
+        }
+    }
+}
