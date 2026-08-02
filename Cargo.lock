@@ -1843,6 +1843,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonguard"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd01eca4cd153fbfbe7963679c361528ecd994e262488b3e1773bcd09cc10729"
+
+[[package]]
 name = "jsonptr"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3168,6 +3174,7 @@ dependencies = [
  "ese-core 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "ese-test-fixtures",
  "hex",
+ "jsonguard",
  "serde",
  "serde_json",
  "sha2",

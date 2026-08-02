@@ -7,6 +7,23 @@ pub enum OutputFormat {
     Ndjson,
 }
 
+/// Neutralize a spreadsheet formula lead-in, leaving RFC 4180 quoting to the
+/// `csv` writer.
+///
+/// `jsonguard` owns the decision — which characters are lead-ins, and that a
+/// lead-in hidden behind leading whitespace still counts — so that rule lives
+/// in one place for the whole fleet. The apostrophe is the standard
+/// neutralization. `jsonguard::csv_field` is deliberately *not* used here: it
+/// quotes as well as guards, and the `csv` writer would then quote the result a
+/// second time.
+fn guard_cell(s: String) -> String {
+    if jsonguard::inspect(s.as_str()).has_formula() {
+        format!("'{s}")
+    } else {
+        s
+    }
+}
+
 /// Render a slice of JSON objects as CSV text.
 ///
 /// Column order follows the key order of the first object.  Missing keys in
@@ -25,10 +42,12 @@ pub fn values_to_csv(values: &[serde_json::Value]) -> anyhow::Result<String> {
         if let serde_json::Value::Object(m) = v {
             let row: Vec<String> = headers
                 .iter()
-                .map(|k| match m.get(k) {
-                    Some(serde_json::Value::String(s)) => s.clone(),
-                    Some(val) => val.to_string(),
-                    None => String::new(),
+                .map(|k| {
+                    guard_cell(match m.get(k) {
+                        Some(serde_json::Value::String(s)) => s.clone(),
+                        Some(val) => val.to_string(),
+                        None => String::new(),
+                    })
                 })
                 .collect();
             wtr.write_record(&row)?;
