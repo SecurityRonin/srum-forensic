@@ -1,6 +1,6 @@
 [package]
 name = "srum-core"
-version = "0.2.0"
+version = "0.3.0"
 description = "SRUM (System Resource Usage Monitor) record type definitions"
 edition.workspace = true
 rust-version.workspace = true

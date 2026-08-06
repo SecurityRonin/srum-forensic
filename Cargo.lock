@@ -3153,7 +3153,7 @@ dependencies = [
 
 [[package]]
 name = "srum-analysis"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "forensicnomicon",
@@ -3166,7 +3166,7 @@ dependencies = [
 
 [[package]]
 name = "srum-cli"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -3185,7 +3185,7 @@ dependencies = [
 
 [[package]]
 name = "srum-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "jiff",
  "serde",
@@ -3208,7 +3208,7 @@ dependencies = [
 
 [[package]]
 name = "srum-parser"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "ese-core 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",

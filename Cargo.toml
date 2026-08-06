@@ -52,10 +52,10 @@ ese-integrity     = "0.3"
 # Dev-only fixture builders; unpublishable (publish = false), sourced via git rev-pin.
 ese-test-fixtures = { git = "https://github.com/SecurityRonin/ese-forensic.git", rev = "856758d" }
 forensicnomicon   = "1"
-srum-core         = { path = "crates/srum-core", version = "0.2.0" }
-srum-parser       = { path = "crates/srum-parser", version = "0.3.0" }
+srum-core         = { path = "crates/srum-core", version = "0.3.0" }
+srum-parser       = { path = "crates/srum-parser", version = "0.4.0" }
 srum-schema       = { path = "crates/srum-schema" }
-srum-analysis     = { path = "crates/srum-analysis", version = "0.4.0" }
+srum-analysis     = { path = "crates/srum-analysis", version = "0.4.1" }
 
 # GUI
 tauri               = { version = "2" }
