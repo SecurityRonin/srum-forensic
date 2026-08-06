@@ -5,6 +5,14 @@
 //! - `srum4n6 apps <path>`   — parse and print application usage records as JSON
 //! - `srum4n6 idmap <path>`  — dump the `SruDbIdMapTable` as JSON
 
+// `unwrap_used`/`expect_used` are denied in production code because a SRUM
+// database is attacker-influenced input. A test asserting on a known fixture is
+// not that: there, an unwrap IS the assertion, and forcing `?` or a match would
+// only obscure which line failed. This is the fleet-standard escape hatch (280
+// crates carry the identical attribute), scoped to `cfg(test)` so production
+// paths keep the deny.
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
