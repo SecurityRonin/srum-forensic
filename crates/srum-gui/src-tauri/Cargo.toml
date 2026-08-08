@@ -2,7 +2,11 @@
 name = "srum-gui"
 version = "0.1.0"
 edition.workspace = true
-rust-version.workspace = true
+# A binary, so its floor IS the pinned toolchain (rust-toolchain.toml):
+# nothing pins a library dependency against it, so there is no low-MSRV
+# promise to keep. The workspace 1.80 it used to inherit was a claim its
+# own dependency graph could not satisfy.
+rust-version = "1.96.0"
 license.workspace = true
 publish = false
 description = "SRUM Examiner — graphical SRUM forensic investigation tool"
