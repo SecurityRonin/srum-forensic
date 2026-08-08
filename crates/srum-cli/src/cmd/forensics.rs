@@ -85,10 +85,10 @@ fn collect_metadata(path: &Path) -> anyhow::Result<serde_json::Value> {
     let mut last_ts: Option<String> = None;
     for v in &all {
         if let Some(ts) = v.get("timestamp").and_then(|x| x.as_str()) {
-            if first_ts.as_deref().map_or(true, |f: &str| ts < f) {
+            if first_ts.as_deref().is_none_or(|f: &str| ts < f) {
                 first_ts = Some(ts.to_owned());
             }
-            if last_ts.as_deref().map_or(true, |l: &str| ts > l) {
+            if last_ts.as_deref().is_none_or(|l: &str| ts > l) {
                 last_ts = Some(ts.to_owned());
             }
         }
