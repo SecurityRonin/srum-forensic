@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3](https://github.com/SecurityRonin/srum-forensic/compare/srum-cli-v0.3.2...srum-cli-v0.3.3) - 2026-08-08
+
+### Fixed
+
+- *(clippy)* use is_none_or now that the declared MSRV reaches it
+- *(msrv)* declare the binaries' real floor instead of inheriting 1.80
+
 ## [0.3.2](https://github.com/SecurityRonin/srum-forensic/compare/srum-cli-v0.3.1...srum-cli-v0.3.2) - 2026-08-06
 
 ### Fixed
